@@ -1,17 +1,18 @@
-# Contributing
+# 기여 가이드
 
-See the project-wide Gitmoji and pull request rules below.
+다음 Gitmoji 및 PR 규칙은 프로젝트 전체에서 동일하게 적용합니다.
 
-PR titles must use `<gitmoji> <type>(optional-scope): <description>`.
+PR 제목은 `<gitmoji> <type>(optional-scope): <description>` 형식을 사용합니다.
 
-Examples:
+예시:
 
 ```text
-✨ feat: add user registration endpoint
-🐛 fix(auth): reject expired refresh tokens
-✅ test: cover duplicate email registration
+✨ feat: 회원가입 endpoint 추가
+🐛 fix(auth): 만료된 refresh token 거부
+✅ test: 중복 이메일 가입 검사 추가
 ```
 
-All changes to `main` and `development` must use a pull request, pass required
-checks, resolve review conversations, and use squash merge.
-
+`main`과 `development`의 모든 변경은 PR을 사용해야 합니다. 필수 검사를
+통과하고 모든 review conversation을 해결한 후 squash merge합니다. 자동
+브랜치 삭제는 사용하지 않으며 작업 브랜치는 sprint 정리 시 수동으로
+삭제합니다.
