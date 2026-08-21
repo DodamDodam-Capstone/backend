@@ -1,25 +1,28 @@
-## Summary
+## 요약
 
-<!-- Explain what changed and why. -->
+<!-- 무엇을 왜 변경했는지 설명해 주세요. -->
 
-## Related issue
+## Jira 작업
 
-<!-- Example: Closes #123 -->
+<!-- 예: DOD-123. Jira 연동 전이거나 해당 사항이 없으면 "없음"으로 작성합니다. -->
 
-## Changes
+## 관련 GitHub 이슈
+
+<!-- 예: Resolves #123 -->
+
+## 변경 사항
 
 -
 
-## API/Database impact
+## API 및 데이터베이스 영향
 
-- [ ] No API contract change
-- [ ] No database migration
-- [ ] API documentation or migration was updated
+- [ ] API contract 변경 없음
+- [ ] database migration 없음
+- [ ] API 문서 또는 migration을 갱신함
 
-## Verification
+## 검증
 
-- [ ] I ran the relevant checks locally.
-- [ ] I added or updated tests where appropriate.
-- [ ] I confirmed no secrets or generated files are included.
-- [ ] The PR title follows `🐛 fix: description` style.
-
+- [ ] 관련 검사를 로컬에서 실행했습니다.
+- [ ] 필요한 테스트를 추가하거나 수정했습니다.
+- [ ] 비밀정보와 생성 파일이 포함되지 않았는지 확인했습니다.
+- [ ] PR 제목이 `🐛 fix: 설명` 형식을 따릅니다.
