@@ -293,7 +293,9 @@ ARM64 image, 일반 Windows PC에서는 AMD64 image가 자동 선택됩니다. `
 | Java compiler argument | Spring Boot plugin이 `-parameters` 제공 | 명시적 중복 제거 |
 | Gradle Wrapper | 9.7.1 | 정상 |
 | Gradle JVM | `#PROJECT_JDK (openjdk-25)` + Daemon criteria 25 | 정상 |
+| Gradle distribution/build/test | Wrapper / Gradle / Gradle | 프로젝트 기본값·CI와 일치 |
 | Gradle Java toolchain | Oracle OpenJDK 25 `aarch64` 탐지 | 정상 |
+| IntelliJ runtime | Bundled JetBrains Runtime(JBR) | Project SDK와 분리 유지 |
 | Spring/Gradle/Java plugin | IntelliJ Ultimate에 포함 | 정상 |
 | Docker Engine/Compose | 29.5.3 ARM64 / Compose 5.1.4 | daemon 연결 및 Compose 해석 정상 |
 
@@ -579,6 +581,7 @@ docker compose config --quiet
 | `./gradlew --version` | Gradle 9.7.1, Daemon criteria Java 25, macOS ARM64 확인 |
 | `./gradlew javaToolchains` | Oracle OpenJDK 25 `aarch64` JDK 탐지 |
 | `./gradlew clean check --no-daemon` | 성공, 테스트 2개/실패 0/오류 0 |
+| `./gradlew test --rerun-tasks --no-daemon` | 컴파일러 중복 제거 후 테스트 2개 재실행, 실패 0/오류 0 |
 | `docker compose --env-file .env.example config --quiet` | 성공 |
 | `docker build -t dodamdodam-backend:local .` | Eclipse Temurin 25 build/JRE image ARM64 빌드 성공 |
 
