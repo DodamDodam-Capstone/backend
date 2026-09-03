@@ -72,4 +72,6 @@ docker compose stop
 Organization 전체 협업 흐름은
 [integration 저장소 문서](https://github.com/DodamDodam-Capstone/integration/blob/main/docs/GITHUB_WORKFLOW.md)에서
 관리합니다. 기능 변경은 작업 브랜치에서 `development`로 squash merge하고,
-검증된 `development`는 보호된 PR과 승인을 거쳐 `main`에 반영합니다.
+검증된 `development`는 보호된 PR과 승인을 거쳐 merge commit으로 `main`에
+반영합니다. `main` 대상 PR의 source branch는 `development`만 허용하며 긴급
+수정도 먼저 `development`에 반영합니다.
