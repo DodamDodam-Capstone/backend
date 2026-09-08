@@ -1,0 +1,52 @@
+name: dodamdodam-backend
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dodamdodam}
+      POSTGRES_USER: ${POSTGRES_USER:-dodamdodam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dodamdodam_local}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    profiles: ["full"]
+    image: dodamdodam-backend:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dodamdodam}
+      DB_USERNAME: ${POSTGRES_USER:-dodamdodam}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dodamdodam_local}
+      SERVER_PORT: 8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-local-google-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-local-google-client-secret}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-local-kakao-client-id}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-local-kakao-client-secret}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      APP_LOGIN_SUCCESS_URL: ${APP_LOGIN_SUCCESS_URL:-http://localhost:5173/oauth/callback}
+      APP_LOGOUT_SUCCESS_URL: ${APP_LOGOUT_SUCCESS_URL:-http://localhost:5173}
+      SESSION_COOKIE_SECURE: "false"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

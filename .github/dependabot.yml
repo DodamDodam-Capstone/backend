@@ -1,5 +1,25 @@
 version: 2
 updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: development
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "⬆️ deps"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: development
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "⬆️ deps"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
