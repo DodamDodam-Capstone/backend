@@ -62,6 +62,8 @@ docker compose stop
 
 ## 문서
 
+- [P0 통합 요구사항·API·ERD·다이어그램 v3.1](docs/p0/README.md)
+
 - [개발환경 설치·실행 가이드](docs/DEVELOPMENT_SETUP.md)
 - [IntelliJ·JDK·Docker 상세 설정](docs/DEVELOPMENT_SETUP.md#5-intellij-idea-설정)
 - [Backend 팀 업무 실행 가이드](docs/TEAM_WORKFLOW_GUIDE.md)
