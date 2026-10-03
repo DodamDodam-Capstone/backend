@@ -1,0 +1,199 @@
+{
+  "mermaidVersion": "11.12.2",
+  "scope": "Parsed and rendered offline; diagram semantics reviewed separately",
+  "count": 32,
+  "diagrams": [
+    {
+      "id": "fe-conversation-lifecycle",
+      "title": "종료 확인은 내용 없는 두 종류 응답",
+      "file": "README.md",
+      "sha256": "87cdfd472cf81d7f0c2caff7444e47f03a7e56598539b3312bf87935b09669ea"
+    },
+    {
+      "id": "api-integrated-ownership",
+      "title": "13.1. 담당과 데이터 경계",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "cf362069cb311edeb3f2f4746e7bce6e7b2c90afba72680d8dc85bda2fe6182d"
+    },
+    {
+      "id": "api-integrated-request-checks",
+      "title": "13.2. 요청 검사와 공통 오류 우선순위",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "2151aefd4915f760151e08062b0920f83d36f367c9c1e1539729c929293aff4f"
+    },
+    {
+      "id": "api-integrated-email-verification",
+      "title": "13.3. 이메일 번호 확인과 일회성 업무 권한",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "0a90e58cc8208c1be6263b018a84810c2c497cea6dba803ec5df9c876787831d"
+    },
+    {
+      "id": "api-integrated-login-entry",
+      "title": "13.4. 로그인·프로필·아이 홈 진입과 로그아웃",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "0c171fe7998183f79cb147f3ea6a2dc99e906403b5fb48a16ccd3b54ade1e8d2"
+    },
+    {
+      "id": "api-integrated-guardian-access",
+      "title": "13.5. PIN 설정·확인·잠금과 이메일 재설정",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "69c54ef103401de2f6dcbd03f71427db58c7a465214868b1702e06d1806edc68"
+    },
+    {
+      "id": "api-integrated-password-reset",
+      "title": "13.6. 비밀번호 재설정과 모든 이전 로그인 무효화",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "f31757f894089a323c648b725f2fdad61cec623a93e2917f047728e3fd95f857"
+    },
+    {
+      "id": "api-integrated-start-resume",
+      "title": "13.7. 새 대화 시작과 화면 재진입 복원",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "7b25f6a202e5e57deff5864106989abfc6cf58ec974251032d3df3088a704499"
+    },
+    {
+      "id": "api-integrated-voice-async",
+      "title": "13.8. 음성 발화 접수와 동기·비동기 결과",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "886378fe03e3468d0e5738390b0945dfefa1777275979bd091497252a2cb1851"
+    },
+    {
+      "id": "api-integrated-idempotency-recovery",
+      "title": "13.9. 발화 중복 키와 응답 유실 복구",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "7d1c863aa06430ac356d27ad7c1e29116de176f3a1ac3f4fae946db454e6395c"
+    },
+    {
+      "id": "api-integrated-end-recovery",
+      "title": "13.10. 수동·자정 종료와 기존 세션의 종료 확인",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "3a62f88d692411fb73d8d81bc882e42e695fe44a6c38f62192f95bef04904144"
+    },
+    {
+      "id": "api-integrated-temporary-audio",
+      "title": "13.11. 임시 응답 음성의 시간·권한·수명 검사",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "0900ee8fe2b308db491ed36c06a21251c7e7e19b9db73cedeb060a357bf50d9f"
+    },
+    {
+      "id": "api-integrated-visibility",
+      "title": "13.12. 텍스트·요약·음성의 개별 공개 허용",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "8615765bf9a679e062f30e215ab989ebb20f8b488a56f178e68af4853626f1b4"
+    },
+    {
+      "id": "api-integrated-record-pagination",
+      "title": "13.13. 보호자 목록 검색과 전체 발화 이어 읽기",
+      "file": "Integrated_API_Spec.md",
+      "sha256": "7eea95aa4f2d22dc7a1567a5839bd13088c7d9b51d685e2b0f8ebd3b8714b18a"
+    },
+    {
+      "id": "erd-integrated-ownership",
+      "title": "2.1 전체 소유권·관계",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "b618597b6eb60204cb466b6fa66303433966d97233dc8f9b34debe31cdd6e535"
+    },
+    {
+      "id": "erd-part1-account-auth-pin",
+      "title": "2.3 Part 1 상세 — 계정·아이·인증·PIN",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "8705768d67768f47655a3ab75c40fb80af38ce107c54bbd64be9d2ca86c6c5dd"
+    },
+    {
+      "id": "erd-part2-conversation-turn-audio",
+      "title": "2.4 Part 2 상세 — 대화·발화·연결·임시 음성",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "01308481bbd7a4ba2da41de46f6c10365c2933c9c4a66833176b7b96c11faf78"
+    },
+    {
+      "id": "erd-session-conversation-recovery",
+      "title": "5.3 conversation_session_links",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "e49bafbf756f7f6e9a0e0cdf6b8bad72aab56933949ae4c92488a9cee01791c2"
+    },
+    {
+      "id": "erd-cleanup-reference-order",
+      "title": "9.2 FK와 권한을 보존하는 정리 절차",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "3b4163d6721f1bf659c4d36cd540d8517d782aa1319285659a528475a82cabba"
+    },
+    {
+      "id": "erd-migration-dependency-order",
+      "title": "10.1 구현 의존 순서",
+      "file": "Integrated_ERD_Design.md",
+      "sha256": "bb8e16491f141a727a67ce5b87f64998fab5e5085cf2d0e7533edc9a47a10d86"
+    },
+    {
+      "id": "req-common-architecture",
+      "title": "적용 범위와 책임",
+      "file": "requirements/P0_Common_Spec.md",
+      "sha256": "bb3df97abdfbb12e1850fed6aeba44c64449ec714517d9cbc39856dd6f54690a"
+    },
+    {
+      "id": "req-common-product-flow",
+      "title": "전체 기능 연결",
+      "file": "requirements/P0_Common_Spec.md",
+      "sha256": "6eef0804065947f03b96e7ac74be30c30ad5c96036829bd0daa2adfc29a68d3d"
+    },
+    {
+      "id": "req-common-erd",
+      "title": "통합 ERD의 공통 관계",
+      "file": "requirements/P0_Common_Spec.md",
+      "sha256": "14055e5505ac5fa7b4b8f4d8a002486c6b889788400839b47788817e6d6b77b5"
+    },
+    {
+      "id": "req-common-entry",
+      "title": "진입·PIN·세션 무효화",
+      "file": "requirements/P0_Common_Spec.md",
+      "sha256": "1c1e49b2f59f4717096a51582437077377970194fa6f15af3a09e51705ebca58"
+    },
+    {
+      "id": "req-part1-signup",
+      "title": "가입·입력·로그인",
+      "file": "requirements/P0_Part1.md",
+      "sha256": "ab4db17b9299d1f53f19d4c7b06e8ee5bc38be8164263bfe328607d9659a5f3c"
+    },
+    {
+      "id": "req-part1-login-reset",
+      "title": "가입·입력·로그인",
+      "file": "requirements/P0_Part1.md",
+      "sha256": "6d246052d9622921bf3e850a887b3b9fc8435613b5a6aea9756728bc79ce6564"
+    },
+    {
+      "id": "req-part1-pin-records",
+      "title": "PIN·세션·무효화",
+      "file": "requirements/P0_Part1.md",
+      "sha256": "a88ca07c5271ce081ef837d950dd6970dc29b27857bd9bff501dc16641782947"
+    },
+    {
+      "id": "req-part1-entry-contract",
+      "title": "기록·검색·Part 2 연결",
+      "file": "requirements/P0_Part1.md",
+      "sha256": "7f68ee791f24fd179f302e67ae65c62e317be85352c7b4bf3713e0449c3eb2d6"
+    },
+    {
+      "id": "req-part2-home-start",
+      "title": "Home·아이 문맥·첫 인사",
+      "file": "requirements/P0_Part2.md",
+      "sha256": "32ed7cdb492d19fd67e8bb8d7cf0301d24f42e33efef3f7f527870915a1631df"
+    },
+    {
+      "id": "req-part2-voice-flow",
+      "title": "음성 접수·AI·실패",
+      "file": "requirements/P0_Part2.md",
+      "sha256": "d2cc5a3f68ab636a12460931e8b697adbef9a625c409204f5362da40df53726c"
+    },
+    {
+      "id": "req-part2-ai-record-contract",
+      "title": "필드별 허용·임시 음성·AI 문맥",
+      "file": "requirements/P0_Part2.md",
+      "sha256": "4ec8b4f9d1973b12bb5cac22dca79ce03fbc5df88c3da0ce26ef9cf440a3ee5a"
+    },
+    {
+      "id": "req-part2-end-summary",
+      "title": "종료 조정기·요약·DB",
+      "file": "requirements/P0_Part2.md",
+      "sha256": "82a6c662ca1fae273c2fd6a1159c71af2c70ad7273d81446db7656235b1975e6"
+    }
+  ]
+}
