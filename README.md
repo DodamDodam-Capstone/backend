@@ -12,9 +12,9 @@ DodamDodam 캡스톤 프로젝트의 Spring Boot 백엔드 서비스입니다.
 | Spring Boot | `4.1.1` |
 | Java | `25` LTS |
 | Local JDK | Oracle OpenJDK 25 또는 Eclipse Temurin 25 |
-| Build | Gradle `9.7.1` Wrapper, Kotlin DSL |
+| Build | [브랜치에 고정된 Gradle Wrapper](gradle/wrapper/gradle-wrapper.properties), Kotlin DSL |
 | Database | PostgreSQL `18.6` |
-| Authentication | Google OIDC, Kakao OIDC, 서버 세션 쿠키 |
+| Authentication | 현재 기반 코드: Google·Kakao OIDC, 서버 세션 쿠키. P0 목표 범위는 [확정 정책](docs/p0/Decision_Record.md) 참고 |
 | Local infrastructure | Docker Compose |
 
 AWS 배포와 RAG·벡터 검색 구성은 현재 범위에 포함하지 않습니다.
@@ -37,11 +37,11 @@ Spring Boot가 `compose.yaml`의 PostgreSQL을 자동으로 시작합니다. 애
 curl http://localhost:8080/actuator/health
 ```
 
-실제 소셜 로그인을 사용하려면 `.env`의 Google·Kakao 값을 발급받은 자격 증명으로
+실제 Google 로그인을 사용하려면 `.env`의 Google 값을 발급받은 자격 증명으로
 교체해야 합니다. 예시 값으로도 애플리케이션은 실행되지만 공급자 로그인에는
 실패합니다.
 
-로그인 시작 주소는 다음과 같습니다.
+로그인 시작 주소는 다음과 같습니다. Kakao는 기존 기반 코드의 참고 경로이며 P0 범위에서 제외합니다.
 
 - Google: `http://localhost:8080/oauth2/authorization/google`
 - Kakao: `http://localhost:8080/oauth2/authorization/kakao`
@@ -67,13 +67,5 @@ docker compose stop
 - [개발환경 설치·실행 가이드](docs/DEVELOPMENT_SETUP.md)
 - [IntelliJ·JDK·Docker 상세 설정](docs/DEVELOPMENT_SETUP.md#5-intellij-idea-설정)
 - [Backend 팀 업무 실행 가이드](docs/TEAM_WORKFLOW_GUIDE.md)
-- [Backend Jira·GitHub 업무 규칙](docs/JIRA_WORKFLOW.md)
 - [기여 가이드](CONTRIBUTING.md)
 - [보안 정책](SECURITY.md)
-
-Organization 전체 협업 흐름은
-[integration 저장소 문서](https://github.com/DodamDodam-Capstone/integration/blob/main/docs/GITHUB_WORKFLOW.md)에서
-관리합니다. 기능 변경은 작업 브랜치에서 `development`로 squash merge하고,
-검증된 `development`는 보호된 PR과 승인을 거쳐 merge commit으로 `main`에
-반영합니다. `main` 대상 PR의 source branch는 `development`만 허용하며 긴급
-수정도 먼저 `development`에 반영합니다.

@@ -6,7 +6,7 @@
 
 이 명세는 Part 1의 인증·아이·PIN·보호자 기록과 Part 2의 Home·음성·대화를 통합한 **24개 경로·26개 operation·61개 스키마**다. 각 API에 담당을 명시한다. 이메일 PIN 재설정과 최소 가입 흐름을 포함하며, 주제 추천은 P0에서 사용하지 않는다.
 
-함께 사용할 문서: [확정 결정 기록](Decision_Record.md), [통합 ERD](Integrated_ERD_Design.md), FE·BE 개발 전달서(별도 전달), [기계 판독 OpenAPI 3.0.3](Integrated_OpenAPI.yaml), [다이어그램 보기](support/Integrated_Visual_Guide.html).
+함께 사용할 문서: [확정 결정 기록](Decision_Record.md), [통합 ERD](Integrated_ERD_Design.md), FE·BE 개발 전달서(별도 전달), [기계 판독 OpenAPI 3.0.3](Integrated_OpenAPI.yaml), [API 다이어그램](api/09-diagrams.md).
 
 최종이라는 말은 **사용자가 결정한 범위의 설계가 반영됐다는 뜻**이다. D13·D14의 AI 실제 형식·수치와 D17 운영 환경값은 자료를 받은 뒤 채운다. 이 문서는 서버 구현·브라우저·AI 통합 시험 완료를 의미하지 않는다. 별도 승인 절차는 추가하지 않는다(D18).
 

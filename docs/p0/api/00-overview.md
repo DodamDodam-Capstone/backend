@@ -26,27 +26,7 @@
 | `part2-api.md` (통합 전 원문, 별도 보관) | Part 2 대화·음성 |
 | `part2-erd.md` (통합 전 원문, 별도 보관) | Part 2 대화·음성 |
 
-| 결정 | 최종 반영 |
-| --- | --- |
-| D01 A | 공통 cookie/CSRF/data/error/unknown field 거부/0바이트 body 적용 |
-| D02 + F01/F02 | KST08\~24, 화면 이탈 ACTIVE 유지, 수동/자정 종료, 종료 후 같은 날 새 대화 가능·미종료1개 |
-| D03 + F03 | 최초 종료 경계 전에 연결된 유효 세션에 실제 endedAt+600초 확인만. 수동/자정 공통·새 로그인 불가·반복 연장 없음 |
-| D04 A | 일반 로그인 서비스 시간 상한 없음·쿠키365일 유효 사용 갱신·PIN1800초 활동 연장 없음 |
-| D05 A | 아이 resume 전체 허용 발화·보호자 ENDED 상세100턴 cursor |
-| D06 + F05/F06 | name/nickname 분리, Home 서버 인사와 대화 시작 FE 고정 인사는 nickname 사용 |
-| F04 | 발화 없는 종료도 EMPTY 기록·요약 AI 미호출 |
-| F07/F08 | 동의·추가 보호자 정보 P0 제외, 기존 P0 범위 유지 |
-| D07 A | 인증된 임시 음성 GET, 금지/미생성404·만료410·종료/자정 차단 |
-| D08 A | 실제 audio 파일 바이트만 SHA-256 소문자64자리 hex |
-| D09 추후 | 추천 UI·입력·저장 제외. 모든 topicSuggestions는[] |
-| D10 둘 다 A | STT 무음422/FAILED, TTS 실패502/전체FAILED. 이미202이면 GET200 FAILED |
-| D11 A | 최초 커밋 실행자만 AI1회 시도, crash 자동 재호출 없음·기한 정리 |
-| D12 A | OAuth 시작 장애503, callback 장애 고정 실패URL302; URL 설정 없으면503 |
-| D13·D14 | AI 수치·실제wire·필드별 허용 자료 대기 |
-| D15 제외 | 추가 동의·보호자 정보 수집 P0 제외. 가입 자체는 유지 |
-| D16 이메일 | PIN_RESET 이메일 재인증 후 일회성 token으로 재설정 |
-| D17 보류 | 운영 환경·제한·보관의 초기 기술 기준과 실운영 결정 구분 |
-| D18 고려 안 함 | 별도 승인자/승인 절차 요구 없음 |
+확정한 D/F 정책과 변경 근거는 [결정 기록](../Decision_Record.md)을 확인한다.
 
 같은 시작 키 ACTIVE 복구와 다른 키의409 ACTIVE_CONVERSATION_EXISTS+ID는 유지한다. CLOSING은409 CONVERSATION_CLOSING, 종료된 같은 키는409 CONVERSATION_ENDED다. 새 대화는 새 키로 생성한다. D02 답변을 원래 오류 선택지 A에 투표한 것으로 확대하지 않는다. PIN reset 후 기존 오답·차단·요청량 보존도 보수적인 기술 설계이며 사용자의 추가 선택으로 기록하지 않는다.
 

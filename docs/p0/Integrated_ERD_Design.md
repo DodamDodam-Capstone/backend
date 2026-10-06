@@ -4,7 +4,7 @@
 
 이 문서는 두 파트의 제공 설계에 사용자 확정 결정을 반영한 최종 데이터 사전이다. **운영에 적용된 migration은 아니다.** 수동·자정 종료·당일 새 대화·기존 연결의 종료 복구·이메일 PIN 재설정·주제추천 제외를 API와 같은 기준으로 명시한다. 원문 기록, 사용자 확정 정책, 정책을 구현하기 위한 기술 설계, AI 응답 대기와 운영 연기를 구분한다. API 계약은 [통합 API 명세](Integrated_API_Spec.md), 담당별 작업과 남은 외부 확인은 FE·BE 인계서(별도 전달)를 따른다. 확정 근거는 [결정 기록](Decision_Record.md)이며 현재 DDL의 검증 범위와 결과는 §12.3에 기록한다.
 
-빠른 보기: [전체 다이어그램](support/Integrated_Visual_Guide.html), [테이블 스키마 JSON](#integrated-db-schema-json). DB 읽기 결과와 공개 응답 JSON 매핑은 §13을 참고한다.
+빠른 보기: [ERD 다이어그램](#2-관계도와-공통-물리-규칙), [테이블 스키마 JSON](#integrated-db-schema-json). DB 읽기 결과와 공개 응답 JSON 매핑은 §13을 참고한다.
 
 ## 1. 출처·결정 상태·소유권
 

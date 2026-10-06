@@ -5,6 +5,7 @@
 
 ## 1. 이 저장소를 사용하는 업무
 
+- Jira: `dodamdodam.atlassian.net` / 프로젝트 `SCRUM`
 - Jira/GitHub 접두어: `[BE]`
 - GitHub 저장소: `DodamDodam-Capstone/backend`
 - 일반 PR 대상: `development`
@@ -14,6 +15,8 @@
 API, domain, database, 인증·인가, 외부 시스템 연결, Backend 테스트와 관련된
 업무를 이 저장소에서 처리합니다. Frontend·AI·통합 변경이 함께 필요하면 같은
 Epic 아래에 `[FE]`, `[AI]`, `[INT]` Task를 별도로 만듭니다.
+
+업무 표기는 Epic `[EPIC] <사용자 가치 또는 목표>`, Backend Task `[BE] <구현할 결과>`, GitHub Issue `SCRUM-<번호> [BE] <같은 제목>`을 사용합니다. GitHub-first는 Jira 업무와 GitHub Issue를 1:1로 연결합니다.
 
 ## 2. 시작 경로를 먼저 선택합니다
 
@@ -116,8 +119,15 @@ Jira: https://dodamdodam.atlassian.net/browse/SCRUM-207
 Resolves #123
 ```
 
-PR merge 후 `close-linked-issues`가 `backend#123`을 닫고, Jira Automation이
+`development` 병합 후 `close-linked-issues`가 `backend#123`을 닫고, Jira Automation이
 `SCRUM-207`을 `완료`로 전환합니다.
+
+### 4.3 자동화의 승인·중복 방지 기준
+
+- 열린 직후 자동 생성은 GitHub `OWNER`, `MEMBER`, `COLLABORATOR`가 등록한 Issue에 적용합니다. 외부 작성자 및 `CONTRIBUTOR`/`NONE`은 팀원이 내용과 `task`/`bug` 유형을 확인한 뒤 `jira-sync`로 승인합니다.
+- `jira-skip`은 생성을 건너뜁니다. 제목에 Jira 키가 있어도 해당 Issue 고유 Jira 레이블이 일치할 때만 기존 업무를 재사용합니다.
+- 재실행은 Jira 업무와 링크 댓글을 중복 생성하지 않습니다. Slack 성공은 `jira-notified`로 표시합니다. Task·Bug 유형이 충돌하면 생성하지 않고 실패를 알립니다.
+- secret을 사용하는 중앙 helper는 CI를 통과한 integration commit의 전체 SHA로 고정합니다.
 
 ## 5. Bug 업무 예시
 
@@ -138,18 +148,25 @@ database credential, 개인정보는 첨부하지 않습니다.
 - `development` 대상 PR 제목에는 `[BE]`만 정확히 하나 넣습니다.
 - Gitmoji는 의미에 맞게 자유롭게 선택하고 `feat`, `fix`, `docs`, `test` 등의
   Conventional Commit type을 사용합니다.
-- GitHub Issue가 있을 때만 같은 저장소 Issue를 `Resolves #번호`로 연결합니다.
+- GitHub Issue가 있을 때만 `development` 대상 작업 PR에 같은 저장소 Issue를
+  `Resolves #번호`로 연결합니다.
 - `backend-quality`와 모든 필수 검사를 통과합니다.
 - 마지막 push를 하지 않은 다른 팀원의 승인을 받습니다.
 - 모든 review conversation을 해결한 뒤 squash merge합니다.
-- `development`와 `main`에는 직접 push하지 않습니다.
+- `development`와 `main`에는 직접 push 또는 force push하지 않습니다.
+- `development` → `main`은 merge commit으로 계보를 유지합니다. 기존 계보가 갈라졌다면 commit을 삭제하지 않고 보호된 동기화 PR로 연결합니다.
+- 자동 브랜치 삭제는 사용하지 않으며 작업 브랜치는 sprint 정리 시 수동 삭제합니다.
+- PR 제목 형식은 `<gitmoji> <type>(optional-scope): <description>`입니다.
 - `main` 대상 PR은 `development`에서만 만들며 긴급 수정도 같은 승격 경로를
   사용합니다.
+- `main` 승격 PR에는 `Resolves #번호`, `Closes #번호`, `Fixes #번호`를
+  적지 않습니다. GitHub는 기본 브랜치 병합 시 이 키워드로 Issue를 닫습니다.
 
 ## 7. 완료 확인
 
 - GitHub-first: GitHub Issue `Closed`와 Jira Task `완료`를 모두 확인합니다.
 - Jira-first: Jira Task `완료`와 Jira Development의 `MERGED` PR을 확인합니다.
+- Jira 업무는 삭제하지 않고 `완료`로 전환하며 Slack 성공 알림도 확인합니다.
 - Team Board Gantt에서 업무가 사라지면 `Show completed tickets`를 켭니다.
 - Epic은 모든 `[FE]`, `[BE]`, `[AI]`, `[INT]` child Task와 통합 검증이 끝난 뒤
   sprint review에서 수동 완료합니다.
@@ -163,9 +180,18 @@ database credential, 개인정보는 첨부하지 않습니다.
   Jira`를 `main`에서 Issue 번호로 재실행합니다.
 - 중복 Jira Task가 의심됨: 새 Task를 만들지 말고 `jira-linked` 댓글과 Jira의
   `github-backend-<issue-number>` 레이블을 확인합니다.
-- Issue가 닫히지 않음: PR 본문의 `Resolves #번호`, 같은 저장소 Issue인지,
-  `Close Linked Issues` 실행 결과를 확인합니다.
+- Issue가 닫히지 않음: 작업 PR의 대상이 `development`인지, 본문의
+  `Resolves #번호`가 같은 저장소 Issue인지, `Close Linked Issues` 실행 결과를
+  확인합니다.
+- Jira Task가 완료되지 않음: PR 대상이 `development`인지, PR 제목의 Jira 키가
+  해당 Task 키와 일치하는지, Jira Automation 감사 로그를 확인합니다.
 
 Organization 전체 흐름과 다른 저장소 예시는
 [integration 팀 가이드](https://github.com/DodamDodam-Capstone/integration/blob/main/docs/TEAM_WORKFLOW_GUIDE.md)를
 기준으로 합니다.
+
+## 9. 팀 권한과 전체 프로젝트 기준
+
+GitHub visible Team `backend`에 Backend 담당자를 넣고 저장소 `Write`를 부여합니다. 팀원이 2명 이상일 때 CODEOWNERS와 리뷰 자동 배정을 사용합니다. Jira `Backend` Team을 연결하되 Assignee는 실제 담당 개인으로 유지합니다. 빈 팀이나 Team filter를 미리 만들지 않습니다.
+
+Epic·하위 이슈·Team Board 공통 운영은 [integration 운영 규칙](https://github.com/DodamDodam-Capstone/integration/blob/main/docs/JIRA_GITHUB_INTEGRATION.md)을 따릅니다.
