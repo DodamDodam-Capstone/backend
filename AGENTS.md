@@ -8,7 +8,7 @@ These instructions apply to the entire backend repository. Read the relevant sou
 - Base package: `com.dodamdodam.backend`
 - Java: 25 LTS; CI uses Eclipse Temurin
 - Spring Boot: 4.1.1
-- Build: Gradle 9.7.1 Wrapper with Kotlin DSL
+- Build: Gradle Wrapper version pinned in `gradle/wrapper/gradle-wrapper.properties`, Kotlin DSL
 - Database: PostgreSQL 18.6
 - Authentication: Google and Kakao OIDC with a server-side HTTP session
 - Local infrastructure: Docker Compose
