@@ -4,7 +4,7 @@
 PostgreSQL·Google/Kakao 로그인·테스트·Docker 구성을 같은 방식으로 사용할 수
 있게 만드는 기준 문서입니다.
 
-기준일은 **2026-08-29**입니다. AWS 배포, 운영 인프라, RAG, 벡터 검색은 이
+설치 절차 정리일은 **2026-10-06**입니다. 실제 버전은 체크아웃한 브랜치의 설정 파일을 기준으로 합니다. AWS 배포, 운영 인프라, RAG, 벡터 검색은 이
 설정의 범위가 아닙니다.
 
 ## 1. 최종 선택과 안정성 판단
@@ -18,7 +18,7 @@ PostgreSQL·Google/Kakao 로그인·테스트·Docker 구성을 같은 방식으
 | Spring Boot | `4.1.1` | 공식 stable이며 Boot 4.1의 첫 버그 수정 릴리스 |
 | Java | `25` LTS | Boot 4.1 지원 범위이고 장기지원 버전 |
 | JDK 배포판 | 개발 PC는 Oracle OpenJDK/Temurin 25, CI·Docker는 Temurin 25 | Java major를 통일하고 OS별 배포판 선택은 허용 |
-| Build | Gradle `9.7.1` Wrapper + Kotlin DSL | Java 25 실행 지원, 설치 버전 차이 제거 |
+| Build | [Gradle Wrapper](../gradle/wrapper/gradle-wrapper.properties) + Kotlin DSL | Java 25 실행 지원, 설치 버전 차이 제거 |
 | Database | PostgreSQL `18.6` | 지원 중인 최신 major의 최신 patch |
 | Schema | Flyway + Hibernate `validate` | 명시적·재현 가능한 스키마 변경 |
 | Authentication | OAuth 2.0 Authorization Code + OIDC | Google/Kakao의 검증된 사용자 식별 정보 사용 |
@@ -27,7 +27,7 @@ PostgreSQL·Google/Kakao 로그인·테스트·Docker 구성을 같은 방식으
 | Integration test | Testcontainers PostgreSQL 18.6 | 실제 DB와 다른 H2 동작 차이를 방지 |
 
 Spring Boot 4.1.1은 Java 17부터 26까지, Gradle 8.14 이상 또는 9.x를 공식
-지원합니다. Gradle 9.7.1은 Java 25에서 실행할 수 있습니다. 따라서 이 조합은
+지원합니다. Wrapper는 Java 25 실행 기준으로 구성합니다. 따라서 이 조합은
 각 프로젝트의 공식 호환 범위 안에 있습니다.
 
 Oracle OpenJDK 25는 이 프로젝트에서 사용해도 됩니다. 로컬 JDK vendor가 Oracle이고
@@ -48,7 +48,7 @@ backend/
 ├── build.gradle.kts              # 의존성과 Java toolchain
 ├── settings.gradle.kts
 ├── gradlew, gradlew.bat
-├── gradle/wrapper/               # Gradle 9.7.1 Wrapper
+├── gradle/wrapper/               # 브랜치에 고정된 Gradle Wrapper
 ├── gradle/gradle-daemon-jvm.properties # Gradle Daemon Java 25 기준
 ├── compose.yaml                  # PostgreSQL, 선택적 app 컨테이너
 ├── Dockerfile                    # Java 25 멀티 스테이지 이미지
@@ -147,7 +147,7 @@ Windows PowerShell에서는 다음 명령을 사용합니다.
 
 출력에서 다음을 확인합니다.
 
-- `Gradle 9.7.1`
+- `gradle/wrapper/gradle-wrapper.properties`에 고정된 Gradle 버전
 - `Daemon JVM` 또는 JVM criteria가 Java 25
 - OS와 architecture가 현재 장비와 일치
 
@@ -280,24 +280,7 @@ ARM64 image, 일반 Windows PC에서는 AMD64 image가 자동 선택됩니다. `
 `platform: linux/amd64`를 고정하지 않습니다. PostgreSQL raw volume을 Mac과 Windows
 사이에 복사하지 말고 데이터 이동이 필요하면 `pg_dump`/`pg_restore`를 사용합니다.
 
-### 5.5 2026-08-29 macOS Apple Silicon 점검 결과
-
-현재 개발 장비에서 확인한 결과는 다음과 같습니다.
-
-| 점검 항목 | 확인 결과 | 상태 |
-| --- | --- | --- |
-| IntelliJ edition/version | Ultimate `2025.2.2`, native `aarch64` | Java 25 지원, 2026.2 업데이트 권장 |
-| Java SDK 등록 | `openjdk-25`, Oracle OpenJDK 25, `aarch64` | 정상 |
-| Project language level | Java 25 | 정상 |
-| Compiler bytecode target | 25 | 정상 |
-| Java compiler argument | Spring Boot plugin이 `-parameters` 제공 | 명시적 중복 제거 |
-| Gradle Wrapper | 9.7.1 | 정상 |
-| Gradle JVM | `#PROJECT_JDK (openjdk-25)` + Daemon criteria 25 | 정상 |
-| Gradle distribution/build/test | Wrapper / Gradle / Gradle | 프로젝트 기본값·CI와 일치 |
-| Gradle Java toolchain | Oracle OpenJDK 25 `aarch64` 탐지 | 정상 |
-| IntelliJ runtime | Bundled JetBrains Runtime(JBR) | Project SDK와 분리 유지 |
-| Spring/Gradle/Java plugin | IntelliJ Ultimate에 포함 | 정상 |
-| Docker Engine/Compose | 29.5.3 ARM64 / Compose 5.1.4 | daemon 연결 및 Compose 해석 정상 |
+### 5.5 IDE 캐시 문제
 
 Gradle reload 뒤 `.idea/workspace.xml`의 오래된 Kotlin DSL cache에 Corretto 26 경로가
 남아 보이거나 `.idea/compiler.xml`에 `-parameters`가 중복되어 보이면 IDE가 아직
@@ -430,6 +413,8 @@ scheme, host, port, path, trailing slash 중 하나라도 콘솔 값과 다르�
 `redirect_uri_mismatch`가 발생합니다.
 
 ## 9. Kakao 로그인 설정
+
+기존 OAuth 기반 코드의 선택적 구성 참고입니다. [현재 P0 정책](p0/Decision_Record.md)에 따라 Kakao는 P0 구현·인수 범위에서 제외하며, P0 개발에 실제 Kakao 자격 증명 발급을 요구하지 않습니다.
 
 1. Kakao Developers에서 애플리케이션을 생성합니다.
 2. **Kakao Login**을 활성화합니다.
@@ -574,20 +559,11 @@ docker compose config --quiet
 - health endpoint가 인증 없이 `UP`을 반환하는지
 - SPA용 CSRF token endpoint가 token을 발급하는지
 
-### 13.1 2026-08-29 기준 설정 검증 기록
+### 13.1 JVM과 CI 확인
 
-| 검증 | 결과 |
-| --- | --- |
-| `./gradlew --version` | Gradle 9.7.1, Daemon criteria Java 25, macOS ARM64 확인 |
-| `./gradlew javaToolchains` | Oracle OpenJDK 25 `aarch64` JDK 탐지 |
-| `./gradlew clean check --no-daemon` | 성공, 테스트 2개/실패 0/오류 0 |
-| `./gradlew test --rerun-tasks --no-daemon` | 컴파일러 중복 제거 후 테스트 2개 재실행, 실패 0/오류 0 |
-| `docker compose --env-file .env.example config --quiet` | 성공 |
-| `docker build -t dodamdodam-backend:local .` | Eclipse Temurin 25 build/JRE image ARM64 빌드 성공 |
-
-현재 shell의 `Launcher JVM`이 Homebrew Java 26이어도 커밋된 Daemon criteria가 실제
-Gradle 실행 JVM을 Java 25로 제한하는 것을 확인했습니다. IntelliJ에서는 추가 혼동을
-막기 위해 Gradle JVM을 `Project SDK (openjdk-25)`로 명시합니다.
+`Launcher JVM`과 실제 Gradle 실행 JVM은 다를 수 있습니다. `./gradlew --version`에서
+커밋된 Daemon criteria에 따라 실제 실행 JVM이 Java 25인지 확인합니다. IntelliJ에서는
+Gradle JVM을 `Project SDK (openjdk-25)`로 명시합니다.
 
 GitHub Actions는 `.java-version`을 읽어 Temurin 25를 설치하고
 `./gradlew clean check --no-daemon`을 실행합니다. Daemon criteria는 vendor를
@@ -697,15 +673,15 @@ REST API key를 client ID에 넣었는지, client secret 기능을 활성화했�
 - [ ] IntelliJ Project SDK, Module SDK, Gradle JVM, Run JRE가 모두 JDK 25이다.
 - [ ] Language level과 target bytecode가 25이고 preview가 꺼져 있다.
 - [ ] Gradle distribution, build runner, test runner가 Wrapper/Gradle로 설정되어 있다.
-- [ ] `./gradlew --version`이 Gradle 9.7.1과 Daemon JVM 25를 표시한다.
+- [ ] `./gradlew --version`이 Wrapper에 고정된 Gradle 버전과 Daemon JVM 25를 표시한다.
 - [ ] `./gradlew javaToolchains`에서 Java 25 JDK를 찾는다.
 - [ ] IntelliJ 자체 JBR은 변경하지 않았다.
 - [ ] Docker daemon과 Compose 명령이 정상이다.
 - [ ] `.env.example`을 `.env`로 복사했다.
-- [ ] 실제 Google/Kakao 값을 `.env`에 넣고 Git 추적 대상이 아님을 확인했다.
+- [ ] 실제 Google 값(기존 Kakao 연동을 별도로 사용할 때만 Kakao 값)을 `.env`에 넣고 Git 추적 대상이 아님을 확인했다.
 - [ ] `./gradlew clean check`가 통과한다.
 - [ ] `/actuator/health`가 `UP`이다.
-- [ ] Google/Kakao callback URI가 공급자 콘솔과 일치한다.
+- [ ] 사용하는 공급자의 callback URI가 해당 콘솔과 일치한다.
 - [ ] React origin과 CORS 목록이 일치한다.
 - [ ] `git status`에 `.env`, `.idea`, build 산출물이 나타나지 않는다.
 

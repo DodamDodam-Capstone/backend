@@ -1,6 +1,6 @@
 # P0 확정 정책 및 문서 변경 기록
 
-2026-10-03 KST · v3.1 · 사용자 F-01\~F-08 답변 반영
+정책 확정 2026-10-03 KST · 계약 v3.1 · 문서 정리 2026-10-06
 
 ## 1. 확정 정책
 
@@ -18,32 +18,53 @@
 
 기존 D01\~D18 중 위 결정으로 대체된 부분 외에는 유지한다. D13/D14 AI 실제 wire·필드별 허용·시간/용량과 D17 운영 환경값은 여전히 자료 대기이며 임의 확정하지 않는다. 최초 문서 작성 단계에서는 GitHub 게시를 제외했으며, 이후 사용자 승인으로 문서만 저장소에 게시한다.
 
-## 2. 통합 구현 계약
+## 2. 유지한 D 결정
 
-다음은 확정 정책을 구현하기 위한 기술 설계이며 사용자가 직접 선택한 수치로 기록하지 않는다.
+아래 표는 이전 회의 결정에 후속 F 결정을 반영한 정책 기록입니다. 입력 형식·수치·오류·트랜잭션의 상세는 다음 절의 명세를 기준으로 합니다.
 
-- `conversations.status`: ACTIVE → CLOSING → ENDED. 처리 중 발화가 없으면 짧은 트랜잭션에서 곧바로 ENDED 확정 가능.
-- `end_requested_at timestamptz NULL`, `end_reason`(MANUAL/MIDNIGHT, 초기 NULL). 최초 종료 경계를 고정하며 중복 end나 자정 도달로 덮어쓰지 않는다. 수동 종료는 잠금 후 DB 시각, 자정 종료는 scheduled_end_at을 경계로 사용한다. 자정 이후 처음 종료를 관측하면 MIDNIGHT로 처리한다.
-- ACTIVE의 종료 필드는 NULL. CLOSING은 end_requested_at/end_reason 필수, ended_at NULL. ENDED는 모두 필수이며 ended_at >= end_requested_at >= started_at. MANUAL의 경계는 scheduled_end_at 미만, MIDNIGHT의 경계는 scheduled_end_at과 같다.
-- `(child_id, service_date)` UNIQUE 제거. `(child_id, client_request_id)` 유지. `status IN ('ACTIVE','CLOSING')`인 행에 child_id 부분 UNIQUE를 적용한다. 지난 날짜의 미종료 행도 정리하기 전 새 대화를 만들지 않는다.
-- 수동 종료와 음성 접수는 같은 conversation 잠금/조건부 갱신으로 직렬화. 종료가 먼저면 접수 거부; 발화가 먼저면 원래 deadline까지 drain. CLOSING은 아이용 본문·음성·resume 차단, 기존 작업의 허용 결과 저장만 허용한다. late callback은 terminal 결과를 덮어쓰지 않는다.
-- `POST .../end`: body 0바이트·CSRF·로그인·소유권·기존 연결. 종료 진행 중 202 `EndPendingReceipt {conversationId,status:"CLOSING"}` + Retry-After(1 이상). 종료 완료 200 기존 네 필드 `EndReceipt {conversationId,status:"ENDED",endedAt,summaryStatus}`. 별도 poll 경로 없이 동일 end를 재확인하며 경계/복구기한을 늘리지 않는다. PIN 불필요.
-- 자정/수동 종료 경계 이전의 `bound_at < end_requested_at`인 유효 연결만 CLOSING 확인 및 ENDED 600초 확인 가능. CLOSING에는 새 연결을 만들지 않는다. 로그인 무효화는 항상 우선한다. 확인 응답에 과거 내용·음성·요약 본문 없음.
-- `/start`: 서비스 시간 안에 기존 ACTIVE이면 기존 ACTIVE_CONVERSATION_EXISTS 계약, CLOSING이면 409 CONVERSATION_CLOSING. 기존 PREVIOUS_CONVERSATION_CLOSING은 CONVERSATION_CLOSING으로 통합하고 DAILY_CONVERSATION_CLOSED는 제거한다. 당일 ENDED 존재만으로 거부하지 않는다. 새 대화는 새 clientRequestId, 재전송은 기존 키를 유지한다. 동일 키의 ENDED 재전송은 CONVERSATION_ENDED로 거부하며 새 대화를 만들지 않는다.
-- `/home`: 접근 가능한 당일 ACTIVE만 activeConversationId에 반환. 서비스 시간의 CLOSING은 ID=null, canEnter=false, reason=CONVERSATION_CLOSING. 시간 밖은 OUTSIDE_SERVICE_HOURS 우선. 새 로그인은 복구권한 없이 Home으로 이용 가능 여부만 확인한다. 시간 밖 종료 완료 추정은 금지하며 opensAt부터 재확인한다. closingConversationId는 추가하지 않는다.
-- `/resume`, 발화 POST/GET, 임시 음성 GET은 CLOSING에 409 CONVERSATION_CLOSING. 자정 이후 시간 차단 규칙도 유지한다. 조회·장시간 요청의 응답 직전 상태/권한을 재검사한다.
-- 최초 ENDED 전이만 PENDING/EMPTY를 확정하고 요약 최대 1회 시도. EMPTY는 허용 요약 입력이 없을 때이며 빈 대화도 포함. 이전 대화 요약 중 새 대화 가능, 결과는 원래 conversationId에만 저장. 보호자 기록은 ENDED만, 시간+ID 정렬 유지.
-- 아이 이름 `name`: 기존 trim 후 1\~5 Unicode 코드포인트 유지. 신규 애칭 `nickname`: 필수, trim 후 1\~20 코드포인트(통합 기술 기준), null/빈 문자열 거부. 별도 유일성·실명 인증 없음. ChildView/CreateChildRequest/Home.child/내부 ChildContext에 nickname 포함. AI에는 호칭 nickname을 매핑하며 실명 name을 자동 전송하지 않는다. 실제 AI 필드명은 D13에 따름.
-- FE 고정 시작 인사: "{nickname}, 오늘 만나서 반가워!" 등 고정 템플릿. Home.greeting도 nickname을 사용하는 서버 고정 문구다.
-- 기존 데이터 migration은 nullable nickname 추가→name 복사 backfill→검증→NOT NULL. 기존 ENDED는 end_reason=MIDNIGHT/end_requested_at=scheduled_end_at으로 현재 v2 데이터 전제에 맞춰 backfill하되 실제 데이터가 전제에 맞지 않으면 중단·분류하고 임의 시각을 만들지 않는다.
+| 결정 | 최종 반영 |
+| --- | --- |
+| D01 A | 공통 cookie/CSRF/data/error/unknown field 거부/0바이트 body 적용 |
+| D02 + F01/F02 | KST08\~24, 화면 이탈 ACTIVE 유지, 수동/자정 종료, 종료 후 같은 날 새 대화 가능·미종료1개 |
+| D03 + F03 | 최초 종료 경계 전에 연결된 유효 세션에 실제 endedAt+600초 확인만. 수동/자정 공통·새 로그인 불가·반복 연장 없음 |
+| D04 A | 일반 로그인 서비스 시간 상한 없음·쿠키365일 유효 사용 갱신·PIN1800초 활동 연장 없음 |
+| D05 A | 아이 resume 전체 허용 발화·보호자 ENDED 상세100턴 cursor |
+| D06 + F05/F06 | name/nickname 분리, Home 서버 인사와 대화 시작 FE 고정 인사는 nickname 사용 |
+| D07 A | 인증된 임시 음성 GET, 금지/미생성404·만료410·종료/자정 차단 |
+| D08 A | 실제 audio 파일 바이트만 SHA-256 소문자64자리 hex |
+| D09 추후 | 추천 UI·입력·저장 제외. 모든 topicSuggestions는[] |
+| D10 둘 다 A | STT 무음422/FAILED, TTS 실패502/전체FAILED. 이미202이면 GET200 FAILED |
+| D11 A | 최초 커밋 실행자만 AI1회 시도, crash 자동 재호출 없음·기한 정리 |
+| D12 A | OAuth 시작 장애503, callback 장애 고정 실패URL302; URL 설정 없으면503 |
+| D13·D14 | AI 수치·실제wire·필드별 허용 자료 대기 |
+| D15 제외 | 추가 동의·보호자 정보 수집 P0 제외. 가입 자체는 유지 |
+| D16 이메일 | PIN_RESET 이메일 재인증 후 일회성 token으로 재설정 |
+| D17 보류 | 운영 환경·제한·보관의 초기 기술 기준과 실운영 결정 구분 |
+| D18 고려 안 함 | 별도 승인자/승인 절차 요구 없음 |
 
-## 3. 최종 검토 범위
+## 3. 구현 계약의 기준 위치
 
-API·OpenAPI JSON 스키마와 예시, ERD 사전·DDL·migration·검증, Common/Part1/Part2, FE/AI/FE·BE 전달서, Mermaid·SVG·HTML·PDF를 함께 맞춘다. 기존 하루 1대화·자정 전 종료 거부·애칭 없음 규칙은 대체된다. Figma 파일은 이번에 편집하지 않으며 화면 변경 요청은 FE 전달서에 기록한다.
+| 계약 | 기준 문서 |
+| --- | --- |
+| HTTP·세션·권한 무효화·공유 DTO | [공통 규칙](api/01-common.md) |
+| 이메일·Google·비밀번호 | [인증](api/02-auth.md) |
+| 이름·애칭·아이 등록 | [아이 프로필](api/03-children.md) |
+| PIN 설정·잠금·이메일 재설정 | [보호자 권한](api/04-guardian.md) |
+| ENDED 기록·검색·페이지 처리 | [기록 API](api/05-records.md) |
+| 시작·수동/자정 종료·복구·같은 날 재시작 | [대화](api/06-conversations.md) |
+| 중복 키·AI 호출·기한·임시 음성 | [음성](api/07-voice.md) |
+| 오류·초기 기술 수치·AI 및 운영 미정 항목 | [오류·검증](api/08-errors-and-validation.md) |
+| DB 제약·잠금·데이터 이관 | [ERD](Integrated_ERD_Design.md) |
+
+정책 변경은 이 기록에 근거를 남기고 위 명세를 갱신합니다. 이 문서에 필드·SQL·처리 알고리즘의 사본을 추가하지 않습니다.
+
+## 4. 검토 이력
+
+2026-10-03 검토 당시 API·OpenAPI, ERD, Common/Part1/Part2, 전달서와 Mermaid·SVG·HTML·PDF를 함께 대조했다. 기존 하루 1대화·자정 전 종료 거부·애칭 없음 규칙을 대체했으며, Figma 화면 변경 요청은 별도 FE 전달서에 기록했다. 저장소에서 유지하는 현재 문서 목록은 [P0 목차](README.md)를 따른다.
 
 Jira는 기존 업무의 관련 범위와 수용 기준을 우선 보완하고 새 작업은 실제 공백이 있을 때만 생성한다. 담당자·상태·스프린트·일정은 임의 변경하지 않는다. 후속 승인에 따른 문서 게시 PR은 Jira를 연결하지 않으며, 구현 업무 완료로 취급하지 않는다.
 
-## 4. v3.1 전면 재검토 결과
+### v3.1 전면 재검토 결과
 
 2026-10-03에 10개 문서·OpenAPI·DDL·JSON·다이어그램을 교차 검토했다. 새 정책 선택을 요구하지 않는 계약 오류 5건을 수정했다.
 
