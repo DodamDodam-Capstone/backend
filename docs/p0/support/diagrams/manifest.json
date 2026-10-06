@@ -12,79 +12,79 @@
     {
       "id": "api-integrated-ownership",
       "title": "13.1. 담당과 데이터 경계",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "cf362069cb311edeb3f2f4746e7bce6e7b2c90afba72680d8dc85bda2fe6182d"
     },
     {
       "id": "api-integrated-request-checks",
       "title": "13.2. 요청 검사와 공통 오류 우선순위",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "2151aefd4915f760151e08062b0920f83d36f367c9c1e1539729c929293aff4f"
     },
     {
       "id": "api-integrated-email-verification",
       "title": "13.3. 이메일 번호 확인과 일회성 업무 권한",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "0a90e58cc8208c1be6263b018a84810c2c497cea6dba803ec5df9c876787831d"
     },
     {
       "id": "api-integrated-login-entry",
       "title": "13.4. 로그인·프로필·아이 홈 진입과 로그아웃",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "0c171fe7998183f79cb147f3ea6a2dc99e906403b5fb48a16ccd3b54ade1e8d2"
     },
     {
       "id": "api-integrated-guardian-access",
       "title": "13.5. PIN 설정·확인·잠금과 이메일 재설정",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "69c54ef103401de2f6dcbd03f71427db58c7a465214868b1702e06d1806edc68"
     },
     {
       "id": "api-integrated-password-reset",
       "title": "13.6. 비밀번호 재설정과 모든 이전 로그인 무효화",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "f31757f894089a323c648b725f2fdad61cec623a93e2917f047728e3fd95f857"
     },
     {
       "id": "api-integrated-start-resume",
       "title": "13.7. 새 대화 시작과 화면 재진입 복원",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "7b25f6a202e5e57deff5864106989abfc6cf58ec974251032d3df3088a704499"
     },
     {
       "id": "api-integrated-voice-async",
       "title": "13.8. 음성 발화 접수와 동기·비동기 결과",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "886378fe03e3468d0e5738390b0945dfefa1777275979bd091497252a2cb1851"
     },
     {
       "id": "api-integrated-idempotency-recovery",
       "title": "13.9. 발화 중복 키와 응답 유실 복구",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "7d1c863aa06430ac356d27ad7c1e29116de176f3a1ac3f4fae946db454e6395c"
     },
     {
       "id": "api-integrated-end-recovery",
       "title": "13.10. 수동·자정 종료와 기존 세션의 종료 확인",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "3a62f88d692411fb73d8d81bc882e42e695fe44a6c38f62192f95bef04904144"
     },
     {
       "id": "api-integrated-temporary-audio",
       "title": "13.11. 임시 응답 음성의 시간·권한·수명 검사",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "0900ee8fe2b308db491ed36c06a21251c7e7e19b9db73cedeb060a357bf50d9f"
     },
     {
       "id": "api-integrated-visibility",
       "title": "13.12. 텍스트·요약·음성의 개별 공개 허용",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "8615765bf9a679e062f30e215ab989ebb20f8b488a56f178e68af4853626f1b4"
     },
     {
       "id": "api-integrated-record-pagination",
       "title": "13.13. 보호자 목록 검색과 전체 발화 이어 읽기",
-      "file": "Integrated_API_Spec.md",
+      "file": "api/09-diagrams.md",
       "sha256": "7eea95aa4f2d22dc7a1567a5839bd13088c7d9b51d685e2b0f8ebd3b8714b18a"
     },
     {

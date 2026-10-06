@@ -1429,7 +1429,7 @@ CREATE TABLE SPRING_SESSION_ATTRIBUTES (
 
 환경은 Homebrew PostgreSQL18.4, UTF-8/locale C의 새 임시 클러스터다. TCP 수신을 끄고 전용 로컬 Unix socket으로만 연결했다. `BEGIN → 새 schema 생성 → 문서 DDL 또는 v2 DDL+문서 migration → 검증 → ROLLBACK`으로 실행했다. 오류 이관도 트랜잭션 롤백되어 잔여 검증 schema0을 확인했다. 운영 DB·제품 코드는 수정하지 않았다.
 
-§12.2 SQL 블록의 끝 개행을 제외한 SHA256: `70dd7f61907e2871b216b020689def46af6fad34bd463e342090080bf17bd4f4`. 재실행은 새 격리 DB에서 이 블록과 [검증 SQL](support/validate_erd.sql)을 위 트랜잭션 순서로 실행한다. 검증 파일은 오류 SQLSTATE를 검사하고 결과를 합산한다. 다른 PostgreSQL 버전·collation은 별도 확인한다. 문서 JSON·DTO 및 Mermaid/PDF 렌더 결과는 [통합 API §12](Integrated_API_Spec.md)와 최종 검증 보고서에 별도 기록한다.
+§12.2 SQL 블록의 끝 개행을 제외한 SHA256: `70dd7f61907e2871b216b020689def46af6fad34bd463e342090080bf17bd4f4`. 재실행은 새 격리 DB에서 이 블록과 [검증 SQL](support/validate_erd.sql)을 위 트랜잭션 순서로 실행한다. 검증 파일은 오류 SQLSTATE를 검사하고 결과를 합산한다. 다른 PostgreSQL 버전·collation은 별도 확인한다. 문서 JSON·DTO 및 Mermaid/PDF 렌더 결과는 [통합 API §12](api/08-errors-and-validation.md#section-12)와 최종 검증 보고서에 별도 기록한다.
 
 **이 검사로 증명하지 않는 범위:** 실제 로그인/framework/PIN 판정, proof1회 소비의 동시 경합, HTTP 시간/권한 차단, 실제 서비스 잠금 및 두 인스턴스 end/발화 경합, 모든 발화 terminal 판정의 제품 구현, AI 실행 횟수, 세션 저장·브라우저·음성 삭제·운영 DB 이관·부하. 검증 SQL의 일부는 서비스에 필요한 조건부 쿼리를 가상 시각/문맥으로 실행한 것이며 제품 코드 인수 시험을 대신하지 않는다. D13·D14·D17의 대기 결정을 테스트 성공으로 확정하지 않는다.
 
