@@ -6,9 +6,11 @@
 
 1. [확정 결정 기록](Decision_Record.md)
 2. [공통 요구사항](requirements/P0_Common_Spec.md), [Part 1](requirements/P0_Part1.md), [Part 2](requirements/P0_Part2.md)
-3. [통합 API 명세](Integrated_API_Spec.md), [OpenAPI 3.0.3](Integrated_OpenAPI.yaml)
+3. [통합 API 목차·기능별 명세](Integrated_API_Spec.md), [OpenAPI 3.0.3](Integrated_OpenAPI.yaml)
 4. [통합 ERD·데이터 사전·DDL](Integrated_ERD_Design.md)
 5. [전체 다이어그램 HTML](support/Integrated_Visual_Guide.html), [SVG 목록과 원문 해시](support/diagrams/manifest.json)
+
+2026-10-06: 긴 통합 API를 기능별 본문 10개와 JSON 스키마 7개로 분할했습니다. 계약 v3.1과 기존 절 번호를 유지하며 전체 목차에서 각 API·스키마로 이동할 수 있습니다.
 
 API는 24개 경로·26개 operation·61개 schema, ERD는 13개 테이블·115개 컬럼입니다. API 담당은 각 operation의 `x-owner`와 명세에 표시합니다. D13/D14 AI 실제 wire·필드별 허용·음성 수치 및 D17 운영값은 아직 외부 확정 대기입니다.
 

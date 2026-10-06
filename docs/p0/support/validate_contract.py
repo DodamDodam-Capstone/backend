@@ -15,6 +15,7 @@ import warnings
 import uuid
 import hashlib
 import xml.etree.ElementTree as ET
+from urllib.parse import unquote
 from datetime import date, datetime, timedelta, timezone
 
 import yaml
@@ -706,7 +707,9 @@ def main(api_only=False):
                           'scope': 'OpenAPI and semantic fixtures only; Markdown, DB catalogs, diagrams and server integration not checked'}, ensure_ascii=False, indent=2))
         return
 
-    api_text = (ROOT / 'Integrated_API_Spec.md').read_text()
+    api_files = [ROOT / 'Integrated_API_Spec.md', *sorted((ROOT / 'api').rglob('*.md'))]
+    assert len(api_files) == 18, 'Expected API index, 10 guides and 7 schema catalogs'
+    api_text = '\n'.join(path.read_text() for path in api_files)
     erd_text = (ROOT / 'Integrated_ERD_Design.md').read_text()
     tables = db_tables_from_markdown(erd_text)
     seen_schemas, seen_tables = set(), set()
@@ -766,7 +769,8 @@ def main(api_only=False):
         assert entry['sha256'] == hashlib.sha256(block[1].encode()).hexdigest(), entry['id']
         ET.parse(ROOT / ('support/diagrams/' + entry['id'] + '.svg'))
         COUNTS['rendered_diagrams'] += 1
-    for filename, content, count in [('Integrated_API_Spec.md', api_text, 13), ('Integrated_ERD_Design.md', erd_text, 6)]:
+    for filename, count in [('api/09-diagrams.md', 13), ('Integrated_ERD_Design.md', 6)]:
+        content = (ROOT / filename).read_text()
         blocks = list(re.finditer(r'<!-- diagram: ([\w-]+) -->\s*```mermaid\n(.*?)\n```', content, re.S))
         assert len(blocks) == count
         for block in blocks:
@@ -776,19 +780,27 @@ def main(api_only=False):
             ET.parse(ROOT / ('support/diagrams/' + block[1] + '.svg'))
     for _, _, op in operations:
         assert op['operationId'] in api_text
-    for filename in ['README.md', 'Integrated_API_Spec.md', 'Integrated_ERD_Design.md', 'Decision_Record.md', 'requirements/P0_Common_Spec.md', 'requirements/P0_Part1.md', 'requirements/P0_Part2.md']:
-        content = (ROOT / filename).read_text()
-        assert len(re.findall(r'^```', content, re.M)) % 2 == 0, filename
+    document_files = api_files + [ROOT / filename for filename in [
+        'README.md', 'Integrated_ERD_Design.md', 'Decision_Record.md',
+        'requirements/P0_Common_Spec.md', 'requirements/P0_Part1.md', 'requirements/P0_Part2.md']]
+    for path in document_files:
+        content = path.read_text()
+        assert len(re.findall(r'^```', content, re.M)) % 2 == 0, path
         for match in re.finditer(r'\[[^\]]*\]\(([^\n)]+)\)', content):
             target = match.group(1).strip('<>')
-            if target.startswith(('http:', 'https:', '#')):
+            if target.startswith(('http:', 'https:', 'mailto:')):
                 continue
-            target = target.split('#')[0]
-            target = re.sub(r':\d+$', '', target)
-            if target:
-                assert not Path(target).is_absolute(), (filename, target)
-                assert (ROOT / filename).parent.joinpath(target).exists(), (filename, target)
-                COUNTS['local_links'] += 1
+            file, _, anchor = unquote(target).partition('#')
+            assert not Path(file).is_absolute(), (path, target)
+            linked = path.parent / file if file else path
+            assert linked.exists(), (path, target)
+            if anchor and linked.suffix == '.md':
+                linked_text = re.sub(r'```.*?```', '', linked.read_text(), flags=re.S)
+                ids = re.findall(r'<a id="([^"]+)"', linked_text)
+                for heading in re.findall(r'^#+ (.+)$', linked_text, re.M):
+                    ids.append(re.sub(r'[^\w\- ]', '', heading).lower().replace(' ', '-'))
+                assert anchor in ids, (path, target, 'missing anchor')
+            COUNTS['local_links'] += 1
     print(json.dumps({'result': 'PASS', 'paths': len(paths), 'operations': len(operations),
                       'schemas': len(SCHEMAS), **COUNTS,
                       'source_schema_changes': SOURCE_SCHEMA_CHANGES,
