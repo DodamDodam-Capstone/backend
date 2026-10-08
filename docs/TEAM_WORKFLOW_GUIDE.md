@@ -28,6 +28,9 @@ Epic 아래에 `[FE]`, `[AI]`, `[INT]` Task를 별도로 만듭니다.
 이미 있는 Jira Task와 GitHub Issue Form을 함께 사용하면 Jira Task가 중복 생성될
 수 있습니다. 한 업무에는 한 가지 시작 경로만 사용합니다.
 
+Story/Task의 포인트를 입력하기 전에 [Jira Story Point 입력 기준 공유안](STORY_POINTS.md)을 확인합니다.
+점수별 설명, 프로젝트 예시와 중복 집계·완료량 기준은 이 문서에서 관리합니다.
+
 ## 3. Jira-first: Jira Task가 이미 있는 경우
 
 예시 계획:
