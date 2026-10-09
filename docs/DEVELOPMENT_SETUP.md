@@ -309,6 +309,19 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
 | `APP_LOGOUT_SUCCESS_URL` | `http://localhost:5173` | 로그아웃 후 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
+| `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
+
+세션 쿠키 `JSESSIONID`는 HttpOnly이며, `XSRF-TOKEN`은 기존 FE 호환을 위해
+HttpOnly=false를 유지합니다. 두 쿠키 모두 Path=/, Domain 미설정(host-only)으로
+발급하고 Secure·SameSite 설정을 공유합니다. FE가 JSON 응답의 토큰만 사용한다면
+CSRF 쿠키의 HttpOnly=true 전환을 별도로 검토할 수 있습니다.
+
+로컬 HTTP는 `SESSION_COOKIE_SECURE=false`, `SESSION_COOKIE_SAME_SITE=lax`를
+사용합니다. HTTPS 환경은 Secure=true로 설정하고, FE/API가 같은 사이트인지에 따라
+SameSite를 결정합니다. `none`과 Secure=false의 조합은 기동 시 거부합니다.
+Google 로그인은 외부 사이트에서 GET callback으로 돌아오므로 `strict`를 권장하지
+않습니다. 실제 운영 origin·SameSite와 브라우저 쿠키 전달은 D17 확정 후 검증하며,
+테스트의 Secure=true·None 조합은 운영 설정을 확정한 것이 아닙니다.
 
 `application.yml`의 `local-...` OAuth 값은 자격 증명이 없을 때도 context가
 기동되도록 만든 비밀이 아닌 placeholder입니다. 실제 공급자 로그인에는 사용할 수
@@ -461,6 +474,11 @@ await fetch("http://localhost:8080/api/v1/example", {
 ```
 
 POST·PUT·PATCH·DELETE 전에 CSRF 토큰을 받습니다.
+로그인 전 공개 인증 POST도 `XSRF-TOKEN` 쿠키와 `X-XSRF-TOKEN` 헤더가 필요합니다.
+응답의 `parameterName`은 `_csrf`로 유지하지만 query/form 파라미터로 헤더를
+대체할 수 없습니다. 토큰 누락·빈 값·불일치는 `403 CSRF_INVALID` JSON 오류로
+반환하며, `error.requestId`는 서버 생성 `X-Request-ID`와 같습니다.
+응답에는 `Cache-Control: no-store`를 적용합니다.
 
 ```javascript
 const csrf = await fetch("http://localhost:8080/api/v1/auth/csrf", {
@@ -653,7 +671,7 @@ REST API key를 client ID에 넣었는지, client secret 기능을 활성화했�
 
 먼저 `/api/v1/auth/csrf`를 `credentials: "include"`로 호출한 뒤 응답의
 `headerName`과 `token`을 변경 요청에 넣습니다. 두 요청에서 동일한 session cookie가
-전송되는지 확인합니다.
+전송되는지 확인하고, 발급받은 `XSRF-TOKEN` 쿠키도 함께 전송합니다.
 
 ## 16. 업데이트 원칙
 
