@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 사용자에게 한 스텝씩 결과를 제시하고 다음 스텝은 확인 후 진행한다. Step 1의 구현 설명 후 2026-10-10 사용자 요청으로 현재 산출물의 기록·로컬 commit을 승인받았다. Step 2는 다음 작업 설명만 제공하고 구현 승인을 기다린다.
+- 사용자에게 한 스텝씩 결과를 제시하고 다음 스텝은 확인 후 진행한다. Step 1은 2026-10-10 기록·로컬 commit 승인 후 dce99c4로 보관했다. 후속 사용자 요청으로 Step 2를 구현하고 내용을 설명한 뒤 로컬 commit 승인을 받았다. Step 3은 진행안을 설명하고 별도 확인 후 진행한다.
 - 기존 feature/SCRUM-95-csrf-cors와 사용자 .gitignore·gradlew.bat 변경을 보존한다. 구현 승인만으로 commit·push·PR·Jira 상태 변경을 진행하지 않는다.
 - 발급 응답은 `{headerName, parameterName, token}`, POST 헤더는 X-XSRF-TOKEN, 실패는 403 CSRF_INVALID를 유지한다. 공통 no-store·서버 생성 X-Request-ID도 유지한다.
 - 최초 진입·로그인 성공·로그아웃 성공 후 FE는 credentials를 포함한 GET /api/v1/auth/csrf로 token을 획득한다. 인증 성공 후 GET 전에는 이전 메모리 토큰을 사용하지 않는다.
@@ -48,7 +48,7 @@
   - 토큰 비교는 boolean 결과만 assertion에 전달하고 쿠키는 속성만 검사한다. `.with(user())`, `.with(oauth2Login())`, `.with(csrf())`로 수명주기 자체를 대신하지 않는다.
   - Run: Java 25에서 `./gradlew test --tests '*CsrfLifecycleContractTests' --no-build-cache`. 기본 처리로 이미 통과한 사례는 회귀 검증으로 기록한다. 실제 실패는 테스트 대역 오류와 구분해 원인·결과를 보고하고 사용자 확인을 받는다.
 
-- [ ] **Step 2: 필요한 수정과 연동 안내.** Step 1 확인 후 진행한다. 운영 설정 누락으로 실패한 경우에만 기존 Spring Security 처리 연결을 최소 수정하고 해당 테스트의 실패→통과를 확인한다. 모두 통과했다면 운영 코드 수정 없이 DEVELOPMENT_SETUP에 FE 호출 순서와 후속 인증 API의 전략/정리 호출 시점을 기록한다. 실제 이메일 로그인·API 로그아웃 구현은 추가하지 않는다.
+- [x] **Step 2: 필요한 수정과 연동 안내.** Step 1 확인 후 진행한다. 운영 설정 누락으로 실패한 경우에만 기존 Spring Security 처리 연결을 최소 수정하고 해당 테스트의 실패→통과를 확인한다. 모두 통과했다면 운영 코드 수정 없이 DEVELOPMENT_SETUP에 FE 호출 순서와 후속 인증 API의 전략/정리 호출 시점을 기록한다. 실제 이메일 로그인·API 로그아웃 구현은 추가하지 않는다.
 
 - [ ] **Step 3: 전체 검증·결과 기록.** Step 2 확인 후 진행한다. Java 25에서 `./gradlew clean check --no-build-cache`와 `git diff --check`를 실행한다. 기존 41개와 새 사례의 통과·실패·skip을 실제 결과로 기록하고 변경 파일·연동 미완료 항목을 제시한다. commit은 사용자 요청 후 진행한다.
 
@@ -58,7 +58,7 @@
 - Spring Security는 인증 성공과 로그아웃 성공에서 기존 CSRF를 정리하며, 명시적 GET endpoint로 이후 재획득하는 흐름을 안내한다. [Spring Security CSRF](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html)
 - 구성된 인증 전략은 실제 인증 필터에서 인증 성공 직후 호출된다. [Spring Security 7.1.1 인증 필터](https://github.com/spring-projects/spring-security/blob/7.1.1/web/src/main/java/org/springframework/security/web/authentication/AbstractAuthenticationProcessingFilter.java)
 - 현재 cookie repository는 서버 측 토큰 폐기 목록을 두지 않는다. 삭제 응답 이후의 정상 클라이언트 흐름과 수동 쿠키 재전송의 보장을 구분한다. [Spring Security 7.1.1 cookie repository](https://github.com/spring-projects/spring-security/blob/7.1.1/web/src/main/java/org/springframework/security/web/csrf/CookieCsrfTokenRepository.java)
-- 계획 설명 후 Step 1 구현 요청을 받았고, 구현·검증 결과를 설명한 뒤 현재 기록과 테스트의 로컬 commit 요청을 받았다. Step 2는 시작하지 않는다.
+- 계획 설명 후 Step 1 구현 요청을 받았고, 구현·검증 결과를 설명한 뒤 기록과 테스트의 로컬 commit 요청을 받아 dce99c4로 보관했다. 이후 사용자 요청으로 Step 2 연동 문서를 작성하고 설명한 뒤 로컬 commit 승인을 받았다. Step 3 진행은 확인 대기다.
 
 ## Step 1 실행 결과 — 2026-10-10 KST
 
@@ -71,9 +71,14 @@
 - 현재 /logout의 302·세션 무효화와 로컬 Secure=false/SameSite=Lax의 CSRF 쿠키 만료 속성을 검증했다. 계약 경로의 API 로그아웃 204나 Secure=true/SameSite=None 환경의 실제 브라우저 동작을 구현·검증한 것은 아니다.
 - 사용자 .gitignore·gradlew.bat 변경을 보존하고 commit에서 제외한다. 이번 후속 요청에 따라 테스트 파일과 이 기록만 로컬 commit으로 보관한다. push·PR·Jira 상태 변경은 진행하지 않는다.
 
-### 다음 작업 — Step 2 승인 대기
+## Step 2 실행 결과 — 2026-10-10 KST
 
-- DEVELOPMENT_SETUP에 FE의 최초 진입·로그인·로그아웃 후 credentials 포함 GET 재획득, JSON token 보관과 모든 POST의 X-XSRF-TOKEN 전달 순서를 기록한다.
-- CSRF_INVALID 시 토큰 재획득과 업무 POST 재실행을 구분하고, POST를 무조건 자동 재실행하지 않는 계약을 안내한다.
-- 후속 이메일 로그인은 인증 성공 시 구성된 SessionAuthenticationStrategy를 실행하고, API 로그아웃은 업무 DB 폐기 성공 후 세션·CSRF 정리를 실행하도록 연결 시점을 기록한다.
-- 현재 /logout의 302와 향후 /api/v1/auth/logout의 204·401·503 계약을 구분한다. 실제 인증 API, FE 코드, JDBC 세션·365일 갱신과 운영 쿠키 정책 변경은 추가하지 않는다.
+- 사용자 요청에 따라 DEVELOPMENT_SETUP의 React 연동 기준에 FE 호출 순서·오류 복구·후속 Backend 연결 규칙을 반영했다. Step 1에서 운영 결함이 발견되지 않아 운영 소스·테스트는 수정하지 않았다.
+- 최초 진입·로그인 성공·로그아웃 성공 후 이전 메모리 token을 비우고 credentials 포함 GET으로 재획득하도록 기록했다. 반복 GET의 token 재사용과 인증 실패 시 성공 정리를 적용하지 않는 동작도 명시했다.
+- JavaScript 예시는 GET HTTP 상태·JSON headerName/token을 확인한 뒤 POST를 실행한다. GET 실패 시 이전 token을 복원하지 않고 POST를 보류한다. 예시 경로가 실제 구현 API가 아님을 표시했다.
+- CSRF_INVALID·인증 필요·로그인 실패·네트워크 오류를 구분하고, 재획득과 업무 POST 재실행을 별도로 처리하도록 안내했다. 기존 쿠키·헤더 수동 재전송에 대한 서버 측 폐기 보장은 추가하지 않았다.
+- 후속 이메일 로그인에는 세션 전략의 인증 성공 호출과 SecurityContextRepository 명시적 저장, 실제 세션 저장 성공 전 200 금지를 기록했다. 후속 API 로그아웃에는 업무 DB 폐기 커밋 후 인증 문맥·세션·CSRF·쿠키 정리 순서를 기록했다.
+- 현재 /logout의 302와 향후 /api/v1/auth/logout의 204·401·503 계약을 구분했다. CORS가 /api/**에만 등록되어 있어 현재 /logout의 다른 origin FE fetch 사용을 전제로 하지 않도록 명시했다. 실제 인증 API·FE 코드·JDBC 세션·365일 갱신과 운영 쿠키 정책 변경은 추가하지 않았다.
+- 문서 JavaScript 2개 블록 구문 검사와 네트워크 없는 7개 예시 확인을 통과했다: 정상 GET→POST, GET 503, data로 감싼 응답, 빈 token, GET 네트워크 실패, POST 403 후 자동 재실행 없음, 후속 재획득 실패 시 기존 메모리 token 비움.
+- 변경 문서 2개의 로컬 링크·anchor 7개와 코드 블록 경계를 확인했고 `git diff --check`를 통과했다. .gitignore·gradlew.bat diff는 작업 전과 일치한다. 문서만 변경한 이번 스텝에서는 Gradle 테스트를 재실행하지 않았으며, Step 1의 47개 통과는 이전 검증 결과다.
+- 사용자 승인에 따라 이번 스텝의 두 문서를 로컬 commit으로 보관한다. push·PR·Jira 상태 변경은 진행하지 않는다. 다음 작업은 Step 3 전체 검증·결과 기록이며 진행안 설명 후 사용자 확인을 받는다.
