@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 사용자에게 한 스텝씩 결과를 제시하고 다음 스텝은 확인 후 진행한다. Step 1은 2026-10-10 기록·로컬 commit 승인 후 dce99c4로 보관했다. 후속 사용자 요청으로 Step 2를 구현하고 내용을 설명한 뒤 로컬 commit 승인을 받았다. Step 3은 진행안을 설명하고 별도 확인 후 진행한다.
+- 사용자에게 한 스텝씩 결과를 제시하고 다음 스텝은 확인 후 진행한다. Step 1은 dce99c4, Step 2는 f19fa53로 사용자 승인 후 로컬 commit했다. Step 3도 진행안 설명 후 승인을 받아 전체 검증·최종 검토·결과 기록을 진행하고, 설명 후 결과 기록의 로컬 commit 승인을 받았다. 다음 작업은 진행안 설명 후 별도 확인을 받는다.
 - 기존 feature/SCRUM-95-csrf-cors와 사용자 .gitignore·gradlew.bat 변경을 보존한다. 구현 승인만으로 commit·push·PR·Jira 상태 변경을 진행하지 않는다.
 - 발급 응답은 `{headerName, parameterName, token}`, POST 헤더는 X-XSRF-TOKEN, 실패는 403 CSRF_INVALID를 유지한다. 공통 no-store·서버 생성 X-Request-ID도 유지한다.
 - 최초 진입·로그인 성공·로그아웃 성공 후 FE는 credentials를 포함한 GET /api/v1/auth/csrf로 token을 획득한다. 인증 성공 후 GET 전에는 이전 메모리 토큰을 사용하지 않는다.
@@ -50,7 +50,7 @@
 
 - [x] **Step 2: 필요한 수정과 연동 안내.** Step 1 확인 후 진행한다. 운영 설정 누락으로 실패한 경우에만 기존 Spring Security 처리 연결을 최소 수정하고 해당 테스트의 실패→통과를 확인한다. 모두 통과했다면 운영 코드 수정 없이 DEVELOPMENT_SETUP에 FE 호출 순서와 후속 인증 API의 전략/정리 호출 시점을 기록한다. 실제 이메일 로그인·API 로그아웃 구현은 추가하지 않는다.
 
-- [ ] **Step 3: 전체 검증·결과 기록.** Step 2 확인 후 진행한다. Java 25에서 `./gradlew clean check --no-build-cache`와 `git diff --check`를 실행한다. 기존 41개와 새 사례의 통과·실패·skip을 실제 결과로 기록하고 변경 파일·연동 미완료 항목을 제시한다. commit은 사용자 요청 후 진행한다.
+- [x] **Step 3: 전체 검증·결과 기록.** Step 2 확인 후 진행한다. Java 25에서 `./gradlew clean check --no-build-cache`와 `git diff --check`를 실행한다. 기존 41개와 새 사례의 통과·실패·skip을 실제 결과로 기록하고 변경 파일·연동 미완료 항목을 제시한다. commit은 사용자 요청 후 진행한다.
 
 ## 근거와 현재 확인 결과 — 2026-10-10 KST
 
@@ -58,7 +58,7 @@
 - Spring Security는 인증 성공과 로그아웃 성공에서 기존 CSRF를 정리하며, 명시적 GET endpoint로 이후 재획득하는 흐름을 안내한다. [Spring Security CSRF](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html)
 - 구성된 인증 전략은 실제 인증 필터에서 인증 성공 직후 호출된다. [Spring Security 7.1.1 인증 필터](https://github.com/spring-projects/spring-security/blob/7.1.1/web/src/main/java/org/springframework/security/web/authentication/AbstractAuthenticationProcessingFilter.java)
 - 현재 cookie repository는 서버 측 토큰 폐기 목록을 두지 않는다. 삭제 응답 이후의 정상 클라이언트 흐름과 수동 쿠키 재전송의 보장을 구분한다. [Spring Security 7.1.1 cookie repository](https://github.com/spring-projects/spring-security/blob/7.1.1/web/src/main/java/org/springframework/security/web/csrf/CookieCsrfTokenRepository.java)
-- 계획 설명 후 Step 1 구현 요청을 받았고, 구현·검증 결과를 설명한 뒤 기록과 테스트의 로컬 commit 요청을 받아 dce99c4로 보관했다. 이후 사용자 요청으로 Step 2 연동 문서를 작성하고 설명한 뒤 로컬 commit 승인을 받았다. Step 3 진행은 확인 대기다.
+- 계획 설명 후 Step 1 구현 요청을 받았고, 구현·검증 결과를 설명한 뒤 기록과 테스트의 로컬 commit 요청을 받아 dce99c4로 보관했다. 이후 Step 2 연동 문서를 작성하고 설명한 뒤 승인받아 f19fa53로 보관했다. Step 3 전체 검증도 승인받아 진행했으며 결과 설명 후 로컬 commit 요청을 받았다.
 
 ## Step 1 실행 결과 — 2026-10-10 KST
 
@@ -81,4 +81,39 @@
 - 현재 /logout의 302와 향후 /api/v1/auth/logout의 204·401·503 계약을 구분했다. CORS가 /api/**에만 등록되어 있어 현재 /logout의 다른 origin FE fetch 사용을 전제로 하지 않도록 명시했다. 실제 인증 API·FE 코드·JDBC 세션·365일 갱신과 운영 쿠키 정책 변경은 추가하지 않았다.
 - 문서 JavaScript 2개 블록 구문 검사와 네트워크 없는 7개 예시 확인을 통과했다: 정상 GET→POST, GET 503, data로 감싼 응답, 빈 token, GET 네트워크 실패, POST 403 후 자동 재실행 없음, 후속 재획득 실패 시 기존 메모리 token 비움.
 - 변경 문서 2개의 로컬 링크·anchor 7개와 코드 블록 경계를 확인했고 `git diff --check`를 통과했다. .gitignore·gradlew.bat diff는 작업 전과 일치한다. 문서만 변경한 이번 스텝에서는 Gradle 테스트를 재실행하지 않았으며, Step 1의 47개 통과는 이전 검증 결과다.
-- 사용자 승인에 따라 이번 스텝의 두 문서를 로컬 commit으로 보관한다. push·PR·Jira 상태 변경은 진행하지 않는다. 다음 작업은 Step 3 전체 검증·결과 기록이며 진행안 설명 후 사용자 확인을 받는다.
+- 사용자 승인에 따라 이번 스텝의 두 문서를 f19fa53 로컬 commit으로 보관했다. push·PR·Jira 상태 변경은 진행하지 않았다. 다음 Step 3은 진행안 설명 후 사용자 승인을 받아 실행했다.
+
+## Step 3 실행 결과 — 2026-10-10 KST
+
+- Java 25와 실행 중인 Docker daemon에서 `./gradlew clean check --no-build-cache`를 실행했다. 19:29 KST 확인 시 BUILD SUCCESSFUL이며 clean 이후 운영·테스트 컴파일과 test·check가 실행됐다. 새 검증은 한 번만 수행했고 최종 검토자는 테스트를 재실행하지 않았다.
+- JUnit XML의 tests·failures·errors·skipped 속성을 직접 집계했다. 기존 41개와 수명주기 6개를 합한 47개가 모두 통과했으며 실패·오류·skip은 0이다.
+
+| 테스트 | 실행 | 실패 | 오류 | skip |
+| --- | ---: | ---: | ---: | ---: |
+| CsrfContractTests | 14 | 0 | 0 | 0 |
+| CsrfLifecycleContractTests | 6 | 0 | 0 | 0 |
+| CorsContractTests | 8 | 0 | 0 | 0 |
+| CookieContractTests: LocalHttp·SecureCookies | 4 | 0 | 0 | 0 |
+| SecurityConfigTests | 13 | 0 | 0 | 0 |
+| DodamDodamBackendApplicationTests | 2 | 0 | 0 | 0 |
+| **합계** | **47** | **0** | **0** | **0** |
+
+- 별도 읽기 전용 최종 검토에서 브랜치 전체 `d048b97..f19fa53`의 3개 commit과 관련 운영 설정·테스트·계약·연동 문서를 확인했다. Critical·Important·Minor 지적은 없었다. 검토자는 최종 XML 47개와 BUILD SUCCESSFUL 로그, 해당 commit 범위의 `git diff --check`를 직접 확인했다. 이는 기술 검토 결과이며 GitHub 팀 승인·필수 CI·Jira 완료를 대신하지 않는다.
+- 현재 필터의 로그인 성공/실패·로그아웃·재획득 동작과 FE 안내가 일치한다. 후속 이메일 로그인에는 세션 전략·명시적 인증 문맥 저장, API 로그아웃에는 업무 DB 폐기 후 framework 정리가 필요하다는 연결 규칙도 확인했다.
+- 이번 Step 3에서 운영 코드·테스트·설정은 수정하지 않았다. 현재 변경은 이 결과 기록뿐이며 사용자 .gitignore·gradlew.bat 변경은 그대로 보존한다. 사용자 요청으로 결과 기록만 로컬 commit한다. push·PR·Jira 상태 변경은 진행하지 않는다.
+
+### 최종 검토의 후속 범위와 남은 영향
+
+| 항목 | 결정과 남은 영향 |
+| --- | --- |
+| 이메일 로그인·API 로그아웃 | 실제 업무 검증·200/204/401/503·DB 실패 보상은 후속 인증 구현에서 연결한다. 현재 필터 검증으로 해당 기능이 제공된 것은 아니다. |
+| 현재 /logout의 다른 origin FE fetch | CORS가 /api/**에만 적용되므로 지원을 전제로 하지 않는다. FE의 API 로그아웃은 후속 경로 구현 뒤 연결해야 한다. |
+| 이전 쿠키·동일 헤더 수동 재전송 | 현재 cookie repository를 유지한다. 서버 측 폐기 목록에 의한 재전송 차단은 제공하지 않는다. |
+| 실제 OAuth 공급자 검증 | 외부 인증 결과 대역을 사용했으므로 공급자의 자격·서명·state/nonce 검증은 실제 연동에서 확인한다. 외부 연동 오류가 남아 있을 수 있다. |
+| 실제 HTTPS 브라우저 쿠키 | 로컬 Lax 수명주기와 Secure/None 발급 속성 테스트만 확인했다. HTTPS 브라우저 저장·전송·삭제와 Secure/None 만료는 별도 검증이 필요하다. |
+| 운영 origin·SameSite·CSRF HttpOnly | 기존 정책을 유지한다. D17·실제 FE 소비 방식 확인 전 운영 값을 확정하거나 CSRF HttpOnly를 전환하지 않는다. 배포 호환성은 미확인이다. |
+| JDBC 세션·365일 갱신·운영 부하 | SCRUM-94·운영 후속 범위로 유지한다. 현재 결과로 영속 세션·갱신·부하 계약이 구현됐다고 판단하지 않는다. |
+| 실제 FE·rate limit·업무 오류 전체 구현 | 이번 연동 안내에서 기능 완료를 주장하지 않는다. 해당 구현과 호출 흐름의 별도 검증이 필요하다. |
+| 사용자 변경·이번 결과 기록 | 사용자 .gitignore·gradlew.bat는 검토 commit 밖이며 보존한다. 최종 검토 이후 추가한 이 기록은 문서 검증 후 사용자 승인으로 별도 commit한다. |
+
+이 계획의 Step 1~3 검증 범위는 완료했다. SCRUM-95 전체 이슈의 완료 조건·후속 인증 연결·GitHub 필수 CI와 팀 리뷰·PR 병합·Jira 자동 완료는 별도로 확인해야 한다. 다음 외부 작업은 사용자 확인 없이 진행하지 않는다.
