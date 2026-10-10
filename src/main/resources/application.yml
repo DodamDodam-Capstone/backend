@@ -34,9 +34,10 @@ server:
     session:
       timeout: 30m
       cookie:
+        path: /
         http-only: true
         secure: ${SESSION_COOKIE_SECURE:false}
-        same-site: lax
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
 
 management:
   endpoints:

@@ -309,6 +309,19 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
 | `APP_LOGOUT_SUCCESS_URL` | `http://localhost:5173` | 로그아웃 후 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
+| `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
+
+세션 쿠키 `JSESSIONID`는 HttpOnly이며, `XSRF-TOKEN`은 기존 FE 호환을 위해
+HttpOnly=false를 유지합니다. 두 쿠키 모두 Path=/, Domain 미설정(host-only)으로
+발급하고 Secure·SameSite 설정을 공유합니다. FE가 JSON 응답의 토큰만 사용한다면
+CSRF 쿠키의 HttpOnly=true 전환을 별도로 검토할 수 있습니다.
+
+로컬 HTTP는 `SESSION_COOKIE_SECURE=false`, `SESSION_COOKIE_SAME_SITE=lax`를
+사용합니다. HTTPS 환경은 Secure=true로 설정하고, FE/API가 같은 사이트인지에 따라
+SameSite를 결정합니다. `none`과 Secure=false의 조합은 기동 시 거부합니다.
+Google 로그인은 외부 사이트에서 GET callback으로 돌아오므로 `strict`를 권장하지
+않습니다. 실제 운영 origin·SameSite와 브라우저 쿠키 전달은 D17 확정 후 검증하며,
+테스트의 Secure=true·None 조합은 운영 설정을 확정한 것이 아닙니다.
 
 `application.yml`의 `local-...` OAuth 값은 자격 증명이 없을 때도 context가
 기동되도록 만든 비밀이 아닌 placeholder입니다. 실제 공급자 로그인에는 사용할 수
@@ -444,6 +457,8 @@ Kakao endpoint, JWK endpoint, issuer는 공식 Discovery 문서의 값으로 코
 
 ## 10. React 연동 기준
 
+### 10.1 OAuth 진입과 cookie 전달
+
 로그인 버튼은 AJAX로 공급자 URL을 호출하기보다 브라우저 navigation을 사용합니다.
 
 ```text
@@ -460,13 +475,62 @@ await fetch("http://localhost:8080/api/v1/example", {
 });
 ```
 
-POST·PUT·PATCH·DELETE 전에 CSRF 토큰을 받습니다.
+React 개발 서버가 다른 port를 사용하면 `APP_CORS_ALLOWED_ORIGINS`와 로그인 성공
+URL을 함께 수정합니다. credential을 사용하는 CORS에서는 `*` origin을 사용하지
+않습니다. SameSite·Secure는 [환경변수와 비밀값](#6-환경변수와-비밀값)의 쿠키 설정과
+배포 구성을 함께 확인합니다.
+
+### 10.2 CSRF 획득과 재획득 시점
+
+POST·PUT·PATCH·DELETE 전에 CSRF 토큰을 확보합니다. 로그인 전 공개 인증 POST도
+`XSRF-TOKEN` 쿠키와 `X-XSRF-TOKEN` 헤더가 필요합니다. 쿠키는 브라우저가 관리하고,
+FE는 GET `/api/v1/auth/csrf`의 JSON token을 메모리에 보관해 헤더로 전달합니다.
+CSRF 응답은 `{headerName, parameterName, token}`이며 `data`로 감싸지 않습니다.
+응답의 `parameterName`은 `_csrf`로 유지하지만 query/form 파라미터로 헤더를
+대체할 수 없습니다. 토큰 누락·빈 값·불일치는 `403 CSRF_INVALID` JSON 오류로
+반환하며, `error.requestId`는 서버 생성 `X-Request-ID`와 같습니다.
+응답에는 `Cache-Control: no-store`를 적용합니다.
+
+| 시점 | FE 처리 |
+| --- | --- |
+| 최초 진입 | credentials를 포함한 GET으로 token을 받은 뒤 공개 인증 POST를 허용합니다. |
+| 로그인 성공 | 이전 메모리 token을 비우고 GET을 완료한 뒤 다음 POST를 허용합니다. OAuth는 성공 URL로 돌아온 화면에서 수행하고, 후속 이메일 로그인은 성공 응답 뒤 수행합니다. |
+| 로그아웃 성공 | 로그인 상태·이전 메모리 token을 비우고 익명 상태에서 GET을 완료합니다. 후속 API 로그아웃의 204 응답 뒤 수행합니다. |
+| 인증 실패 | 성공 시 정리를 적용하지 않습니다. 단, `CSRF_INVALID`이면 아래 복구 절차를 따릅니다. |
+| 일반 API 호출 | 현재 token을 재사용합니다. 반복 GET은 기존 쿠키의 같은 token을 반환하므로 매 POST 전에 GET을 반복하거나 강제 회전을 기대하지 않습니다. |
+
+로그인·로그아웃 성공 응답의 쿠키 만료를 적용한 뒤에는 이전 메모리 token을 보내지
+않습니다. GET이 실패하면 token을 사용 가능한 상태로 되돌리지 않고 POST를 보류합니다.
+FE의 token은 메모리에만 보관하며 token·쿠키 값·raw session ID는 로그에 기록하지
+않습니다. 현재 `CookieCsrfTokenRepository`에는 서버 측 폐기 목록이 없으므로 이전
+쿠키와 동일 헤더를 수동 재전송하는 것까지 차단한다고 해석하지 않습니다.
+
+### 10.3 호출 예시
+
+다음은 호출 순서 예시입니다. `/api/v1/example`은 설명용 경로이므로 실제 사용할 API로
+교체합니다. `refreshCsrf()`는 최초 진입과 로그인·로그아웃 성공 뒤에 호출합니다.
 
 ```javascript
-const csrf = await fetch("http://localhost:8080/api/v1/auth/csrf", {
-  credentials: "include",
-}).then((response) => response.json());
+let csrf = null;
 
+async function refreshCsrf() {
+  csrf = null;
+  const response = await fetch("http://localhost:8080/api/v1/auth/csrf", {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`CSRF 획득 실패: HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  if (payload?.headerName !== "X-XSRF-TOKEN"
+      || typeof payload.token !== "string" || payload.token.length === 0) {
+    throw new Error("CSRF 응답 형식 오류");
+  }
+  csrf = payload;
+}
+
+await refreshCsrf();
 await fetch("http://localhost:8080/api/v1/example", {
   method: "POST",
   credentials: "include",
@@ -478,9 +542,63 @@ await fetch("http://localhost:8080/api/v1/example", {
 });
 ```
 
-React 개발 서버가 다른 port를 사용하면 `APP_CORS_ALLOWED_ORIGINS`와 로그인 성공
-URL을 함께 수정합니다. credential을 사용하는 CORS에서는 `*` origin을 사용하지
-않습니다.
+### 10.4 오류 복구와 재시도
+
+- `403 CSRF_INVALID`: 메모리 token을 비우고 credentials를 포함한 GET으로 다시 받습니다.
+  403 응답도 새 CSRF 쿠키를 발급할 수 있으므로 브라우저가 해당 쿠키를 반영하도록 합니다.
+  재획득이 성공해도 실패한 업무 POST를 자동 재실행하지 않습니다. 사용자 확인과 해당
+  API의 재시도 계약에 따라 별도로 실행합니다.
+- `401 AUTHENTICATION_REQUIRED`: 로컬 로그인 상태·token을 비우고 재로그인 흐름으로
+  이동합니다. 이메일 로그인 자체의 `401 LOGIN_FAILED`는 자격 증명 실패이므로 구분합니다.
+- 네트워크 오류: 서버에서 POST가 처리됐는지 응답 없이 단정할 수 없습니다. 무조건
+  재전송하지 않고 조회로 결과를 확인하거나 해당 API의 복구 계약을 따릅니다.
+- GET 재획득 실패: 후속 POST를 보류합니다. `429`이면 `Retry-After`만큼 기다리고,
+  반복 호출로 토큰을 얻으려 하지 않습니다.
+
+공통 오류·재시도 기준은 [공통 HTTP와 세션 계약](p0/api/01-common.md#section-3)을 따릅니다.
+
+### 10.5 후속 Backend 인증 API 연결
+
+현재 OAuth 로그인은 Spring Security 인증 필터의 세션 전략과 인증 문맥 저장 처리를
+사용합니다. 현재 로그아웃은 CSRF 검사를 거친 `POST /logout`의 성공 302 이동입니다.
+이메일 로그인과 계약 경로 `POST /api/v1/auth/logout`은 아직 구현하지 않았습니다.
+credentialed CORS는 `/api/**`에만 등록되어 있으므로, 현재 `/logout`을 다른 origin의
+FE에서 fetch로 호출할 수 있다고 가정하지 않습니다. FE의 API 로그아웃 연결은 후속
+인증 API 구현 뒤 진행합니다.
+
+후속 **이메일 로그인**은 다음 순서를 지킵니다.
+
+1. 자격 증명과 최신 계정 상태를 검증한 뒤, 인증 필터와 같은 구성의
+   `SessionAuthenticationStrategy.onAuthentication(...)`을 실행합니다. 세션 fixation
+   방어와 현재 cookie repository를 사용하는 `CsrfAuthenticationStrategy`를 포함해야
+   하며, 사용자 정의 컨트롤러에 자동 적용된다고 가정하지 않습니다.
+2. 인증된 `SecurityContext`를 만들고 요청 처리 문맥에 설정한 뒤, 보안 필터와 같은
+   `SecurityContextRepository.saveContext(...)`로 저장합니다. `SecurityContextHolder`만
+   설정하면 다음 요청의 인증 보존을 보장하지 않습니다.
+3. 업무 보안 문맥과 실제 framework 세션 저장까지 성공한 뒤 200을 반환합니다.
+   저장 실패의 503·보조 문맥 폐기는 [이메일 로그인 계약](p0/api/02-auth.md#section-6-5)을
+   따릅니다. JDBC 세션 저장과 업무 트랜잭션이 자동으로 원자적이라고 가정하지 않습니다.
+
+후속 **API 로그아웃**은 다음 순서를 지킵니다.
+
+1. CSRF·로그인 상태와 실제 0바이트 body를 검사합니다. 유효한 CSRF를 가진 비로그인
+   요청은 `401 AUTHENTICATION_REQUIRED`입니다.
+2. 현재 `session_security`와 보호자 확인·PIN 관련 권한의 DB 폐기를 먼저 커밋합니다.
+   DB 폐기가 실패하면 `503 AUTH_STATE_UNAVAILABLE`로 처리하고 성공 응답을 내지 않습니다.
+3. 성공한 DB 폐기 뒤 `SecurityContextLogoutHandler`로 인증 문맥·세션을 정리하고,
+   같은 cookie repository의 `CsrfLogoutHandler`로 CSRF를 정리합니다. 세션·CSRF 쿠키는
+   발급 때와 같은 Path/Domain으로 만료시키고, 모든 정리가 성공한 뒤 본문 없는 204를
+   반환합니다.
+
+이때 기본 `/logout` 매핑도 제거해 [로그아웃 계약](p0/api/02-auth.md#section-6-7)의 단일
+경로를 사용합니다. URL만 바꾸어 `LogoutFilter`가 업무 DB 폐기를 건너뛰거나 DB 성공 전에
+세션을 정리하게 만들지 않습니다. 실제 API와 연결할 때 해당 순서·실패 동작을 검증합니다.
+JDBC 세션·365일 갱신은 SCRUM-94, 실제 OAuth·HTTPS 브라우저 연동은 SCRUM-129의 후속
+검증 범위입니다.
+
+Spring Security 근거: [CSRF 수명주기](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
+[인증 문맥 저장](https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html),
+[로그아웃 처리](https://docs.spring.io/spring-security/reference/servlet/authentication/logout.html).
 
 ## 11. FastAPI·AI 팀 연동 기준
 
@@ -653,7 +771,7 @@ REST API key를 client ID에 넣었는지, client secret 기능을 활성화했�
 
 먼저 `/api/v1/auth/csrf`를 `credentials: "include"`로 호출한 뒤 응답의
 `headerName`과 `token`을 변경 요청에 넣습니다. 두 요청에서 동일한 session cookie가
-전송되는지 확인합니다.
+전송되는지 확인하고, 발급받은 `XSRF-TOKEN` 쿠키도 함께 전송합니다.
 
 ## 16. 업데이트 원칙
 
