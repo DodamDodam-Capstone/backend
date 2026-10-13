@@ -21,3 +21,13 @@ CLAUDE.local.md
 
 __pycache__/
 *.py[cod]
+
+# obsidian
+.obsidian/
+docs/.obsidian/
+
+# JetBrains IDEs
+.idea/
+
+# Local implementation plans and work logs
+/docs/superpowers/
