@@ -5,6 +5,7 @@ import jakarta.servlet.http.Cookie;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +21,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockCookie;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2LoginAuthenticationToken;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
@@ -30,6 +33,10 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.session.Session;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -40,8 +47,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
-import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,7 +55,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({TestcontainersConfiguration.class, CsrfContractTests.AuthProbe.class,
         CsrfLifecycleContractTests.ProtectedProbe.class})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
-@SpringBootTest(properties = {"SESSION_COOKIE_SECURE=false", "SESSION_COOKIE_SAME_SITE=lax"})
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {"SESSION_COOKIE_SECURE=false", "SESSION_COOKIE_SAME_SITE=lax"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CsrfLifecycleContractTests {
 
@@ -65,6 +71,12 @@ class CsrfLifecycleContractTests {
 
     @Autowired
     private FilterChainProxy securityFilterChain;
+
+    @Autowired
+    private JdbcIndexedSessionRepository sessionRepository;
+
+    @Autowired
+    private CookieSerializer sessionCookieSerializer;
 
     private OAuth2LoginAuthenticationFilter oauthFilter;
 
@@ -91,15 +103,15 @@ class CsrfLifecycleContractTests {
     void oauthSuccessClearsTokenAndAllowsRefresh() throws Exception {
         var beforeLogin = issuedCsrf(null, null);
         var login = login(beforeLogin.cookie());
-        var session = (MockHttpSession) login.getRequest().getSession(false);
+        var session = currentSessionCookie(login);
 
         assertClearedCookie(login.getResponse());
         var rejected = expectCsrfInvalid(post(PROTECTED_PATH)
-                .session(session).header(CSRF_HEADER, beforeLogin.token()));
+                .cookie(session).header(CSRF_HEADER, beforeLogin.token()));
         var refreshed = issuedCsrf(session, rejected.getCookie(CSRF_COOKIE));
         assertThat(refreshed.token().equals(beforeLogin.token())).as("login token is replaced").isFalse();
 
-        mockMvc.perform(post(PROTECTED_PATH).session(session)
+        mockMvc.perform(post(PROTECTED_PATH).cookie(session)
                         .cookie(refreshed.cookie()).header(CSRF_HEADER, refreshed.token()))
                 .andExpect(status().isNoContent());
     }
@@ -107,15 +119,15 @@ class CsrfLifecycleContractTests {
     @Test
     void logoutClearsTokenAndAllowsAnonymousRefresh() throws Exception {
         var login = login(issuedCsrf(null, null).cookie());
-        var session = (MockHttpSession) login.getRequest().getSession(false);
+        var session = currentSessionCookie(login);
         var beforeLogout = issuedCsrf(session, null);
 
-        var logout = mockMvc.perform(post("/logout").session(session)
+        var logout = mockMvc.perform(post("/logout").cookie(session)
                         .cookie(beforeLogout.cookie()).header(CSRF_HEADER, beforeLogout.token()))
                 .andExpect(status().isFound()).andReturn().getResponse();
 
         assertClearedCookie(logout);
-        assertThat(session.isInvalid()).as("logout invalidates the session").isTrue();
+        assertThat(storedSession(session) == null).as("logout deletes the stored session").isTrue();
         var rejected = expectCsrfInvalid(post(PUBLIC_PATH).header(CSRF_HEADER, beforeLogout.token()));
         var refreshed = issuedCsrf(null, rejected.getCookie(CSRF_COOKIE));
         assertThat(refreshed.token().equals(beforeLogout.token())).as("logout token is replaced").isFalse();
@@ -132,13 +144,13 @@ class CsrfLifecycleContractTests {
         });
         var original = issuedCsrf(null, null);
         var failure = completeOAuth(original.cookie());
-        unauthenticated().match(failure);
-        var session = (MockHttpSession) failure.getRequest().getSession(false);
+        var session = currentSessionCookie(failure);
+        assertThat(isAuthenticatedSession(session)).as("failed login stays anonymous").isFalse();
 
         assertThat(failure.getResponse().getCookie(CSRF_COOKIE)).isNull();
         var retained = issuedCsrf(session, original.cookie());
         assertThat(retained.token().equals(original.token())).as("failed login retains the token").isTrue();
-        mockMvc.perform(post(PUBLIC_PATH).session(session).cookie(retained.cookie())
+        mockMvc.perform(post(PUBLIC_PATH).cookie(session, retained.cookie())
                         .header(CSRF_HEADER, retained.token()))
                 .andExpect(status().isNoContent());
     }
@@ -147,24 +159,25 @@ class CsrfLifecycleContractTests {
     @ValueSource(strings = {"", "invalid-csrf-token"})
     void invalidLogoutKeepsAuthenticatedSession(String header) throws Exception {
         var login = login(issuedCsrf(null, null).cookie());
-        var session = (MockHttpSession) login.getRequest().getSession(false);
+        var session = currentSessionCookie(login);
         var csrf = issuedCsrf(session, null);
-        var request = post("/logout").session(session).cookie(csrf.cookie());
+        var request = post("/logout").cookie(session, csrf.cookie());
         if (!header.isEmpty()) {
             request.header(CSRF_HEADER, header);
         }
 
         var rejected = expectCsrfInvalid(request);
         assertThat(rejected.getCookie(CSRF_COOKIE)).isNull();
-        assertThat(session.isInvalid()).as("rejected logout keeps the session").isFalse();
-        mockMvc.perform(post(PROTECTED_PATH).session(session)
+        assertThat(isAuthenticatedSession(session)).as("rejected logout keeps authentication").isTrue();
+        mockMvc.perform(post(PROTECTED_PATH).cookie(session)
                         .cookie(csrf.cookie()).header(CSRF_HEADER, csrf.token()))
                 .andExpect(status().isNoContent());
     }
 
     private MvcResult login(Cookie cookie) throws Exception {
         var result = completeOAuth(cookie);
-        authenticated().match(result);
+        assertThat(isAuthenticatedSession(currentSessionCookie(result)))
+                .as("login stores the authenticated context").isTrue();
         return result;
     }
 
@@ -174,9 +187,9 @@ class CsrfLifecycleContractTests {
         var state = UriComponentsBuilder.fromUriString(start.getResponse().getRedirectedUrl())
                 .build().getQueryParams().getFirst("state");
         state = URLDecoder.decode(state, StandardCharsets.UTF_8);
-        var session = (MockHttpSession) start.getRequest().getSession(false);
-        var callback = mockMvc.perform(get("/login/oauth2/code/google").session(session)
-                        .cookie(cookie).param("code", "test-authorization-code").param("state", state))
+        var callback = mockMvc.perform(get("/login/oauth2/code/google")
+                        .cookie(cookie, currentSessionCookie(start))
+                        .param("code", "test-authorization-code").param("state", state))
                 .andExpect(status().isFound()).andReturn();
         assertResponseHeaders(callback.getResponse());
         return callback;
@@ -193,10 +206,10 @@ class CsrfLifecycleContractTests {
                 request.getAuthorizationExchange(), principal, authorities, accessToken);
     }
 
-    private IssuedCsrf issuedCsrf(MockHttpSession session, Cookie currentCookie) throws Exception {
+    private IssuedCsrf issuedCsrf(Cookie session, Cookie currentCookie) throws Exception {
         var request = get(CSRF_PATH);
         if (session != null) {
-            request.session(session);
+            request.cookie(session);
         }
         if (currentCookie != null) {
             request.cookie(currentCookie);
@@ -215,6 +228,36 @@ class CsrfLifecycleContractTests {
         assertThat(token.equals(cookie.getValue())).as("JSON token matches the CSRF cookie").isTrue();
         assertResponseHeaders(response);
         return new IssuedCsrf(cookie, token);
+    }
+
+    private Cookie currentSessionCookie(MvcResult result) {
+        var serialized = result.getResponse().getHeaders("Set-Cookie").stream()
+                .filter(header -> header.startsWith("JSESSIONID="))
+                .findFirst();
+        if (serialized.isPresent()) {
+            return MockCookie.parse(serialized.orElseThrow());
+        }
+        return Arrays.stream(result.getRequest().getCookies())
+                .filter(cookie -> cookie.getName().equals("JSESSIONID"))
+                .findFirst().orElseThrow();
+    }
+
+    private Session storedSession(Cookie cookie) {
+        var request = new MockHttpServletRequest();
+        request.setCookies(cookie);
+        var ids = sessionCookieSerializer.readCookieValues(request);
+        assertThat(ids.size()).as("one session cookie").isEqualTo(1);
+        return sessionRepository.findById(ids.getFirst());
+    }
+
+    private boolean isAuthenticatedSession(Cookie cookie) {
+        var session = storedSession(cookie);
+        if (session == null) {
+            return false;
+        }
+        SecurityContext context = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        return context != null && context.getAuthentication() != null
+                && context.getAuthentication().isAuthenticated();
     }
 
     private MockHttpServletResponse expectCsrfInvalid(MockHttpServletRequestBuilder request) throws Exception {

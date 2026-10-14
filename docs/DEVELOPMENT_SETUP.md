@@ -373,6 +373,17 @@ volumes:
 
 ### 7.3 마이그레이션 규칙
 
+프레임워크 세션은 Spring Session JDBC로 PostgreSQL에 저장합니다.
+`V1__create_spring_session_tables.sql`은 실제 사용 버전 4.1.1의 공식 PostgreSQL
+스키마를 적용하며, `SPRING_SESSION`과 `SPRING_SESSION_ATTRIBUTES`를 생성합니다.
+`spring.session.jdbc.initialize-schema=never`로 프레임워크의 자동 스키마 생성을
+끄고 Flyway만 스키마를 관리합니다.
+
+`spring.session.jdbc.flush-mode=immediate`는 세션 변경을 즉시 DB에 기록합니다.
+이 저장은 업무 DB 트랜잭션과 자동으로 원자적이지 않습니다. 현재 기본 timeout은
+30분이고 쿠키 이름은 `JSESSIONID`입니다. 일반 로그인 무상한 수명과 인증 쿠키
+365일 갱신·저장 실패 보상은 SCRUM-94의 후속 단계에서 연결합니다.
+
 새 스키마 파일은 다음 위치와 이름 규칙을 사용합니다.
 
 ```text
