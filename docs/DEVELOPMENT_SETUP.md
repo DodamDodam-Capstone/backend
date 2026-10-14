@@ -384,6 +384,14 @@ volumes:
 30분이고 쿠키 이름은 `JSESSIONID`입니다. 일반 로그인 무상한 수명과 인증 쿠키
 365일 갱신·저장 실패 보상은 SCRUM-94의 후속 단계에서 연결합니다.
 
+업무 계정과 보안 문맥은 V2의 `accounts`·`session_security`, PIN challenge/token은
+V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NULL`을
+허용하며 guardian 기한·PIN 버전은 함께 설정하거나 함께 해제해야 합니다.
+`SessionSecurityRepository.revokeCurrentContext(accountId, securityContextId)`는
+현재 문맥·guardian·미소비 두 PIN 목적을 한 업무 트랜잭션에서 폐기합니다.
+무효 문맥은 false, DB 실패는 예외로 전달합니다. 프레임워크 세션·쿠키 정리는
+이 업무 트랜잭션의 커밋을 확인한 뒤 실행해야 하며, API 연결은 후속 단계입니다.
+
 새 스키마 파일은 다음 위치와 이름 규칙을 사용합니다.
 
 ```text
