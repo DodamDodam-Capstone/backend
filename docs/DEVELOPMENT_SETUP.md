@@ -392,6 +392,18 @@ V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NUL
 무효 문맥은 false, DB 실패는 예외로 전달합니다. 프레임워크 세션·쿠키 정리는
 이 업무 트랜잭션의 커밋을 확인한 뒤 실행해야 하며, API 연결은 후속 단계입니다.
 
+보호 API는 `AuthenticatedSessionService.requireAuthenticatedSession(request)`를
+통해 프레임워크 세션·인증 principal·업무 문맥을 함께 확인합니다. principal 이름은
+계정 UUID 문자열이고, native 세션의 `accountId`·`securityContextId` 속성은 UUID입니다.
+계정/문맥 결합, 폐기, 최신 계정 버전과 DB 현재 시각 기준의 유한 만료를 매번 검사하며
+일반 세션의 NULL 기한도 다른 검사를 생략하지 않습니다. 유효하면 두 UUID를 반환합니다.
+무효/비로그인은 `401 AUTHENTICATION_REQUIRED`, 저장소 읽기·쓰기·역직렬화 실패는
+`503 AUTH_STATE_UNAVAILABLE` 공통 JSON으로 처리합니다. CSRF 실패의 403은 인증 판정보다
+먼저 처리하고, API 인증 실패에 로그인 페이지 redirect나 익명 요청 저장용 세션을 만들지 않습니다.
+현재 미처리 DB 예외의 fallback은 인증 저장소 기준이므로 다른 업무 저장소가 추가되면
+그 도메인의 오류 변환을 연결해야 합니다. 실제 로그인에서 문맥을 생성·저장하는 연결은
+후속 단계와 SCRUM-78·93에서 수행합니다.
+
 새 스키마 파일은 다음 위치와 이름 규칙을 사용합니다.
 
 ```text

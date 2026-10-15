@@ -1,9 +1,12 @@
 package com.dodamdodam.backend.global.config;
 
+import com.dodamdodam.backend.auth.session.AuthStateErrorHandler;
+import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.global.auth.CsrfAccessDeniedHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.server.Cookie.SameSite;
 import org.springframework.boot.web.server.autoconfigure.ServerProperties;
@@ -36,7 +39,9 @@ public class SecurityConfig {
             HttpSecurity http,
             AppSecurityProperties properties,
             CsrfAccessDeniedHandler csrfAccessDeniedHandler,
-            CookieCsrfTokenRepository csrfTokenRepository
+            CookieCsrfTokenRepository csrfTokenRepository,
+            AuthenticatedSessionService authenticatedSessionService,
+            AuthStateErrorHandler authStateErrorHandler
     ) throws Exception {
         var csrfRequestHandler = new CsrfTokenRequestAttributeHandler() {
             @Override
@@ -65,16 +70,22 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/password-resets"
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().access((authentication, context) -> {
+                            authenticatedSessionService.requireAuthenticatedSession(context.getRequest());
+                            return new AuthorizationDecision(true);
+                        })
                 )
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfRequestHandler)
                 )
-                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(
-                        new DelegatingAccessDeniedHandler(accessDeniedHandlers, new AccessDeniedHandlerImpl())
-                ))
+                .requestCache(cache -> cache.disable())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authStateErrorHandler)
+                        .accessDeniedHandler(new DelegatingAccessDeniedHandler(
+                                accessDeniedHandlers, new AccessDeniedHandlerImpl()))
+                )
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl(properties.loginSuccessUrl(), true)
                 )

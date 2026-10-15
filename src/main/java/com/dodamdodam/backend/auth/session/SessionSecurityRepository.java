@@ -15,6 +15,28 @@ public class SessionSecurityRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public boolean isCurrentContext(UUID accountId, UUID securityContextId) {
+        var states = jdbcTemplate.query("""
+                SELECT s.session_version, a.session_version AS account_version,
+                       s.revoked_at, s.expires_at, clock_timestamp() AS checked_at
+                FROM session_security s JOIN accounts a ON a.id = s.account_id
+                WHERE s.id = ? AND s.account_id = ?
+                """, (result, row) -> new SessionValidity(
+                result.getLong("session_version"), result.getLong("account_version"),
+                result.getObject("revoked_at", OffsetDateTime.class),
+                result.getObject("expires_at", OffsetDateTime.class),
+                result.getObject("checked_at", OffsetDateTime.class)), securityContextId, accountId);
+        return !states.isEmpty() && states.getFirst().isValid();
+    }
+
+    record SessionValidity(long sessionVersion, long accountVersion, OffsetDateTime revokedAt,
+                           OffsetDateTime expiresAt, OffsetDateTime checkedAt) {
+        boolean isValid() {
+            return sessionVersion == accountVersion && revokedAt == null
+                    && (expiresAt == null || checkedAt.isBefore(expiresAt));
+        }
+    }
+
     @Transactional
     public boolean revokeCurrentContext(UUID accountId, UUID securityContextId) {
         var accountVersions = jdbcTemplate.queryForList(

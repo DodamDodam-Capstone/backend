@@ -1,5 +1,6 @@
 package com.dodamdodam.backend;
 
+import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.net.URLDecoder;
@@ -8,6 +9,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -20,6 +22,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockCookie;
@@ -78,17 +81,24 @@ class CsrfLifecycleContractTests {
     @Autowired
     private CookieSerializer sessionCookieSerializer;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private UUID accountId;
+
     private OAuth2LoginAuthenticationFilter oauthFilter;
 
     @BeforeEach
     void configureOAuthResult() {
+        accountId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO accounts (id, email) VALUES (?, ?)", accountId, accountId + "@example.invalid");
         oauthFilter = securityFilterChain.getFilterChains().stream()
                 .flatMap(chain -> chain.getFilters().stream())
                 .filter(OAuth2LoginAuthenticationFilter.class::isInstance)
                 .map(OAuth2LoginAuthenticationFilter.class::cast)
                 .findFirst().orElseThrow();
         // 외부 인증 결과만 대체하고 필터의 세션·CSRF·성공 처리는 그대로 실행한다.
-        oauthFilter.setAuthenticationManager(CsrfLifecycleContractTests::successfulAuthentication);
+        oauthFilter.setAuthenticationManager(this::successfulAuthentication);
     }
 
     @Test
@@ -176,6 +186,13 @@ class CsrfLifecycleContractTests {
 
     private MvcResult login(Cookie cookie) throws Exception {
         var result = completeOAuth(cookie);
+        var contextId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO session_security (id, account_id, session_version) VALUES (?, ?, 0)
+                """, contextId, accountId);
+        var session = storedSession(currentSessionCookie(result));
+        session.setAttribute(AuthenticatedSessionService.ACCOUNT_ID, accountId);
+        session.setAttribute(AuthenticatedSessionService.SECURITY_CONTEXT_ID, contextId);
         assertThat(isAuthenticatedSession(currentSessionCookie(result)))
                 .as("login stores the authenticated context").isTrue();
         return result;
@@ -195,10 +212,10 @@ class CsrfLifecycleContractTests {
         return callback;
     }
 
-    private static Authentication successfulAuthentication(Authentication authentication) {
+    private Authentication successfulAuthentication(Authentication authentication) {
         var request = (OAuth2LoginAuthenticationToken) authentication;
         var authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
-        var principal = new DefaultOAuth2User(authorities, Map.of("sub", "csrf-lifecycle-user"), "sub");
+        var principal = new DefaultOAuth2User(authorities, Map.of("sub", accountId.toString()), "sub");
         var now = Instant.now();
         var accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
                 "test-oauth-access-token", now, now.plusSeconds(300));
