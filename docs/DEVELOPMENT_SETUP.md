@@ -381,8 +381,16 @@ volumes:
 
 `spring.session.jdbc.flush-mode=immediate`는 세션 변경을 즉시 DB에 기록합니다.
 이 저장은 업무 DB 트랜잭션과 자동으로 원자적이지 않습니다. 현재 기본 timeout은
-30분이고 쿠키 이름은 `JSESSIONID`입니다. 일반 로그인 무상한 수명과 인증 쿠키
-365일 갱신·저장 실패 보상은 SCRUM-94의 후속 단계에서 연결합니다.
+30분이고 쿠키 이름은 `JSESSIONID`입니다. 공유 로그인 전략을 거친 일반 세션만
+inactive interval=-1과 업무 expires_at=NULL로 전환합니다. 인증 쿠키 365일 갱신은
+SCRUM-94의 후속 단계에서 연결합니다.
+
+현재 Spring Session JDBC 4.1.1의 기본 명시적 삭제 SQL은 음수 timeout을 제외합니다.
+`SessionConfig.explicitSessionDeletion`은 표준 `SessionRepositoryCustomizer`로
+`deleteById`를 ID 기준 삭제로 설정하여 무기한 세션도 로그아웃·교체·보상 때 삭제합니다.
+Flyway 스키마와 만료 cleanup은 표준 구현을 유지합니다. 근거는
+[4.1.1 저장소 소스의 DELETE_SESSION_QUERY](https://github.com/spring-projects/spring-session/blob/4.1.1/spring-session-jdbc/src/main/java/org/springframework/session/jdbc/JdbcIndexedSessionRepository.java)이며,
+유한·무기한 세션의 명시적 삭제와 속성 cascade를 실제 PostgreSQL 테스트로 검증합니다.
 
 업무 계정과 보안 문맥은 V2의 `accounts`·`session_security`, PIN challenge/token은
 V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NULL`을
@@ -401,8 +409,33 @@ V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NUL
 `503 AUTH_STATE_UNAVAILABLE` 공통 JSON으로 처리합니다. CSRF 실패의 403은 인증 판정보다
 먼저 처리하고, API 인증 실패에 로그인 페이지 redirect나 익명 요청 저장용 세션을 만들지 않습니다.
 현재 미처리 DB 예외의 fallback은 인증 저장소 기준이므로 다른 업무 저장소가 추가되면
-그 도메인의 오류 변환을 연결해야 합니다. 실제 로그인에서 문맥을 생성·저장하는 연결은
-후속 단계와 SCRUM-78·93에서 수행합니다.
+그 도메인의 오류 변환을 연결해야 합니다.
+
+로그인 소비자는 **자격 검증 트랜잭션을 마친 뒤** 공유
+`SessionAuthenticationStrategy.onAuthentication(authentication, request, response)`를 호출하고,
+인증 결과를 `SecurityContextHolder`에 설정한 다음 동일한
+`SecurityContextRepository.saveContext(context, request, response)`로 명시적으로 저장합니다.
+principal 이름은 인증이 끝난 계정 UUID 문자열이어야 합니다. 실제 비밀번호 검증과
+provider sub→계정 UUID 매핑은 SCRUM-78·93의 책임이며, 이번 테스트의 수동 로그인 API와
+synthetic OAuth 결과는 테스트 구성에서만 제공합니다.
+
+공유 `LoginSessionAuthenticationStrategy`는 기존 계정·문맥의 자격 폐기와 새 문맥 등록을
+별도 업무 트랜잭션에서 커밋한 뒤 표준 세션 고정 방지·CSRF 교체를 각각 한 번 수행합니다.
+기존 일반 속성·guardian 값은 새 native 세션에 복사하지 않으며, 새 업무 문맥의 guardian은
+비어 있고 setup_generation은 0입니다. 계정 간 교체는 계정 UUID 정렬 순서로 잠급니다.
+이메일 소비자는 업무 DB 잠금을 유지한 상태로 이 전략을 호출하지 않아야 합니다.
+
+`LoginSecurityContextRepository`는 표준 request/native 저장소에 인증을 저장한 뒤
+native 세션을 재조회합니다. 저장된 principal·accountId·securityContextId와 음수 timeout,
+업무 문맥의 최신 계정 버전·미폐기·만료 상태를 확인합니다. 저장 호출의 정상 반환만으로
+성공으로 판단하지 않으며, `AuthStateErrorFilter`가 native 응답 저장 뒤 HTTP 응답 직전에도
+같은 판정을 수행합니다. 명시적 saveContext를 빠뜨린 소비자도 성공 응답을 낼 수 없습니다.
+
+새 문맥 커밋 후 저장 실패·누락·재판정 실패는 새 문맥을 보상 폐기하고 native 세션 삭제를
+시도한 뒤 `503 AUTH_STATE_UNAVAILABLE`로 처리합니다. 이전 폐기 문맥·guardian은 복구하지
+않으며, 응답을 커밋하기 전 새 JSESSIONID와 성공 Location을 제거합니다. 보상 DB 확인도
+실패하면 성공으로 간주하지 않고 503을 유지합니다. 이 경우 DB 정리 완료를 보장할 수 없으며
+별도 보상 큐는 두지 않습니다. 이미 전송한 응답 바이트는 재작성할 수 없습니다.
 
 새 스키마 파일은 다음 위치와 이름 규칙을 사용합니다.
 

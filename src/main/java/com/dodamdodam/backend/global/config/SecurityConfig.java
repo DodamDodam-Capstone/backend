@@ -2,6 +2,7 @@ package com.dodamdodam.backend.global.config;
 
 import com.dodamdodam.backend.auth.session.AuthStateErrorHandler;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
+import com.dodamdodam.backend.auth.session.LoginSessionAuthenticationStrategy;
 import com.dodamdodam.backend.global.auth.CsrfAccessDeniedHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
@@ -21,9 +22,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.access.DelegatingAccessDeniedHandler;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -41,14 +45,11 @@ public class SecurityConfig {
             CsrfAccessDeniedHandler csrfAccessDeniedHandler,
             CookieCsrfTokenRepository csrfTokenRepository,
             AuthenticatedSessionService authenticatedSessionService,
-            AuthStateErrorHandler authStateErrorHandler
+            AuthStateErrorHandler authStateErrorHandler,
+            LoginSessionAuthenticationStrategy loginSessionAuthenticationStrategy,
+            SecurityContextRepository securityContextRepository,
+            CsrfTokenRequestHandler csrfRequestHandler
     ) throws Exception {
-        var csrfRequestHandler = new CsrfTokenRequestAttributeHandler() {
-            @Override
-            public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
-                return request.getHeader(csrfToken.getHeaderName());
-            }
-        };
         var accessDeniedHandlers = new LinkedHashMap<Class<? extends AccessDeniedException>, AccessDeniedHandler>();
         accessDeniedHandlers.put(CsrfException.class, csrfAccessDeniedHandler);
 
@@ -79,7 +80,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfRequestHandler)
+                        // 공유 로그인 전략이 표준 CSRF 교체까지 한 번 수행한다.
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
                 )
+                .sessionManagement(session -> session.sessionAuthenticationStrategy(loginSessionAuthenticationStrategy))
+                .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .requestCache(cache -> cache.disable())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authStateErrorHandler)
@@ -94,6 +99,16 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    @Bean
+    CsrfTokenRequestHandler csrfTokenRequestHandler() {
+        return new CsrfTokenRequestAttributeHandler() {
+            @Override
+            public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+                return request.getHeader(csrfToken.getHeaderName());
+            }
+        };
     }
 
     @Bean

@@ -1,5 +1,8 @@
 package com.dodamdodam.backend;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -110,10 +113,13 @@ class JdbcSessionContractTests {
                 "SELECT COUNT(*) FROM SPRING_SESSION_ATTRIBUTES", Integer.class)).isZero();
     }
 
-    @Test
-    void explicitDeletionRemovesStoredSessionAndAttributes() {
-        var session = savedSession(sessionRepository,
-                value -> value.setAttribute("contract-marker", "deleted"));
+    @ParameterizedTest
+    @ValueSource(longs = {1800, -1})
+    void explicitDeletionRemovesStoredSessionAndAttributes(long inactiveSeconds) {
+        var session = savedSession(sessionRepository, value -> {
+            value.setMaxInactiveInterval(Duration.ofSeconds(inactiveSeconds));
+            value.setAttribute("contract-marker", "deleted");
+        });
 
         sessionRepository.deleteById(session.getId());
 

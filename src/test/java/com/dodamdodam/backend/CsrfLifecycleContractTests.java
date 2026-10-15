@@ -1,6 +1,5 @@
 package com.dodamdodam.backend;
 
-import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.net.URLDecoder;
@@ -186,13 +185,6 @@ class CsrfLifecycleContractTests {
 
     private MvcResult login(Cookie cookie) throws Exception {
         var result = completeOAuth(cookie);
-        var contextId = UUID.randomUUID();
-        jdbcTemplate.update("""
-                INSERT INTO session_security (id, account_id, session_version) VALUES (?, ?, 0)
-                """, contextId, accountId);
-        var session = storedSession(currentSessionCookie(result));
-        session.setAttribute(AuthenticatedSessionService.ACCOUNT_ID, accountId);
-        session.setAttribute(AuthenticatedSessionService.SECURITY_CONTEXT_ID, contextId);
         assertThat(isAuthenticatedSession(currentSessionCookie(result)))
                 .as("login stores the authenticated context").isTrue();
         return result;
