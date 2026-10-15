@@ -66,4 +66,3 @@ app:
   security:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
     login-success-url: ${APP_LOGIN_SUCCESS_URL:http://localhost:5173/oauth/callback}
-    logout-success-url: ${APP_LOGOUT_SUCCESS_URL:http://localhost:5173}

@@ -307,7 +307,6 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `KAKAO_CLIENT_SECRET` | 발급 값 | 활성화한 Kakao client secret |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | React 개발 origin 목록 |
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
-| `APP_LOGOUT_SUCCESS_URL` | `http://localhost:5173` | 로그아웃 후 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
 | `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
 
@@ -621,14 +620,14 @@ await fetch("http://localhost:8080/api/v1/example", {
 
 공통 오류·재시도 기준은 [공통 HTTP와 세션 계약](p0/api/01-common.md#section-3)을 따릅니다.
 
-### 10.5 후속 Backend 인증 API 연결
+### 10.5 Backend 인증 API 연결
 
-현재 OAuth 로그인은 Spring Security 인증 필터의 세션 전략과 인증 문맥 저장 처리를
-사용합니다. 현재 로그아웃은 CSRF 검사를 거친 `POST /logout`의 성공 302 이동입니다.
-이메일 로그인과 계약 경로 `POST /api/v1/auth/logout`은 아직 구현하지 않았습니다.
-credentialed CORS는 `/api/**`에만 등록되어 있으므로, 현재 `/logout`을 다른 origin의
-FE에서 fetch로 호출할 수 있다고 가정하지 않습니다. FE의 API 로그아웃 연결은 후속
-인증 API 구현 뒤 진행합니다.
+현재 OAuth 로그인은 Spring Security 인증 필터의 공유 세션 전략과 인증 문맥 저장 처리를
+사용합니다. 로그아웃은 `POST /api/v1/auth/logout`이며 성공 시 본문 없는 204를 반환합니다.
+기본 `/logout` 매핑과 성공 redirect는 제거했습니다. `APP_LOGOUT_SUCCESS_URL` 설정은
+더 이상 사용하지 않으며, 204를 받은 FE가 화면 이동과 로컬 상태 정리를 담당합니다.
+허용된 origin의 FE는 `/api/**`의 credentialed CORS로 호출할 수 있습니다.
+이메일 로그인 자격 검증 API는 SCRUM-78에서 연결합니다.
 
 후속 **이메일 로그인**은 다음 순서를 지킵니다.
 
@@ -643,22 +642,27 @@ FE에서 fetch로 호출할 수 있다고 가정하지 않습니다. FE의 API �
    저장 실패의 503·보조 문맥 폐기는 [이메일 로그인 계약](p0/api/02-auth.md#section-6-5)을
    따릅니다. JDBC 세션 저장과 업무 트랜잭션이 자동으로 원자적이라고 가정하지 않습니다.
 
-후속 **API 로그아웃**은 다음 순서를 지킵니다.
+**API 로그아웃**은 다음 순서로 처리합니다.
 
-1. CSRF·로그인 상태와 실제 0바이트 body를 검사합니다. 유효한 CSRF를 가진 비로그인
-   요청은 `401 AUTHENTICATION_REQUIRED`입니다.
+1. 실제 body를 최대 16,385바이트까지 읽어 16,384바이트 초과는 413, 미지원 Content-Type은
+   415로 거부합니다. JSON은 `application/json`과 UTF-8을 사용하며, Content-Type 없는
+   0바이트 요청도 허용합니다. 이후 CSRF → 로그인 → 실제 0바이트 구조 검증을 수행합니다.
+   유효한 CSRF를 가진 비로그인은 401이며, 인증된 요청의 `{}`·`null`·공백도 400입니다.
 2. 현재 `session_security`와 보호자 확인·PIN 관련 권한의 DB 폐기를 먼저 커밋합니다.
    DB 폐기가 실패하면 `503 AUTH_STATE_UNAVAILABLE`로 처리하고 성공 응답을 내지 않습니다.
 3. 성공한 DB 폐기 뒤 `SecurityContextLogoutHandler`로 인증 문맥·세션을 정리하고,
    같은 cookie repository의 `CsrfLogoutHandler`로 CSRF를 정리합니다. 세션·CSRF 쿠키는
    발급 때와 같은 Path/Domain으로 만료시키고, 모든 정리가 성공한 뒤 본문 없는 204를
-   반환합니다.
+   반환합니다. JSESSIONID 만료는 세션 invalidate 뒤 표준 Spring Session 응답 처리와
+   동일 CookieSerializer가 담당합니다. 물리 세션 삭제 실패도 503이며, 이미 커밋한 DB
+   폐기를 복구하지 않습니다. 삭제가 늦어져도 이전 쿠키는 업무 문맥 검사에서 401입니다.
 
-이때 기본 `/logout` 매핑도 제거해 [로그아웃 계약](p0/api/02-auth.md#section-6-7)의 단일
-경로를 사용합니다. URL만 바꾸어 `LogoutFilter`가 업무 DB 폐기를 건너뛰거나 DB 성공 전에
-세션을 정리하게 만들지 않습니다. 실제 API와 연결할 때 해당 순서·실패 동작을 검증합니다.
-JDBC 세션·365일 갱신은 SCRUM-94, 실제 OAuth·HTTPS 브라우저 연동은 SCRUM-129의 후속
-검증 범위입니다.
+FE는 로그아웃 요청에 `credentials: "include"`와 현재 `X-XSRF-TOKEN`을 포함하고 body를
+보내지 않습니다. 204 이후 GET `/api/v1/auth/csrf`로 토큰을 재획득합니다. 실패·네트워크
+오류 후 POST를 자동 재시도하지 않습니다. 자세한 기준은
+[로그아웃 계약](p0/api/02-auth.md#section-6-7)을 따릅니다.
+365일 쿠키 갱신은 SCRUM-94의 후속 단계이며, 실제 OAuth·HTTPS 브라우저 연동은
+SCRUM-129의 검증 범위입니다.
 
 Spring Security 근거: [CSRF 수명주기](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
 [인증 문맥 저장](https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html),

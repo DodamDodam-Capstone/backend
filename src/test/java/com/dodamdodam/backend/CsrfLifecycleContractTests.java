@@ -131,9 +131,9 @@ class CsrfLifecycleContractTests {
         var session = currentSessionCookie(login);
         var beforeLogout = issuedCsrf(session, null);
 
-        var logout = mockMvc.perform(post("/logout").cookie(session)
+        var logout = mockMvc.perform(post("/api/v1/auth/logout").cookie(session)
                         .cookie(beforeLogout.cookie()).header(CSRF_HEADER, beforeLogout.token()))
-                .andExpect(status().isFound()).andReturn().getResponse();
+                .andExpect(status().isNoContent()).andReturn().getResponse();
 
         assertClearedCookie(logout);
         assertThat(storedSession(session) == null).as("logout deletes the stored session").isTrue();
@@ -170,7 +170,7 @@ class CsrfLifecycleContractTests {
         var login = login(issuedCsrf(null, null).cookie());
         var session = currentSessionCookie(login);
         var csrf = issuedCsrf(session, null);
-        var request = post("/logout").cookie(session, csrf.cookie());
+        var request = post("/api/v1/auth/logout").cookie(session, csrf.cookie());
         if (!header.isEmpty()) {
             request.header(CSRF_HEADER, header);
         }

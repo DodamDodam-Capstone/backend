@@ -3,6 +3,7 @@ package com.dodamdodam.backend.global.config;
 import com.dodamdodam.backend.auth.session.AuthStateErrorHandler;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.auth.session.LoginSessionAuthenticationStrategy;
+import com.dodamdodam.backend.auth.session.LogoutRequestGuardFilter;
 import com.dodamdodam.backend.global.auth.CsrfAccessDeniedHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
@@ -26,12 +27,14 @@ import org.springframework.security.web.authentication.session.NullAuthenticated
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -48,7 +51,8 @@ public class SecurityConfig {
             AuthStateErrorHandler authStateErrorHandler,
             LoginSessionAuthenticationStrategy loginSessionAuthenticationStrategy,
             SecurityContextRepository securityContextRepository,
-            CsrfTokenRequestHandler csrfRequestHandler
+            CsrfTokenRequestHandler csrfRequestHandler,
+            JsonMapper jsonMapper
     ) throws Exception {
         var accessDeniedHandlers = new LinkedHashMap<Class<? extends AccessDeniedException>, AccessDeniedHandler>();
         accessDeniedHandlers.put(CsrfException.class, csrfAccessDeniedHandler);
@@ -85,6 +89,7 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionAuthenticationStrategy(loginSessionAuthenticationStrategy))
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
+                .addFilterBefore(new LogoutRequestGuardFilter(jsonMapper), CsrfFilter.class)
                 .requestCache(cache -> cache.disable())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authStateErrorHandler)
@@ -94,9 +99,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl(properties.loginSuccessUrl(), true)
                 )
-                .logout(logout -> logout
-                        .logoutSuccessUrl(properties.logoutSuccessUrl())
-                );
+                .logout(logout -> logout.disable());
 
         return http.build();
     }
