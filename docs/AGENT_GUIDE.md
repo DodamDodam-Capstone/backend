@@ -43,6 +43,7 @@ workflow entry points are kept in [AGENTS.md](../AGENTS.md).
 - Google and Kakao account identity must be keyed by provider plus `sub`, not by mutable email alone.
 - Treat provider email as optional until the product policy and consent settings guarantee otherwise.
 - A production cookie policy or token architecture change requires a separate security decision.
+- When adding, removing, or reordering servlet or Spring Security filters, update [the filter order and rationale](DEVELOPMENT_SETUP.md#106-필터-실행-순서와-변경-기준) in the same change and verify the affected behavior with the relevant contract tests.
 
 ## Cross-team contracts
 

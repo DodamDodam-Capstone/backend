@@ -57,6 +57,6 @@ class SecurityConfigTests {
 
     private AppSecurityProperties properties(String origin) {
         return new AppSecurityProperties(List.of(origin),
-                "http://localhost:5173/oauth/callback", "http://localhost:5173");
+                "http://localhost:5173/oauth/callback");
     }
 }

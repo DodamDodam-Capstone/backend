@@ -1,6 +1,8 @@
 package com.dodamdodam.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -12,10 +14,17 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -51,7 +60,8 @@ class CookieContractTests {
     }
 
     @Nested
-    @Import({TestcontainersConfiguration.class, SessionProbe.class})
+    @Import({TestcontainersConfiguration.class, SessionProbe.class, SessionCookieLifecycleTests.Probe.class})
+    @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
     @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
             "SESSION_COOKIE_SECURE=true", "SESSION_COOKIE_SAME_SITE=none"
     })
@@ -59,6 +69,18 @@ class CookieContractTests {
 
         @LocalServerPort
         private int port;
+        @Autowired private MockMvc mvc;
+        @Autowired private JdbcTemplate jdbc;
+        @Autowired private JdbcIndexedSessionRepository sessions;
+        @Autowired private CookieSerializer cookies;
+
+        @Test
+        void authenticatedRenewalKeepsSecureNonePolicy() throws Exception {
+            var current = SessionCookieLifecycleTests.authenticated(jdbc, sessions, cookies);
+            var response = mvc.perform(get(SessionCookieLifecycleTests.PROTECTED).cookie(current.cookie()))
+                    .andExpect(status().isNoContent()).andReturn().getResponse();
+            SessionCookieLifecycleTests.assertPersistentCookie(response, true, "None");
+        }
 
         @Test
         void sessionCookieUsesSecureNonePolicyAndRemainsHttpOnly() throws Exception {
