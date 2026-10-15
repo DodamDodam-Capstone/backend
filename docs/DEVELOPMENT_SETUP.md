@@ -733,6 +733,100 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 `CsrfLifecycleContractTests` 등 관련 계약 테스트로 저장 후 갱신, 실패 시 성공 응답 차단,
 로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
 
+**전체 Spring 구성과 요청·응답 흐름**
+
+실선은 요청·처리 순서, 점선은 설정·의존 호출입니다. 보안 체인의 숫자는 현재 실행 순서이며,
+조건에 맞는 요청만 로그인·로그아웃 경로로 분기합니다. 인코딩·관측·forwarded header·MVC
+보조 필터는 생략하고 세션·인증 관련 서블릿 필터와 Security 내부 필터를 표시했습니다.
+
+```mermaid
+flowchart TB
+    CLIENT["브라우저 / API 클라이언트"]
+    subgraph SERVLET["서블릿 필터: 요청 진입"]
+        HEADERS["ApiResponseHeadersFilter · H<br/>요청 ID · no-store"]
+        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상"]
+        COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
+        SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
+        PROXY["springSecurityFilterChain · -100"]
+        HEADERS --> ERROR --> COOKIE --> SESSION --> PROXY
+    end
+    subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
+        INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
+        CORS["5 CorsFilter"]
+        GUARD["6 LogoutRequestGuardFilter<br/>로그아웃 크기 413 · 형식 415"]
+        CSRF["7 CsrfFilter<br/>실패 403 CSRF_INVALID"]
+        OAUTH["8 OAuth2AuthorizationRequestRedirectFilter<br/>9 OAuth2LoginAuthenticationFilter"]
+        INTERMEDIATE["10 SecurityContextHolderAwareRequestFilter<br/>11 AnonymousAuthenticationFilter<br/>12 SessionManagementFilter<br/>13 ExceptionTranslationFilter"]
+        AUTHZ["14 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
+        INITIAL --> CORS --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
+    end
+    CLIENT --> HEADERS
+    PROXY --> INITIAL
+    AUTHZ -->|허용| MVC["DispatcherServlet → Controller"]
+    MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
+
+    subgraph LOGIN["SessionConfig: 공유 로그인 연결"]
+        STRATEGY["LoginSessionAuthenticationStrategy<br/>업무 문맥 교체 → native ID 교체<br/>인증 UUID 저장 · CSRF 교체"]
+        CONTEXT["DelegatingSecurityContextRepository<br/>RequestAttribute + LoginSecurityContextRepository"]
+        LIFE["SessionLifecycleService<br/>저장 직후·응답 전 실제 저장 확인<br/>실패 시 새 업무 문맥·native 세션 폐기"]
+        STRATEGY -->|전략 완료 후 인증 문맥 저장| CONTEXT
+        STRATEGY -. 업무 문맥 생성 .-> LIFE
+        CONTEXT -. 저장 결과 확인 .-> LIFE
+    end
+    OAUTH -. 인증 성공 .-> STRATEGY
+    FUTURE["후속 이메일 로그인 · SCRUM-78<br/>자격 검증 후 전략 호출·문맥 저장"] -. 연결 계약 .-> STRATEGY
+    OAUTHCONFIG["OAuth2ClientConfig<br/>Google · Kakao ClientRegistration"] -. 공급자 설정 .-> OAUTH
+    CONTEXT -->|로그인 성공 응답| SAVE
+    MVC -->|일반 응답| SAVE
+    LOGOUT --> SAVE
+
+    subgraph DATA["검증 서비스와 PostgreSQL 저장소"]
+        AUTH["AuthenticatedSessionService<br/>native · principal · UUID 결합 검사<br/>DB 폐기·버전·만료 검사"]
+        BUSINESS["SessionSecurityRepository<br/>계정 → 문맥 → PIN 잠금<br/>업무 자격 원자적 폐기"]
+        NATIVE["JdbcIndexedSessionRepository<br/>일반 인증 timeout -1 · 익명 30분<br/>즉시 저장 · 명시적 ID 삭제"]
+        BIZDB[("accounts · session_security<br/>email_verifications · Flyway V2–V3")]
+        SESSIONDB[("SPRING_SESSION<br/>SPRING_SESSION_ATTRIBUTES · Flyway V1")]
+        AUTH -. 현재 문맥 확인 .-> BUSINESS
+        BUSINESS --> BIZDB
+        NATIVE --> SESSIONDB
+    end
+    AUTHZ -. 보호 경로 검사 .-> AUTH
+    LOGOUT -. 인증 검사 .-> AUTH
+    LOGOUT -. 현재 문맥·guardian·PIN 폐기 .-> BUSINESS
+    LIFE -. 생성·실패 보상 .-> BUSINESS
+    LIFE -. 실제 저장 재조회·실패 삭제 .-> NATIVE
+    LIFE -. 공통 검증 재사용 .-> AUTH
+    SESSION -. native 읽기·저장·삭제 .-> NATIVE
+    CONTEXT -. HttpSession을 통한 인증 문맥 저장 .-> NATIVE
+    INITIAL -. 인증 문맥 로드 .-> CONTEXT
+
+    subgraph RESPONSE["응답: 안쪽에서 바깥쪽, 실제 전송 전"]
+        SAVE["1 Spring Session native 저장·쿠키 기록"]
+        RENEW["2 SessionCookieRenewalFilter<br/>저장 상태 재검사 → 유효한 인증 쿠키 365일 갱신<br/>로그아웃 Max-Age=0 우선"]
+        VERIFY["3 AuthStateErrorFilter<br/>로그인 요청 최종 검증"]
+        WIRE["4 HTTP 응답 전송"]
+        SAVE --> RENEW --> VERIFY --> WIRE
+    end
+    RENEW -. 실제 저장 재조회 .-> NATIVE
+    RENEW -. 재검증 .-> AUTH
+    VERIFY -. 로그인일 때 .-> LIFE
+    COOKIECONFIG["Boot CookieSerializer<br/>JSESSIONID · HttpOnly · Path=/ · SameSite · Secure"] -. 동일 설정 사용 .-> RENEW
+    COOKIECONFIG -. 동일 설정 사용 .-> SESSION
+    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>AuthStateErrorFilter: 성공 본문·인증 쿠키 제거, 공통 헤더 보존<br/>AuthStateErrorHandler: 인증 무효 401 / 저장·검증 장애 503"]
+    FAILURE --> WIRE
+    WIRE --> CLIENTOUT["클라이언트 응답 수신"]
+```
+
+OAuth callback은 인증 필터에서 응답을 끝낼 수 있어 항상 Controller까지 진행하지 않습니다.
+`SessionConfig`의 전략·문맥 저장소를 후속 로그인도 공유하며, 실제 공급자 인증 결과를 계정
+UUID principal로 연결하는 작업은 SCRUM-93 범위입니다. DB 연결·JdbcTemplate·트랜잭션·Flyway는
+Spring Boot 자동 구성을 사용합니다. 세션 저장과 업무 폐기는 서로 다른 트랜잭션이므로,
+`session_security`를 다시 확인하고 실패 시 보상하는 절차가 필요합니다.
+
+`SessionConcurrencyTests`는 실제 HTTP 요청을 latch로 정지시켜 **이전 요청의 세션 조회 →
+로그아웃/재로그인 완료 → 이전 요청의 늦은 저장** 순서를 검증합니다. 늦은 응답과 이전 쿠키는
+401이며, 폐기된 문맥·guardian·PIN 자격이 복구되지 않고 재로그인한 새 세션은 유지되어야 합니다.
+
 ## 11. FastAPI·AI 팀 연동 기준
 
 - FastAPI의 일반적인 로컬 port는 `8000`으로 예약하되 실제 AI 저장소 설정을
