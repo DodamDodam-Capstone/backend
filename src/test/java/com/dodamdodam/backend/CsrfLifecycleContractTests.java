@@ -126,6 +126,12 @@ class CsrfLifecycleContractTests {
     }
 
     @Test
+    void oauthLoginIssuesPersistentSessionCookie() throws Exception {
+        var result = login(issuedCsrf(null, null).cookie());
+        SessionCookieLifecycleTests.assertPersistentCookie(result.getResponse(), false, "Lax");
+    }
+
+    @Test
     void logoutClearsTokenAndAllowsAnonymousRefresh() throws Exception {
         var login = login(issuedCsrf(null, null).cookie());
         var session = currentSessionCookie(login);

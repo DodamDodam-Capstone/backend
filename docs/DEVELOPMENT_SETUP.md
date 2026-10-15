@@ -381,8 +381,21 @@ volumes:
 `spring.session.jdbc.flush-mode=immediate`는 세션 변경을 즉시 DB에 기록합니다.
 이 저장은 업무 DB 트랜잭션과 자동으로 원자적이지 않습니다. 현재 기본 timeout은
 30분이고 쿠키 이름은 `JSESSIONID`입니다. 공유 로그인 전략을 거친 일반 세션만
-inactive interval=-1과 업무 expires_at=NULL로 전환합니다. 인증 쿠키 365일 갱신은
-SCRUM-94의 후속 단계에서 연결합니다.
+inactive interval=-1과 업무 expires_at=NULL로 전환합니다.
+
+일반 인증 세션은 로그인 성공 시와 보호 API의 유효한 사용 후 `JSESSIONID`를
+`Max-Age=31536000`(365일)로 발급·갱신합니다. `SessionCookieRenewalFilter`는 Spring Session의
+native 저장 뒤 실제 응답 커밋 전에 저장된 principal·계정·문맥과 DB의 현재 유효성을
+다시 확인합니다. 기존 `CookieSerializer`를 재사용하므로 인코딩·Path·Domain·HttpOnly·
+Secure·SameSite 설정이 일치하며, 같은 응답에 세션 쿠키를 중복 발급하지 않습니다.
+응답 전 상태가 무효해지면 성공 본문을 제거하고 401, 저장소 장애는 503을 반환합니다.
+이때 요청 ID·보안·CORS 헤더는 유지합니다.
+
+익명/OAuth 임시 세션과 공개 CSRF 조회에는 지속 쿠키를 적용하지 않습니다.
+실패 응답은 갱신하지 않으며 로그아웃의 `Max-Age=0` 만료가 갱신보다 우선합니다.
+쿠키 사용은 `securityContextId`·`setup_generation`·보호자 확인 1800초·PIN 버전이나
+두 PIN 목적 proof의 만료를 변경하지 않습니다. 공개 엔드포인트가 나중에 인증 권한을
+사용한다면 동일한 공통 인증 판정을 호출해야 갱신 대상이 됩니다.
 
 현재 Spring Session JDBC 4.1.1의 기본 명시적 삭제 SQL은 음수 timeout을 제외합니다.
 `SessionConfig.explicitSessionDeletion`은 표준 `SessionRepositoryCustomizer`로
@@ -397,7 +410,7 @@ V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NUL
 `SessionSecurityRepository.revokeCurrentContext(accountId, securityContextId)`는
 현재 문맥·guardian·미소비 두 PIN 목적을 한 업무 트랜잭션에서 폐기합니다.
 무효 문맥은 false, DB 실패는 예외로 전달합니다. 프레임워크 세션·쿠키 정리는
-이 업무 트랜잭션의 커밋을 확인한 뒤 실행해야 하며, API 연결은 후속 단계입니다.
+이 업무 트랜잭션의 커밋을 확인한 뒤 실행하며, API 로그아웃이 이 순서를 사용합니다.
 
 보호 API는 `AuthenticatedSessionService.requireAuthenticatedSession(request)`를
 통해 프레임워크 세션·인증 principal·업무 문맥을 함께 확인합니다. principal 이름은
@@ -661,12 +674,64 @@ FE는 로그아웃 요청에 `credentials: "include"`와 현재 `X-XSRF-TOKEN`�
 보내지 않습니다. 204 이후 GET `/api/v1/auth/csrf`로 토큰을 재획득합니다. 실패·네트워크
 오류 후 POST를 자동 재시도하지 않습니다. 자세한 기준은
 [로그아웃 계약](p0/api/02-auth.md#section-6-7)을 따릅니다.
-365일 쿠키 갱신은 SCRUM-94의 후속 단계이며, 실제 OAuth·HTTPS 브라우저 연동은
-SCRUM-129의 검증 범위입니다.
+인증 쿠키의 365일 발급·갱신은 위 JDBC 세션 정책을 따릅니다. 실제 OAuth·HTTPS 브라우저
+연동은 D17 확정 후 SCRUM-129의 검증 범위입니다.
 
 Spring Security 근거: [CSRF 수명주기](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
 [인증 문맥 저장](https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html),
 [로그아웃 처리](https://docs.spring.io/spring-security/reference/servlet/authentication/logout.html).
+
+### 10.6 필터 실행 순서와 변경 기준
+
+세션·인증 계약에 관련된 필터의 상대 순서를 아래에서 관리합니다. 요청 진입은 작은
+order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_VALUE`)입니다.
+
+| 서블릿 필터 | order | 배치 이유 |
+| --- | --- | --- |
+| [ApiResponseHeadersFilter](../src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java) | `H` | 뒤 단계의 성공·실패 응답에 서버 생성 요청 ID와 `no-store`를 적용합니다. |
+| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증과 실패 보상을 수행합니다. |
+| [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
+| Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
+| Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
+
+`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.1의 기본값을 사용합니다.
+프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
+
+앞단 필터가 응답을 감싼 뒤 다음 필터를 호출하므로, 정상 응답의 관련 처리는 안쪽부터
+진행합니다. 현재 저장·갱신 순서는 다음과 같습니다.
+
+```text
+Spring Session native 저장
+→ SessionCookieRenewalFilter의 저장 상태 재조회·쿠키 갱신
+→ AuthStateErrorFilter의 로그인 최종 검증(로그인 요청일 때)
+→ 실제 HTTP 응답 전송
+```
+
+두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
+컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
+저장·재검증이 실패하면 바깥 `AuthStateErrorFilter`가 아직 전송되지 않은 성공 본문과
+인증 쿠키를 제거하고 401·503으로 처리합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
+갱신보다 우선합니다. 이미 전송된 응답은 재작성할 수 없습니다.
+
+Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
+`SecurityConfig`는 [LogoutRequestGuardFilter](../src/main/java/com/dodamdodam/backend/auth/session/LogoutRequestGuardFilter.java)를
+`CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
+`@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
+로그아웃의 관련 검사 순서는 다음과 같습니다.
+
+```text
+CORS → 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 실제 0바이트 본문 확인
+```
+
+CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
+[LoginSessionAuthenticationStrategy](../src/main/java/com/dodamdodam/backend/auth/session/LoginSessionAuthenticationStrategy.java)는
+인증 성공 시 호출되는 전략이며, 실행 절차는 10.5절의 공유 로그인 계약을 따릅니다.
+
+필터를 추가·삭제·이동할 때는 같은 변경에서 이 절의 **등록 위치·현재 순서·배치 이유·영향받는
+요청/응답 흐름**을 갱신합니다. 변경 이유와 검증 결과는 해당 PR에 남깁니다.
+`SessionCookieLifecycleTests`·`LoginSessionPersistenceTests`·`LogoutContractTests`·
+`CsrfLifecycleContractTests` 등 관련 계약 테스트로 저장 후 갱신, 실패 시 성공 응답 차단,
+로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
 
 ## 11. FastAPI·AI 팀 연동 기준
 

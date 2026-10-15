@@ -1,18 +1,16 @@
 package com.dodamdodam.backend.auth.session;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.UUID;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.stereotype.Service;
-
-import java.util.UUID;
 
 @Service
 public class SessionLifecycleService {
@@ -20,11 +18,14 @@ public class SessionLifecycleService {
     private static final String LOGIN_ATTEMPT = SessionLifecycleService.class.getName() + ".login";
     private final SessionSecurityRepository securityRepository;
     private final JdbcIndexedSessionRepository sessionRepository;
+    private final AuthenticatedSessionService authenticatedSessions;
     private final AuthenticationTrustResolverImpl trustResolver = new AuthenticationTrustResolverImpl();
 
-    public SessionLifecycleService(SessionSecurityRepository securityRepository, JdbcIndexedSessionRepository sessionRepository) {
+    public SessionLifecycleService(SessionSecurityRepository securityRepository, JdbcIndexedSessionRepository sessionRepository,
+                                   AuthenticatedSessionService authenticatedSessions) {
         this.securityRepository = securityRepository;
         this.sessionRepository = sessionRepository;
+        this.authenticatedSessions = authenticatedSessions;
     }
 
     AuthenticatedSession beginLogin(Authentication authentication, HttpServletRequest request) {
@@ -67,18 +68,16 @@ public class SessionLifecycleService {
         if (login == null) return;
         if (!login.contextSaved || login.sessionId == null) throw unavailable();
         Session stored = sessionRepository.findById(login.sessionId);
-        if (stored == null || !login.context.accountId().equals(stored.getAttribute(AuthenticatedSessionService.ACCOUNT_ID))
-                || !login.context.securityContextId().equals(stored.getAttribute(AuthenticatedSessionService.SECURITY_CONTEXT_ID))
-                || !stored.getMaxInactiveInterval().isNegative()) {
+        if (stored == null || !stored.getMaxInactiveInterval().isNegative()) {
             throw unavailable();
         }
-        Object storedContext = stored.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-        if (!(storedContext instanceof SecurityContext securityContext)
-                || !trustResolver.isAuthenticated(securityContext.getAuthentication())
-                || !login.context.accountId().toString().equals(securityContext.getAuthentication().getName())
-                || !securityRepository.isCurrentContext(login.context.accountId(), login.context.securityContextId())) {
+        try {
+            authenticatedSessions.requireStoredSession(stored, login.context);
+        }
+        catch (AuthenticationException exception) {
             throw unavailable();
         }
+        AuthenticatedSessionService.markCookieRenewal(request, login.sessionId, login.context);
     }
 
     public boolean hasPendingLogin(HttpServletRequest request) {

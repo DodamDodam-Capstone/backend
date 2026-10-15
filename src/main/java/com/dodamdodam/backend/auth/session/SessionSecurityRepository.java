@@ -49,12 +49,7 @@ public class SessionSecurityRepository {
                 SET revoked_at = COALESCE(revoked_at, ?), guardian_unlocked_until = NULL, guardian_pin_version = NULL
                 WHERE id = ? AND account_id = ?
                 """, revokedAt, context.securityContextId(), context.accountId());
-        jdbcTemplate.update("""
-                UPDATE email_verifications SET invalidated_at = ?
-                WHERE setup_account_id = ? AND setup_session_binding = ?
-                  AND purpose IN ('PIN_SETUP', 'PIN_RESET')
-                  AND token_consumed_at IS NULL AND invalidated_at IS NULL
-                """, revokedAt, context.accountId(), context.securityContextId());
+        invalidatePinCredentials(context.accountId(), context.securityContextId(), revokedAt);
     }
 
     public boolean isCurrentContext(UUID accountId, UUID securityContextId) {
@@ -112,12 +107,16 @@ public class SessionSecurityRepository {
         if (updated == 0) {
             return false;
         }
+        invalidatePinCredentials(accountId, securityContextId, revokedAt);
+        return true;
+    }
+
+    private void invalidatePinCredentials(UUID accountId, UUID securityContextId, OffsetDateTime revokedAt) {
         jdbcTemplate.update("""
                 UPDATE email_verifications SET invalidated_at = ?
                 WHERE setup_account_id = ? AND setup_session_binding = ?
                   AND purpose IN ('PIN_SETUP', 'PIN_RESET')
                   AND token_consumed_at IS NULL AND invalidated_at IS NULL
                 """, revokedAt, accountId, securityContextId);
-        return true;
     }
 }
