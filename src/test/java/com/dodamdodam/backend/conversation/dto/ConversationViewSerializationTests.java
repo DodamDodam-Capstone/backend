@@ -1,10 +1,13 @@
 package com.dodamdodam.backend.conversation.dto;
 
+import com.dodamdodam.backend.conversation.application.AllowedTextPolicy;
 import com.dodamdodam.backend.conversation.domain.ConversationStatus;
 import com.dodamdodam.backend.conversation.domain.EndReason;
 import com.dodamdodam.backend.conversation.domain.SummaryStatus;
 import com.dodamdodam.backend.conversation.domain.TextVisibility;
 import com.dodamdodam.backend.conversation.domain.TurnStatus;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -114,5 +117,65 @@ class ConversationViewSerializationTests {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> json(JsonMapper mapper, Object value) {
         return mapper.readValue(mapper.writeValueAsString(value), Map.class);
+    }
+
+    @Test
+    void policyRejectedOriginalIsAbsentFromSerializedTurnAndDiagnostics() {
+        contextRunner.run(context -> {
+            var mapper = context.getBean(JsonMapper.class);
+            var policy = new AllowedTextPolicy();
+            String forbidden = "synthetic forbidden original";
+            var child = policy.select(TextVisibility.VISIBLE, false, true, forbidden);
+            var reply = policy.select(TextVisibility.VISIBLE, true, true, "[test] permitted reply");
+            var turn = new TurnView(ID, 1, TurnStatus.SUCCEEDED, child.text(), child.visibility(),
+                    reply.text(), reply.visibility(), CREATED_AT, CREATED_AT.plusSeconds(2), null);
+
+            assertThat(json(mapper, turn)).containsEntry("childText", null)
+                    .containsEntry("childTextVisibility", "OMITTED")
+                    .containsEntry("replyText", "[test] permitted reply")
+                    .containsEntry("replyTextVisibility", "VISIBLE");
+            assertThat(mapper.writeValueAsString(turn)).doesNotContain(forbidden);
+            assertThat(turn.toString()).doesNotContain(forbidden);
+        });
+    }
+
+    @Test
+    void successfulAndFailedJsonSamplesMatchDtoContractWithSequentialTimes() {
+        contextRunner.run(context -> {
+            var mapper = context.getBean(JsonMapper.class);
+            var succeeded = new TurnView(ID, 1, TurnStatus.SUCCEEDED,
+                    null, TextVisibility.OMITTED, "[test] permitted reply", TextVisibility.VISIBLE,
+                    OffsetDateTime.parse("2026-10-03T14:09:00+09:00"),
+                    OffsetDateTime.parse("2026-10-03T14:09:02+09:00"), null);
+            var failed = new TurnView(UUID.fromString("66666666-6666-4666-8666-666666666666"), 2, TurnStatus.FAILED,
+                    "[test] permitted child", TextVisibility.VISIBLE, null, TextVisibility.OMITTED,
+                    OffsetDateTime.parse("2026-10-03T14:09:20+09:00"),
+                    OffsetDateTime.parse("2026-10-03T14:09:24+09:00"), "AI_UPSTREAM_FAILED");
+
+            assertThat(json(mapper, succeeded)).isEqualTo(sample(mapper, "turn-succeeded.json"));
+            assertThat(json(mapper, failed)).isEqualTo(sample(mapper, "turn-failed.json"));
+            assertThat(json(mapper, succeeded)).containsOnlyKeys("turnId", "sequence", "status", "childText",
+                    "childTextVisibility", "replyText", "replyTextVisibility", "createdAt", "completedAt", "errorCode");
+            assertThat(json(mapper, failed)).containsOnlyKeys("turnId", "sequence", "status", "childText",
+                    "childTextVisibility", "replyText", "replyTextVisibility", "createdAt", "completedAt", "errorCode");
+            assertThat(succeeded.completedAt()).isAfter(succeeded.createdAt());
+            assertThat(failed.createdAt()).isAfter(succeeded.completedAt());
+            assertThat(failed.completedAt()).isAfter(failed.createdAt());
+            assertThat(failed.sequence()).isGreaterThan(succeeded.sequence());
+            assertThat(failed.turnId()).isNotEqualTo(succeeded.turnId());
+            assertThat(succeeded.errorCode()).isNull();
+            assertThat(failed.errorCode()).isEqualTo("AI_UPSTREAM_FAILED").isNotBlank();
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> sample(JsonMapper mapper, String filename) {
+        try (var input = ConversationViewSerializationTests.class.getResourceAsStream(
+                "/com/dodamdodam/backend/conversation/dto/" + filename)) {
+            assertThat(input).as("synthetic TurnView sample").isNotNull();
+            return mapper.readValue(input, Map.class);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Cannot read synthetic TurnView sample", exception);
+        }
     }
 }

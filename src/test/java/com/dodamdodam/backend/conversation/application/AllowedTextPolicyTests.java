@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class AllowedTextPolicyTests {
     private final AllowedTextPolicy policy = new AllowedTextPolicy();
@@ -93,5 +94,28 @@ class AllowedTextPolicyTests {
 
         assertThat(permitted.toString()).isEqualTo("AllowedText[visibility=VISIBLE]");
         assertThat(omitted.toString()).isEqualTo("AllowedText[visibility=OMITTED]");
+    }
+
+    @ParameterizedTest
+    @MethodSource("rejectedTextCases")
+    void rejectedTextReturnsNoContentAndDoesNotProduceAnException(
+            TextVisibility visibility, Boolean storageAllowed, Boolean displayAllowed, String text) {
+        var result = assertDoesNotThrow(() -> policy.select(visibility, storageAllowed, displayAllowed, text));
+
+        assertThat(result.visibility()).isEqualTo(TextVisibility.OMITTED);
+        assertThat(result.text()).isNull();
+        assertThat(result.toString()).doesNotContain("synthetic forbidden original");
+    }
+
+    private static Stream<Arguments> rejectedTextCases() {
+        String forbidden = "synthetic forbidden original";
+        return Stream.of(
+                Arguments.of(TextVisibility.OMITTED, true, true, forbidden),
+                Arguments.of(TextVisibility.VISIBLE, false, true, forbidden),
+                Arguments.of(TextVisibility.REDACTED, true, false, forbidden),
+                Arguments.of(null, true, true, forbidden),
+                Arguments.of(TextVisibility.VISIBLE, null, true, forbidden),
+                Arguments.of(TextVisibility.REDACTED, true, null, forbidden),
+                Arguments.of(TextVisibility.REDACTED, true, true, null));
     }
 }
