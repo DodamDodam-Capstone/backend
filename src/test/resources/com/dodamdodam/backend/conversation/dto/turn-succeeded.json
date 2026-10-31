@@ -1,0 +1,12 @@
+{
+  "turnId": "55555555-5555-4555-8555-555555555555",
+  "sequence": 1,
+  "status": "SUCCEEDED",
+  "childText": null,
+  "childTextVisibility": "OMITTED",
+  "replyText": "[test] permitted reply",
+  "replyTextVisibility": "VISIBLE",
+  "createdAt": "2026-10-03T14:09:00+09:00",
+  "completedAt": "2026-10-03T14:09:02+09:00",
+  "errorCode": null
+}

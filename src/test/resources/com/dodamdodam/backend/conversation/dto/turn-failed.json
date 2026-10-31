@@ -1,0 +1,12 @@
+{
+  "turnId": "66666666-6666-4666-8666-666666666666",
+  "sequence": 2,
+  "status": "FAILED",
+  "childText": "[test] permitted child",
+  "childTextVisibility": "VISIBLE",
+  "replyText": null,
+  "replyTextVisibility": "OMITTED",
+  "createdAt": "2026-10-03T14:09:20+09:00",
+  "completedAt": "2026-10-03T14:09:24+09:00",
+  "errorCode": "AI_UPSTREAM_FAILED"
+}
