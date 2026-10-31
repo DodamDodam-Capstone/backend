@@ -1,22 +1,22 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.application;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
 import com.dodamdodam.backend.auth.session.AuthenticatedSession;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
+import com.dodamdodam.backend.child.api.ChildController;
+import com.dodamdodam.backend.child.dto.ChildView;
+import com.dodamdodam.backend.child.dto.CreateChildRequest;
+import com.dodamdodam.backend.child.exception.ChildException;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -34,9 +34,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
@@ -66,7 +64,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@Import({TestcontainersConfiguration.class, ChildRegistrationConcurrencyTests.CatalogueFixture.class,
+@Import({TestcontainersConfiguration.class, ChildCatalogueTestConfiguration.class,
         ChildRegistrationConcurrencyTests.ResponseGate.class})
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.session.jdbc.cleanup-cron=-", "SESSION_COOKIE_SECURE=false", "SESSION_COOKIE_SAME_SITE=lax",
@@ -570,13 +568,4 @@ class ChildRegistrationConcurrencyTests {
         }
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class CatalogueFixture {
-        @Bean
-        @Primary
-        ChildService configuredChildService(ChildRepository repository, SessionSecurityRepository sessions) {
-            return new ChildService(repository, sessions,
-                    Clock.fixed(Instant.parse("2026-10-31T15:00:00Z"), ZoneOffset.UTC), Set.of("test-character"));
-        }
-    }
 }

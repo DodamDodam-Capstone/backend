@@ -1,5 +1,8 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.infrastructure;
 
+import com.dodamdodam.backend.child.dto.ChildView;
+import com.dodamdodam.backend.child.dto.CreateChildRequest;
+import com.dodamdodam.backend.child.exception.ChildException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -33,10 +36,12 @@ public class ChildRepository {
 
     private final JdbcTemplate jdbc;
 
+    /** 기존 JDBC 연결과 예외 변환을 사용한다. */
     public ChildRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
+    /** 정규화된 프로필을 저장하며 계정당 중복만 빈 결과로 반환한다. */
     public Optional<ChildView> insert(UUID accountId, CreateChildRequest normalized) {
         try {
             return jdbc.query("""
@@ -54,6 +59,7 @@ public class ChildRepository {
         }
     }
 
+    /** 계정과 자녀를 함께 조회해 미소유·미존재를 같은 빈 결과로 처리한다. */
     public Optional<ChildView> findOwned(UUID accountId, UUID childId) {
         try {
             return jdbc.query("SELECT " + COLUMNS + " FROM children WHERE id = ? AND account_id = ?",
@@ -64,6 +70,7 @@ public class ChildRepository {
         }
     }
 
+    /** 선행 소유권 검사를 마친 내부 문맥 조회에 사용할 프로필을 읽는다. */
     public Optional<ChildView> findById(UUID childId) {
         try {
             return jdbc.query("SELECT " + COLUMNS + " FROM children WHERE id = ?", CHILD_ROW, childId)

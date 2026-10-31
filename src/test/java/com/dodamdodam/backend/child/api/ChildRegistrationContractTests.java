@@ -1,18 +1,15 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.api;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
-import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
+import com.dodamdodam.backend.child.application.ChildCatalogueTestConfiguration;
+import com.dodamdodam.backend.child.application.ChildService;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,9 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockCookie;
@@ -55,7 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({TestcontainersConfiguration.class, ChildRegistrationContractTests.Fixtures.class,
+@Import({TestcontainersConfiguration.class, ChildCatalogueTestConfiguration.class,
         ChildRegistrationContractTests.AccessProbe.class})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @SpringBootTest(properties = {"spring.session.jdbc.cleanup-cron=-", "logging.level.org.springframework.security=INFO",
@@ -362,17 +357,6 @@ class ChildRegistrationContractTests {
 
     private record Fixture(UUID accountId, UUID contextId, String sessionId, Cookie cookie) { }
     private record Csrf(Cookie cookie, String token) { }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Fixtures {
-        @Bean
-        @Primary
-        ChildService contractChildService(ChildRepository repository, SessionSecurityRepository securityRepository) {
-            // 합성 ID는 HTTP 계약 검증 전용이며 운영 캐릭터 목록을 확정하지 않는다.
-            return new ChildService(repository, securityRepository,
-                    Clock.fixed(Instant.parse("2026-10-31T15:00:00Z"), ZoneOffset.UTC), Set.of("test-character"));
-        }
-    }
 
     @TestConfiguration(proxyBeanMethods = false)
     @RestController

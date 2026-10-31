@@ -1,8 +1,8 @@
-package com.dodamdodam.backend;
+package com.dodamdodam.backend.child.application;
 
-import com.dodamdodam.backend.child.ChildException;
-import com.dodamdodam.backend.child.ChildService;
-import com.dodamdodam.backend.child.ChildView;
+import com.dodamdodam.backend.TestcontainersConfiguration;
+import com.dodamdodam.backend.child.dto.ChildView;
+import com.dodamdodam.backend.child.exception.ChildException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;

@@ -1,5 +1,6 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.api;
 
+import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;

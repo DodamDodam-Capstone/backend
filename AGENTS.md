@@ -27,7 +27,7 @@ API, domain, database, 인증·인가, 외부 시스템 연결과 Backend 테스
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
 | Git·Jira 계획·상태·포인트·일정·업로드 | [Backend 실행 규칙](docs/AGENT_WORKFLOW.md), [팀 업무 가이드](docs/TEAM_WORKFLOW_GUIDE.md) |
-| 코드·DB·인증·서비스 계약 변경 | [Backend 상세 지침](docs/AGENT_GUIDE.md) |
+| 코드·DB·인증·서비스 계약 변경 | [Backend 상세 지침](docs/AGENT_GUIDE.md), [패키지 구조 표준](docs/AGENT_GUIDE.md#기능별-패키지-표준) |
 | 도구 버전·포트·환경변수·OAuth callback·설치 변경 | [개발 환경 문서](docs/DEVELOPMENT_SETUP.md) |
 | AGENTS·CLAUDE 지침·CI 정책 생성·수정 | [문서 분리·유지 규칙](docs/AGENT_DOCUMENTATION.md) |
 

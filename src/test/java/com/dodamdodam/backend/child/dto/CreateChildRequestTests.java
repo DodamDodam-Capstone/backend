@@ -1,5 +1,6 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.dto;
 
+import com.dodamdodam.backend.child.exception.ChildException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

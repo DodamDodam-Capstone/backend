@@ -25,6 +25,39 @@ workflow entry points are kept in [AGENTS.md](../AGENTS.md).
 - Do not create generic `util` or `common` dumping grounds. Name shared code after its actual responsibility.
 - Keep REST routes under `/api/v1` unless an existing contract says otherwise.
 
+### 기능별 패키지 표준
+
+- 최상위 업무 패키지는 `com.dodamdodam.backend.<feature>`로 구성한다. 전체 기능을 하나의 controller/service/dto 패키지에 모으지 않는다.
+- 기능 내부에 역할이 늘어나면 아래 이름으로 분리한다. 같은 역할은 같은 이름을 쓰되, 모든 기능에 모든 하위 패키지를 만들지는 않는다.
+
+| 하위 패키지 | 책임 |
+| --- | --- |
+| `api` | HTTP 컨트롤러, 요청·응답 연결, HTTP 예외 처리 |
+| `application` | 서비스, 업무 처리 순서와 트랜잭션 경계 |
+| `dto` | 기능의 요청·응답·내부 전달 객체 |
+| `infrastructure` | JDBC 저장소, 외부 시스템 연결 구현 |
+| `exception` | 기능에서 공유하는 업무 예외와 오류 정보 |
+| `domain` | HTTP·Jackson·DB 구현에 의존하지 않는 업무 모델·상태·규칙이 있을 때 사용 |
+
+- 파일이 적고 책임이 명확한 기능은 기능 패키지에 직접 둘 수 있다. 빈 패키지나 분류만을 위한 Entity·Service 인터페이스·공통 기반 클래스를 추가하지 않는다.
+- `auth/session`처럼 수명주기·접근 범위가 함께 움직이는 응집된 묶음과 `global/config`, `global/web`, `global/auth`, `global/error` 같은 공통 책임은 유지할 수 있다. 공통 CSRF 코드를 특정 기능에 종속시키지 않는다.
+- API 오류 필드에 의존하는 예외는 `exception`에 두고, 상태 enum·정책 클래스도 실제 업무 책임을 확인해 `domain` 또는 `application`에 둔다. 타입 이름만으로 `domain`에 모으지 않는다.
+- 테스트는 가능하면 대상 코드의 패키지를 따른다. 여러 기능을 함께 검증하는 통합 계약 테스트는 루트 test 패키지에 둘 수 있다. 패키지 전용 의존성 주입이 필요한 테스트 설정은 해당 패키지의 test 소스에 두며, 테스트 편의를 위해 운영 생성자를 public으로 넓히지 않는다.
+- 패키지 이동 시 호출자·import·Spring 스캔·접근 범위·테스트·문서 링크를 함께 확인한다. 계층 간에 필요한 타입·메서드만 공개하고, 기존 HTTP·JSON·트랜잭션·예외 계약을 보존한다.
+- 세션에 저장되는 타입의 패키지 변경은 저장된 직렬화 데이터와 연결될 수 있으므로 별도 호환성 검증 없이 이동하지 않는다. 적용된 DB migration은 패키지 정리를 위해 변경하지 않는다.
+- 폴더 이름이나 파일 개수를 고정하는 테스트는 추가하지 않는다. 컴파일과 기존 기능·보안·동시성 테스트로 동작을 검증하고, 패키지 책임은 코드 리뷰로 확인한다.
+
+자녀 기능의 현재 구성 예시:
+
+```text
+child/
+├── api/             ChildController, ChildExceptionHandler
+├── application/     ChildService
+├── dto/             CreateChildRequest, ChildView, ChildContext
+├── infrastructure/  ChildRepository
+└── exception/       ChildException
+```
+
 ## 주석과 가독성
 
 - 작성·수정하는 운영 코드의 메서드에는 역할과 필요한 호출 조건을 짧은 한국어 JavaDoc으로 남긴다. 내부에는 검증·정규화·저장 단계와 시간대·잠금 순서·예외 처리의 의도를 필요한 위치에 한 줄로 설명한다.

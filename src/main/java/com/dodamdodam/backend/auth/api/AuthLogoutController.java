@@ -1,4 +1,4 @@
-package com.dodamdodam.backend.auth;
+package com.dodamdodam.backend.auth.api;
 
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
@@ -25,6 +25,7 @@ public class AuthLogoutController {
     private final SecurityContextLogoutHandler contextLogout = new SecurityContextLogoutHandler();
     private final CsrfLogoutHandler csrfLogout;
 
+    /** 기존 세션·CSRF 정리 기능으로 로그아웃 API를 구성한다. */
     public AuthLogoutController(AuthenticatedSessionService authenticatedSessions, SessionSecurityRepository securityRepository,
                                 SecurityContextRepository securityContextRepository, CookieCsrfTokenRepository csrfRepository) {
         this.authenticatedSessions = authenticatedSessions;

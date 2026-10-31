@@ -1,6 +1,10 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.api;
 
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
+import com.dodamdodam.backend.child.application.ChildService;
+import com.dodamdodam.backend.child.dto.ChildView;
+import com.dodamdodam.backend.child.dto.CreateChildRequest;
+import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

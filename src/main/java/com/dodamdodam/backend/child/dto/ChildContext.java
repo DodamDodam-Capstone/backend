@@ -1,4 +1,4 @@
-package com.dodamdodam.backend.child;
+package com.dodamdodam.backend.child.dto;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
