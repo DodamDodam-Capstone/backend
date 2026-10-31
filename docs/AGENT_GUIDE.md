@@ -25,6 +25,15 @@ workflow entry points are kept in [AGENTS.md](../AGENTS.md).
 - Do not create generic `util` or `common` dumping grounds. Name shared code after its actual responsibility.
 - Keep REST routes under `/api/v1` unless an existing contract says otherwise.
 
+## 주석과 가독성
+
+- 작성·수정하는 운영 코드의 메서드에는 역할과 필요한 호출 조건을 짧은 한국어 JavaDoc으로 남긴다. 내부에는 검증·정규화·저장 단계와 시간대·잠금 순서·예외 처리의 의도를 필요한 위치에 한 줄로 설명한다.
+- 코드만 읽어도 명확한 동작을 반복 설명하는 주석은 줄이고 판단 근거와 제약을 기록한다. 구현을 변경하면 관련 주석도 함께 갱신한다.
+- 변수와 메서드는 업무 의도가 드러나게 이름 짓는다. 복잡한 조건은 의미 있는 이름이나 작은 메서드로 정리하고, 실패 조건을 먼저 처리해 중첩을 줄인다. 분리는 읽기 부담이나 중복을 실제로 줄일 때만 한다.
+- 검증 실패 분기와 반복문은 중괄호와 줄바꿈으로 적용 범위를 명확히 한다. 서로 다른 검증·변환 단계를 한 줄에 몰아 쓰지 않는다.
+- 가독성 정리는 요청 범위의 코드에 한정하고 기존 동작·보안·API 계약을 보존한다. 기존 구현을 재사용하며 불필요한 계층·옵션·의존성을 추가하지 않는다.
+- 동작 보존은 관련 테스트로 검증하고, 주석의 정확성·이름·구조는 코드 리뷰로 확인한다. 주석 개수나 문서 문구 존재만으로 가독성을 판정하는 검사는 만들지 않는다.
+
 ## Database rules
 
 - PostgreSQL is the only application database. Do not add H2 for convenience.
