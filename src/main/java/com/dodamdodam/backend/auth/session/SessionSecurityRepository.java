@@ -74,6 +74,22 @@ public class SessionSecurityRepository {
         }
     }
 
+    /** 호출자의 트랜잭션에서 계정→문맥 순서로 잠그고 현재 유효성을 재검사한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void requireCurrentContextForUpdate(UUID accountId, UUID securityContextId) {
+        var accounts = jdbcTemplate.queryForList("SELECT id FROM accounts WHERE id = ? FOR UPDATE", UUID.class, accountId);
+        if (accounts.isEmpty()) {
+            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        }
+        var contexts = jdbcTemplate.queryForList("""
+                SELECT id FROM session_security WHERE id = ? AND account_id = ? FOR UPDATE
+                """, UUID.class, securityContextId, accountId);
+        // 잠금 대기가 끝난 뒤 기존 규칙과 새 DB 시각으로 다시 확인한다.
+        if (contexts.isEmpty() || !isCurrentContext(accountId, securityContextId)) {
+            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        }
+    }
+
     @Transactional
     public boolean revokeCurrentContext(UUID accountId, UUID securityContextId) {
         var accountVersions = jdbcTemplate.queryForList(
