@@ -747,6 +747,12 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 `LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
 `child.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
 입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
+`child.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
+동시 등록의 잠금 대기를 확인합니다. 같은 계정은 201/409와 한 행, 다른 계정은 같은 애칭으로도
+독립 등록을 검증하며, 테스트 전용 응답 advice와 latch로 등록 커밋 후 폐기 순서를 고정합니다.
+응답 직전 재검사에서 폐기를 확인하면 자녀 본문·Location 없이 401을 반환하고 세션 쿠키를
+갱신하지 않습니다. 이미 등록이 확정됐을 수 있으므로 POST를 자동 재실행하지 않고,
+재로그인 후 목록으로 확인하는 계약을 SCRUM-81에 인계합니다. 목록 API는 이 작업에 포함하지 않습니다.
 
 **전체 Spring 구성과 요청·응답 흐름**
 
