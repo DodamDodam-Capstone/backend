@@ -724,7 +724,10 @@ UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃�
 
 크기·형식 검사를 통과한 본문은 동기 MVC용 request wrapper에 보관해 후속 코드가 다시
 읽을 수 있습니다. 로그아웃은 기존 `EMPTY_BODY` 속성으로 실제 0바이트 여부를 확인합니다.
-자녀 JSON 구조·입력 검증과 등록 HTTP 연결은 후속 구현이며 guard에서 먼저 파싱하지 않습니다.
+자녀 JSON은 로그인 검증 이후 [ChildController](../src/main/java/com/dodamdodam/backend/child/ChildController.java)에서
+읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
+자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/ChildExceptionHandler.java)에서
+400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
 관련 검사 순서는 다음과 같습니다.
 
 ```text
@@ -742,6 +745,8 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
 `Part1JsonRequestGuardTests`는 크기 경계·UTF-8 재읽기·Content-Length 누락/허위와 제한 읽기를,
 `LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
+`child.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
+입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
 
 **전체 Spring 구성과 요청·응답 흐름**
 
