@@ -1,7 +1,7 @@
 package com.dodamdodam.backend.auth;
 
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
-import com.dodamdodam.backend.auth.session.LogoutRequestGuardFilter;
+import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,10 +33,11 @@ public class AuthLogoutController {
         csrfLogout = new CsrfLogoutHandler(csrfRepository);
     }
 
+    /** 인증과 빈 본문을 확인한 뒤 현재 문맥·세션·CSRF 쿠키를 폐기한다. */
     @PostMapping("/api/v1/auth/logout")
     public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
         var current = authenticatedSessions.requireAuthenticatedSession(request);
-        if (!Boolean.TRUE.equals(request.getAttribute(LogoutRequestGuardFilter.EMPTY_BODY))) {
+        if (!Boolean.TRUE.equals(request.getAttribute(Part1JsonRequestGuardFilter.EMPTY_BODY))) {
             return ResponseEntity.badRequest().body(new ApiErrorResponse(new ApiErrorResponse.ErrorDetail(
                     "VALIDATION_FAILED", "요청 본문은 비어 있어야 합니다.", response.getHeader("X-Request-ID"), List.of())));
         }
