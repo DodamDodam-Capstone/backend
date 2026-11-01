@@ -152,6 +152,19 @@ class LogoutContractTests {
     }
 
     @ParameterizedTest
+    @CsvSource({"16385,application/json,413,REQUEST_TOO_LARGE", "2,text/plain,415,UNSUPPORTED_MEDIA_TYPE",
+            "2,application/json,403,CSRF_INVALID", "0,,415,UNSUPPORTED_MEDIA_TYPE",
+            "0,application/json,403,CSRF_INVALID"})
+    void childrenTransportGuardsPrecedeCsrfAndAuthentication(int size, String type, int expectedStatus, String code)
+            throws Exception {
+        var call = post("/api/v1/children").content(" ".repeat(size).getBytes(StandardCharsets.UTF_8));
+        if (type != null) {
+            call.contentType(type);
+        }
+        error(call, expectedStatus, code);
+    }
+
+    @ParameterizedTest
     @CsvSource({"0,204", "2,400", "16384,400", "16385,413"})
     void chunkedRequestsWithoutContentLengthUseActualBytes(int size, int expectedStatus) throws Exception {
         var current = authenticated();

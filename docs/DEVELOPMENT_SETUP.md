@@ -694,7 +694,7 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
 
-`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.1의 기본값을 사용합니다.
+`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.2의 기본값을 사용합니다.
 프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
 
 앞단 필터가 응답을 감싼 뒤 다음 필터를 호출하므로, 정상 응답의 관련 처리는 안쪽부터
@@ -714,13 +714,24 @@ Spring Session native 저장
 갱신보다 우선합니다. 이미 전송된 응답은 재작성할 수 없습니다.
 
 Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
-`SecurityConfig`는 [LogoutRequestGuardFilter](../src/main/java/com/dodamdodam/backend/auth/session/LogoutRequestGuardFilter.java)를
+`SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
-로그아웃의 관련 검사 순서는 다음과 같습니다.
+검사 대상은 `POST /api/v1/auth/logout`와 `POST /api/v1/children`입니다. 두 경로 모두
+실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
+Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
+UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
+
+크기·형식 검사를 통과한 본문은 동기 MVC용 request wrapper에 보관해 후속 코드가 다시
+읽을 수 있습니다. 로그아웃은 기존 `EMPTY_BODY` 속성으로 실제 0바이트 여부를 확인합니다.
+자녀 JSON은 로그인 검증 이후 [ChildController](../src/main/java/com/dodamdodam/backend/child/api/ChildController.java)에서
+읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
+자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java)에서
+400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
+관련 검사 순서는 다음과 같습니다.
 
 ```text
-CORS → 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 실제 0바이트 본문 확인
+CORS → 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 본문·업무 검증
 ```
 
 CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
@@ -732,6 +743,16 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 `SessionCookieLifecycleTests`·`LoginSessionPersistenceTests`·`LogoutContractTests`·
 `CsrfLifecycleContractTests` 등 관련 계약 테스트로 저장 후 갱신, 실패 시 성공 응답 차단,
 로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
+`Part1JsonRequestGuardTests`는 크기 경계·UTF-8 재읽기·Content-Length 누락/허위와 제한 읽기를,
+`LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
+`child.api.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
+입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
+`child.application.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
+동시 등록의 잠금 대기를 확인합니다. 같은 계정은 201/409와 한 행, 다른 계정은 같은 애칭으로도
+독립 등록을 검증하며, 테스트 전용 응답 advice와 latch로 등록 커밋 후 폐기 순서를 고정합니다.
+응답 직전 재검사에서 폐기를 확인하면 자녀 본문·Location 없이 401을 반환하고 세션 쿠키를
+갱신하지 않습니다. 이미 등록이 확정됐을 수 있으므로 POST를 자동 재실행하지 않고,
+재로그인 후 목록으로 확인하는 계약을 SCRUM-81에 인계합니다. 목록 API는 이 작업에 포함하지 않습니다.
 
 **전체 Spring 구성과 요청·응답 흐름**
 
@@ -753,7 +774,7 @@ flowchart TB
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
         INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
         CORS["5 CorsFilter"]
-        GUARD["6 LogoutRequestGuardFilter<br/>로그아웃 크기 413 · 형식 415"]
+        GUARD["6 Part1JsonRequestGuardFilter<br/>로그아웃·자녀 등록 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
         CSRF["7 CsrfFilter<br/>실패 403 CSRF_INVALID"]
         OAUTH["8 OAuth2AuthorizationRequestRedirectFilter<br/>9 OAuth2LoginAuthenticationFilter"]
         INTERMEDIATE["10 SecurityContextHolderAwareRequestFilter<br/>11 AnonymousAuthenticationFilter<br/>12 SessionManagementFilter<br/>13 ExceptionTranslationFilter"]
