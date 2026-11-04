@@ -47,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -284,6 +285,7 @@ class ChildRegistrationContractTests {
     private MockHttpServletResponse error(MockHttpServletRequestBuilder call, int expectedStatus, String code,
                                            String... fields) throws Exception {
         var response = mockMvc.perform(call).andExpect(status().is(expectedStatus))
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.error.code").value(code)).andReturn().getResponse();
         Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
         Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");

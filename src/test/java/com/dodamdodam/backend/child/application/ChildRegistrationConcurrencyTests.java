@@ -2,6 +2,7 @@ package com.dodamdodam.backend.child.application;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
 import com.dodamdodam.backend.auth.session.AuthenticatedSession;
+import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.child.api.ChildController;
 import com.dodamdodam.backend.child.dto.ChildView;
@@ -258,7 +259,10 @@ class ChildRegistrationConcurrencyTests {
                 assertThat(business.getCause()).isInstanceOf(DataAccessException.class);
             });
         }
-        else assertThat(failure).isInstanceOf(DataAccessException.class);
+        else {
+            assertThat(failure).isInstanceOf(AuthStateUnavailableException.class)
+                    .hasCauseInstanceOf(DataAccessException.class);
+        }
         assertChildCount(0);
     }
 

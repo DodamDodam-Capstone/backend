@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -148,12 +151,18 @@ class CsrfContractTests {
     private void expectCsrfInvalid(MockHttpServletRequestBuilder request) throws Exception {
         var response = mockMvc.perform(request.accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().encoding(StandardCharsets.UTF_8))
                 .andExpect(jsonPath("$.error.code").value("CSRF_INVALID"))
                 .andExpect(jsonPath("$.error.message").isNotEmpty())
                 .andExpect(jsonPath("$.error.fields").isArray())
                 .andExpect(jsonPath("$.error.fields").isEmpty())
                 .andReturn().getResponse();
 
+        Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
+        Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
         var requestId = response.getHeader("X-Request-ID");
         assertThat(requestId).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
         assertThat(JsonPath.<String>read(response.getContentAsString(), "$.error.requestId"))
