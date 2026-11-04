@@ -4,11 +4,14 @@ import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
 import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 public class ChildExceptionHandler {
 

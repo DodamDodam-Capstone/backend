@@ -65,10 +65,12 @@ public class AuthStateErrorFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 명시적인 인증 장애와 MVC 밖에서 발생한 프레임워크 세션 장애를 찾는다. */
     private Throwable findAuthStateFailure(Throwable failure) {
-        // shortcut: 다른 업무 저장소 도입 시 그 도메인의 DB 오류 처리와 분리한다.
+        // Spring Session 저장 실패는 MVC 밖에서도 발생하므로 기존 저장소 오류 분류를 유지한다.
         while (failure != null && !(failure instanceof DataAccessException)
                 && !(failure instanceof TransactionException) && !(failure instanceof ConversionException)
+                && !(failure instanceof AuthStateUnavailableException)
                 && !(failure instanceof SessionCookieRenewalFilter.InvalidSessionException)) {
             failure = failure.getCause();
         }

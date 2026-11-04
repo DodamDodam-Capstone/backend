@@ -1,12 +1,15 @@
 package com.dodamdodam.backend.auth.api;
 
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
+import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
+import org.springframework.core.convert.ConversionException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +19,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfLogoutHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.TransactionException;
 
 @RestController
 public class AuthLogoutController {
@@ -42,12 +46,18 @@ public class AuthLogoutController {
             return ResponseEntity.badRequest().body(ApiErrorResponses.body(
                     response, "VALIDATION_FAILED", "요청 본문은 비어 있어야 합니다.", List.of()));
         }
-        if (!securityRepository.revokeCurrentContext(current.accountId(), current.securityContextId())) {
-            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        try {
+            if (!securityRepository.revokeCurrentContext(current.accountId(), current.securityContextId())) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            contextLogout.logout(request, response, authentication);
+            csrfLogout.logout(request, response, authentication);
+            return ResponseEntity.noContent().build();
         }
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        contextLogout.logout(request, response, authentication);
-        csrfLogout.logout(request, response, authentication);
-        return ResponseEntity.noContent().build();
+        catch (DataAccessException | TransactionException | ConversionException failure) {
+            // 문맥 폐기의 커밋과 뒤이은 네이티브 세션 삭제 실패도 인증 장애다.
+            throw new AuthStateUnavailableException(failure);
+        }
     }
 }

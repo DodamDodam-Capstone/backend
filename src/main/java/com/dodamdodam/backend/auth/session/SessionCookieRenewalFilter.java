@@ -70,5 +70,6 @@ public class SessionCookieRenewalFilter extends OncePerRequestFilter {
         cookies.writeCookieValue(value);
     }
 
-    static class InvalidSessionException extends RuntimeException { }
+    /** MVC가 소비하지 않고 외곽 필터의 본문 초기화·401 변환으로 넘겨야 하는 재검사 실패다. */
+    public static class InvalidSessionException extends RuntimeException { }
 }

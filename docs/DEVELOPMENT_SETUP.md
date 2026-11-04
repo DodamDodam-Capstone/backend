@@ -420,8 +420,10 @@ V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NUL
 무효/비로그인은 `401 AUTHENTICATION_REQUIRED`, 저장소 읽기·쓰기·역직렬화 실패는
 `503 AUTH_STATE_UNAVAILABLE` 공통 JSON으로 처리합니다. CSRF 실패의 403은 인증 판정보다
 먼저 처리하고, API 인증 실패에 로그인 페이지 redirect나 익명 요청 저장용 세션을 만들지 않습니다.
-현재 미처리 DB 예외의 fallback은 인증 저장소 기준이므로 다른 업무 저장소가 추가되면
-그 도메인의 오류 변환을 연결해야 합니다.
+Backend 컨트롤러의 명시적 인증 저장소 장애는 `503 AUTH_STATE_UNAVAILABLE`, 그 밖의
+미처리 업무 오류는 원문 없는 `500 INTERNAL_ERROR`로 변환합니다. JSON·UUID 구조 오류는
+400이며 자녀 기능의 404·409 처리가 공통 fallback보다 우선합니다. 진행 중 로그인 실패는
+외곽 필터로 전달해 보상 폐기하며, MVC 밖의 Spring Session 저장 장애도 기존 503 경로를 유지합니다.
 
 로그인 소비자는 **자격 검증 트랜잭션을 마친 뒤** 공유
 `SessionAuthenticationStrategy.onAuthentication(authentication, request, response)`를 호출하고,

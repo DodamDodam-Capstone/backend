@@ -2,9 +2,12 @@ package com.dodamdodam.backend.auth.session;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.springframework.core.convert.ConversionException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,16 +80,22 @@ public class SessionSecurityRepository {
     /** 호출자의 트랜잭션에서 계정→문맥 순서로 잠그고 현재 유효성을 재검사한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireCurrentContextForUpdate(UUID accountId, UUID securityContextId) {
-        var accounts = jdbcTemplate.queryForList("SELECT id FROM accounts WHERE id = ? FOR UPDATE", UUID.class, accountId);
-        if (accounts.isEmpty()) {
-            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        try {
+            var accounts = jdbcTemplate.queryForList("SELECT id FROM accounts WHERE id = ? FOR UPDATE", UUID.class, accountId);
+            if (accounts.isEmpty()) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
+            var contexts = jdbcTemplate.queryForList("""
+                    SELECT id FROM session_security WHERE id = ? AND account_id = ? FOR UPDATE
+                    """, UUID.class, securityContextId, accountId);
+            // 잠금 대기가 끝난 뒤 기존 규칙과 새 DB 시각으로 다시 확인한다.
+            if (contexts.isEmpty() || !isCurrentContext(accountId, securityContextId)) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
         }
-        var contexts = jdbcTemplate.queryForList("""
-                SELECT id FROM session_security WHERE id = ? AND account_id = ? FOR UPDATE
-                """, UUID.class, securityContextId, accountId);
-        // 잠금 대기가 끝난 뒤 기존 규칙과 새 DB 시각으로 다시 확인한다.
-        if (contexts.isEmpty() || !isCurrentContext(accountId, securityContextId)) {
-            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        catch (DataAccessException | TransactionException | ConversionException failure) {
+            // 자녀 업무 트랜잭션 전체가 아니라 인증 검사 실패만 구분한다.
+            throw new AuthStateUnavailableException(failure);
         }
     }
 
