@@ -27,6 +27,11 @@ public class GuardianAccessService {
         return until;
     }
 
+    /** 재검사 대상 요청인지만 반환하며, 표식 자체가 현재 권한을 보증하지는 않는다. */
+    public static boolean requiresResponseVerification(HttpServletRequest request) {
+        return request.getAttribute(RESPONSE_ACCESS) instanceof AuthenticatedSession;
+    }
+
     /** 보호자 권한 검사에 성공한 요청의 현재 DB 권한을 다시 확인한다. */
     public void verifyResponseAccess(HttpServletRequest request) {
         if (request.getAttribute(RESPONSE_ACCESS) instanceof AuthenticatedSession authenticated) {

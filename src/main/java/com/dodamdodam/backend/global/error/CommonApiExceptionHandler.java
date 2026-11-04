@@ -4,6 +4,7 @@ import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.auth.session.SessionCookieRenewalFilter.InvalidSessionException;
 import com.dodamdodam.backend.auth.session.SessionLifecycleService;
 import com.dodamdodam.backend.global.error.ApiErrorResponse.FieldError;
+import com.dodamdodam.backend.guardian.application.GuardianAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -42,6 +43,10 @@ public class CommonApiExceptionHandler {
                 throw exception;
             }
             if (failure instanceof AuthStateUnavailableException) {
+                if (GuardianAccessService.requiresResponseVerification(request)) {
+                    // 보호자 응답의 늦은 native 재검사 장애도 성공 헤더·본문을 비운 뒤 출력한다.
+                    throw exception;
+                }
                 return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiErrorResponses.body(
                         response, "AUTH_STATE_UNAVAILABLE", "인증 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.", List.of()));
             }

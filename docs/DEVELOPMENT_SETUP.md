@@ -691,7 +691,7 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | 서블릿 필터 | order | 배치 이유 |
 | --- | --- | --- |
 | [ApiResponseHeadersFilter](../src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java) | `H` | 뒤 단계의 성공·실패 응답에 서버 생성 요청 ID와 `no-store`를 적용합니다. |
-| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증과 실패 보상을 수행합니다. |
+| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증·실패 보상과 보호자 응답 재검사를 수행합니다. |
 | [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
@@ -706,14 +706,24 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 Spring Session native 저장
 → SessionCookieRenewalFilter의 저장 상태 재조회·쿠키 갱신
 → AuthStateErrorFilter의 로그인 최종 검증(로그인 요청일 때)
+→ AuthStateErrorFilter의 보호자 권한 재조회(검사 성공 표식이 있는 400 미만 응답)
 → 실제 HTTP 응답 전송
 ```
 
 두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
 컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
 저장·재검증이 실패하면 바깥 `AuthStateErrorFilter`가 아직 전송되지 않은 성공 본문과
-인증 쿠키를 제거하고 401·503으로 처리합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
+`Content-Length`·`Location`·인증 쿠키를 제거하고 401·403·503으로 처리합니다.
+서버 요청 ID·`no-store`·CORS 헤더는 유지합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
 갱신보다 우선합니다. 이미 전송된 응답은 재작성할 수 없습니다.
+
+`GuardianAccessService.requireGuardianAccess` 성공 시에만 같은 요청의 계정·문맥 표식을
+남기고, 응답 커밋 직전과 미커밋 종료 시 `verifyResponseAccess`로 현재 DB 권한을 다시
+읽습니다. 표식 자체는 현재 권한을 보증하지 않으며 최초 기한이나 HTTP 세션의 guardian
+속성을 재사용하지 않습니다. 일반 요청과 이미 오류 상태인 응답은 guardian 재검사 대상이
+아닙니다. 재검사 대상의 늦은 guardian·인증 확인 예외는 MVC handler가 소비하지 않고
+외곽 필터로 넘겨 성공 본문·헤더를 먼저 비웁니다. guardian만 거부된 403은 일반 로그인을
+폐기하지 않습니다. 이 연결은 동기 MVC 응답을 대상으로 합니다.
 
 Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
 `SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
@@ -767,7 +777,7 @@ flowchart TB
     CLIENT["브라우저 / API 클라이언트"]
     subgraph SERVLET["서블릿 필터: 요청 진입"]
         HEADERS["ApiResponseHeadersFilter · H<br/>요청 ID · no-store"]
-        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상"]
+        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상 · guardian 재검사"]
         COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
         SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
         PROXY["springSecurityFilterChain · -100"]
@@ -807,10 +817,12 @@ flowchart TB
         AUTH["AuthenticatedSessionService<br/>native · principal · UUID 결합 검사<br/>DB 폐기·버전·만료 검사"]
         BUSINESS["SessionSecurityRepository<br/>계정 → 문맥 → PIN 잠금<br/>업무 자격 원자적 폐기"]
         NATIVE["JdbcIndexedSessionRepository<br/>일반 인증 timeout -1 · 익명 30분<br/>즉시 저장 · 명시적 ID 삭제"]
-        BIZDB[("accounts · session_security<br/>email_verifications · Flyway V2–V3")]
+        GUARDIAN["GuardianAccessService · GuardianAccessRepository<br/>요청의 계정·문맥으로 guardian 기한·PIN 버전 재검사"]
+        BIZDB[("accounts · session_security · guardian_pins<br/>email_verifications · Flyway V2–V3, V5")]
         SESSIONDB[("SPRING_SESSION<br/>SPRING_SESSION_ATTRIBUTES · Flyway V1")]
         AUTH -. 현재 문맥 확인 .-> BUSINESS
         BUSINESS --> BIZDB
+        GUARDIAN --> BIZDB
         NATIVE --> SESSIONDB
     end
     AUTHZ -. 보호 경로 검사 .-> AUTH
@@ -826,16 +838,17 @@ flowchart TB
     subgraph RESPONSE["응답: 안쪽에서 바깥쪽, 실제 전송 전"]
         SAVE["1 Spring Session native 저장·쿠키 기록"]
         RENEW["2 SessionCookieRenewalFilter<br/>저장 상태 재검사 → 유효한 인증 쿠키 365일 갱신<br/>로그아웃 Max-Age=0 우선"]
-        VERIFY["3 AuthStateErrorFilter<br/>로그인 요청 최종 검증"]
+        VERIFY["3 AuthStateErrorFilter<br/>로그인 최종 검증 · guardian 응답 재검사"]
         WIRE["4 HTTP 응답 전송"]
         SAVE --> RENEW --> VERIFY --> WIRE
     end
     RENEW -. 실제 저장 재조회 .-> NATIVE
     RENEW -. 재검증 .-> AUTH
     VERIFY -. 로그인일 때 .-> LIFE
+    VERIFY -. guardian 표식이 있는 성공 응답 .-> GUARDIAN
     COOKIECONFIG["Boot CookieSerializer<br/>JSESSIONID · HttpOnly · Path=/ · SameSite · Secure"] -. 동일 설정 사용 .-> RENEW
     COOKIECONFIG -. 동일 설정 사용 .-> SESSION
-    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>AuthStateErrorFilter: 성공 본문·인증 쿠키 제거, 공통 헤더 보존<br/>AuthStateErrorHandler: 인증 무효 401 / 저장·검증 장애 503"]
+    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>성공 본문·길이·Location·인증 쿠키 제거, 공통 헤더 보존<br/>인증 무효 401 / guardian 확인 필요 403 / 확인 장애 503"]
     FAILURE --> WIRE
     WIRE --> CLIENTOUT["클라이언트 응답 수신"]
 ```
