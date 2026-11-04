@@ -10,6 +10,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -244,8 +246,15 @@ class LogoutContractTests {
 
     private MockHttpServletResponse error(MockHttpServletRequestBuilder call, int status, String code) throws Exception {
         var response = mockMvc.perform(call).andExpect(status().is(status))
-                .andExpect(jsonPath("$.error.code").value(code)).andExpect(jsonPath("$.error.fields").isEmpty())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.error.code").value(code))
+                .andExpect(jsonPath("$.error.fields").isArray()).andExpect(jsonPath("$.error.fields").isEmpty())
                 .andReturn().getResponse();
+        Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
+        Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
+        assertThat((String) error.get("message")).isNotBlank();
         assertHeaders(response);
         assertThat(JsonPath.<String>read(response.getContentAsString(), "$.error.requestId"))
                 .isEqualTo(response.getHeader("X-Request-ID"));

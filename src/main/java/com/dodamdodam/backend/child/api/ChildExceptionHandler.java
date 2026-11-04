@@ -2,6 +2,7 @@ package com.dodamdodam.backend.child.api;
 
 import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
+import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,13 @@ public class ChildExceptionHandler {
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
         // 업무 DB 오류는 MVC에서 처리해 원인 순회 중 인증 장애 503으로 바뀌지 않게 한다.
-        return ResponseEntity.status(status).body(new ApiErrorResponse(new ApiErrorResponse.ErrorDetail(
-                exception.code(), exception.getMessage(), response.getHeader("X-Request-ID"), exception.fields())));
+        return ResponseEntity.status(status).body(
+            ApiErrorResponses.body(
+                response,
+                exception.code(),
+                exception.getMessage(),
+                exception.fields()
+            )
+        );
     }
 }

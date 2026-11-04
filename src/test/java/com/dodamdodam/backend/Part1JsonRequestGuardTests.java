@@ -1,9 +1,12 @@
 package com.dodamdodam.backend;
 
 import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
+import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,6 +15,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.DelegatingServletInputStream;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -189,10 +193,16 @@ class Part1JsonRequestGuardTests {
         });
 
         assertThat(response.getStatus()).isEqualTo(status);
-        var error = JSON.readTree(response.getContentAsByteArray()).get("error");
-        assertThat(error.get("code").stringValue()).isEqualTo(code);
-        assertThat(error.get("requestId").stringValue()).isEqualTo(response.getHeader("X-Request-ID"));
-        assertThat(error.get("fields").isArray()).isTrue();
-        assertThat(error.get("fields").size()).isZero();
+        assertThat(MediaType.parseMediaType(response.getContentType()).isCompatibleWith(MediaType.APPLICATION_JSON))
+                .isTrue();
+        assertThat(response.getCharacterEncoding()).isEqualTo(StandardCharsets.UTF_8.name());
+        Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
+        Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
+        assertThat(error.get("code")).isEqualTo(code);
+        assertThat((String) error.get("message")).isNotBlank();
+        assertThat(error.get("requestId")).isEqualTo(response.getHeader("X-Request-ID"));
+        assertThat(error.get("fields")).isEqualTo(List.of());
     }
 }

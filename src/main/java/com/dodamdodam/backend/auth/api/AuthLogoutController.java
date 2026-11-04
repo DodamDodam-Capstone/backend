@@ -3,7 +3,7 @@ package com.dodamdodam.backend.auth.api;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
-import com.dodamdodam.backend.global.error.ApiErrorResponse;
+import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -39,8 +39,8 @@ public class AuthLogoutController {
     public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
         var current = authenticatedSessions.requireAuthenticatedSession(request);
         if (!Boolean.TRUE.equals(request.getAttribute(Part1JsonRequestGuardFilter.EMPTY_BODY))) {
-            return ResponseEntity.badRequest().body(new ApiErrorResponse(new ApiErrorResponse.ErrorDetail(
-                    "VALIDATION_FAILED", "요청 본문은 비어 있어야 합니다.", response.getHeader("X-Request-ID"), List.of())));
+            return ResponseEntity.badRequest().body(ApiErrorResponses.body(
+                    response, "VALIDATION_FAILED", "요청 본문은 비어 있어야 합니다.", List.of()));
         }
         if (!securityRepository.revokeCurrentContext(current.accountId(), current.securityContextId())) {
             throw new InsufficientAuthenticationException("로그인이 필요합니다.");

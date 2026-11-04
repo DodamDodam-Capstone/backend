@@ -6,6 +6,7 @@ import com.dodamdodam.backend.child.dto.ChildView;
 import com.dodamdodam.backend.child.dto.CreateChildRequest;
 import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.global.error.ApiErrorResponse;
+import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
@@ -44,7 +45,7 @@ public class ChildController {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> invalidJson(HttpServletResponse response) {
         var invalid = ChildException.validation("body");
-        return ResponseEntity.badRequest().body(new ApiErrorResponse(new ApiErrorResponse.ErrorDetail(
-                invalid.code(), invalid.getMessage(), response.getHeader("X-Request-ID"), invalid.fields())));
+        return ResponseEntity.badRequest().body(ApiErrorResponses.body(
+                response, invalid.code(), invalid.getMessage(), invalid.fields()));
     }
 }
