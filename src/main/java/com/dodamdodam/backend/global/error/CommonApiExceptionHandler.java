@@ -4,13 +4,11 @@ import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.auth.session.SessionCookieRenewalFilter.InvalidSessionException;
 import com.dodamdodam.backend.auth.session.SessionLifecycleService;
 import com.dodamdodam.backend.global.error.ApiErrorResponse.FieldError;
-import com.dodamdodam.backend.guardian.application.GuardianAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.AuthenticationException;
@@ -37,18 +35,11 @@ public class CommonApiExceptionHandler {
         if (lifecycle.hasPendingLogin(request)) {
             throw exception;
         }
-        // 직렬화 중 감싼 인증 오류도 보존하고, 늦은 무효화는 외곽 필터가 성공 본문을 비운다.
+        // guardian 표식과 관계없이 인증 실패·확인 장애는 외곽 필터가 성공 헤더·본문부터 비운다.
         for (Throwable failure = exception; failure != null; failure = failure.getCause()) {
-            if (failure instanceof AuthenticationException || failure instanceof InvalidSessionException) {
+            if (failure instanceof AuthenticationException || failure instanceof InvalidSessionException
+                    || failure instanceof AuthStateUnavailableException) {
                 throw exception;
-            }
-            if (failure instanceof AuthStateUnavailableException) {
-                if (GuardianAccessService.requiresResponseVerification(request)) {
-                    // 보호자 응답의 늦은 native 재검사 장애도 성공 헤더·본문을 비운 뒤 출력한다.
-                    throw exception;
-                }
-                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiErrorResponses.body(
-                        response, "AUTH_STATE_UNAVAILABLE", "인증 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.", List.of()));
             }
         }
         if (exception instanceof HttpMessageNotReadableException
