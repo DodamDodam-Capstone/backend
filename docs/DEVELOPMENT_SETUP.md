@@ -722,8 +722,9 @@ Spring Session native 저장
 읽습니다. 표식 자체는 현재 권한을 보증하지 않으며 최초 기한이나 HTTP 세션의 guardian
 속성을 재사용하지 않습니다. 일반 요청과 이미 오류 상태인 응답은 guardian 재검사 대상이
 아닙니다. 재검사 대상의 늦은 guardian·인증 확인 예외는 MVC handler가 소비하지 않고
-외곽 필터로 넘겨 성공 본문·헤더를 먼저 비웁니다. guardian만 거부된 403은 일반 로그인을
-폐기하지 않습니다. 이 연결은 동기 MVC 응답을 대상으로 합니다.
+외곽 필터로 넘겨 성공 본문·헤더를 먼저 비웁니다. 명시적인 인증 확인 장애는 guardian
+표식 없이도 같은503 경로를 사용하며 native 세션 재조회 실패도 포함합니다. guardian만
+거부된 403은 일반 로그인을 폐기하지 않습니다. 이 연결은 동기 MVC 응답을 대상으로 합니다.
 
 Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
 `SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
@@ -862,6 +863,104 @@ Spring Boot 자동 구성을 사용합니다. 세션 저장과 업무 폐기는 
 `SessionConcurrencyTests`는 실제 HTTP 요청을 latch로 정지시켜 **이전 요청의 세션 조회 →
 로그아웃/재로그인 완료 → 이전 요청의 늦은 저장** 순서를 검증합니다. 늦은 응답과 이전 쿠키는
 401이며, 폐기된 문맥·guardian·PIN 자격이 복구되지 않고 재로그인한 새 세션은 유지되어야 합니다.
+
+### 10.7 Backend 공통 권한 사용과 Part 2 인계
+
+[SCRUM-96](https://dodamdodam.atlassian.net/browse/SCRUM-96)은 기존 로그인·자녀 소유권
+서비스와 DB 기준 보호자 검사를 공통으로 제공합니다. 제품별 적용 경로·응답 DTO는
+[공통 API](p0/api/01-common.md#section-3)와 각 operation이 기준이며, 아래는 현재 코드의 사용법입니다.
+
+**호출 순서와 반환값**
+
+```java
+var authenticated = authentication.requireAuthenticatedSession(request);
+var child = children.requireChildAccess(authenticated.accountId(), childId);
+// conversation/turn 경로는 이 위치에서 아래의 리소스 관계를 검사한다. 실패는 404다.
+var until = guardian.requireGuardianAccess(request, authenticated); // 보호자 경로에만 적용
+```
+
+- `authentication`은 `auth.session.AuthenticatedSessionService`, `children`은
+  `child.application.ChildService`, `guardian`은 `guardian.application.GuardianAccessService`다.
+  `accountId`·`securityContextId`는 같은 요청에서 검증한 `AuthenticatedSession`에서만 얻는다.
+- `requireChildAccess`는 소유 `ChildView`를 반환한다. 내부 AI 입력 등에 쓰는
+  `getChildContext(childId)`도 인증·소유권 검사를 마친 뒤 호출한다.
+- `requireGuardianAccess`는 현재 문맥과 PIN이 유효하고 기한이 DB 시각보다 미래일 때만
+  `OffsetDateTime` 기한을 반환한다. 기한과 DB 시각이 같으면 403이다. 다른 문맥의 확인이나
+  오래된 HTTP 세션 속성은 사용할 수 없다. 조회로 기한·PIN·문맥을 갱신하지 않는다.
+- 반환한 기한은 요청 이후의 권한을 보증하지 않는다. 성공 시 요청 표식이 남아 §10.6의
+  응답 직전 DB 재검사가 적용된다. 소비자가 기한을 캐시하거나 직접 필터를 추가할 필요는 없다.
+
+전송 크기·형식 → CSRF → 로그인 → 구조 → 소유권·리소스 관계 → 필요한 guardian →
+업무 상태 순서로 검사한다. 현재 전송 guard의 적용 경로는 §10.6에 한정되어 있으며,
+후속 API의 형식·크기·요청량 제한은 각 구현에서 연결해야 한다.
+
+**대화·발화 소비자의 관계 검사**
+
+[SCRUM-86](https://dodamdodam.atlassian.net/browse/SCRUM-86) /
+[SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) /
+[SCRUM-111](https://dodamdodam.atlassian.net/browse/SCRUM-111) 연동에서는 검증한 자녀 아래의
+리소스임을 guardian·업무 상태 검사보다 먼저 확인해야 한다.
+
+- 대화 조회는 요청 `conversationId`와 검증된 `child.childId()`를 함께 조건으로 사용한다.
+- 발화 조회는 위 자녀·대화 조건에 `conversation_turns.conversation_id`와 요청 `turnId`까지
+  결합한다. 경로의 ID들이 각각 존재하는 것만으로 관계 검사를 마친 것으로 간주하지 않는다.
+- 미존재·미소유·잘못된 조합은 모두 `404 RESOURCE_NOT_FOUND`다. 관계 확인 전 상태·텍스트·
+  음성을 노출하지 않고, 이후 실제 업무 조회·갱신에도 같은 자녀·리소스 조건을 유지한다.
+- 응답에는 해당 operation이 허용한 DTO 필드만 매핑한다. `AuthenticatedSession`,
+  `GuardianAccessState`, 저장소 row, PIN 해시·보안 문맥·예외 원인을 그대로 직렬화하지 않는다.
+  보호자 기록과 아이 대화의 차이는 [기록 API](p0/api/05-records.md)와
+  [대화 API](p0/api/06-conversations.md)를 따른다.
+
+**공통 오류와 응답 처리**
+
+일반 오류 본문은 `error.code/message/requestId/fields`이며 `fields`는 없으면 `[]`다.
+`requestId`는 서버의 `X-Request-ID`와 같고 `Cache-Control: no-store`를 유지한다.
+원문 입력·자격·금지 텍스트·SQL을 메시지나 검증 필드에 복사하지 않는다.
+
+| 상황 | 현재 공통 처리 |
+| --- | --- |
+| 현재 로그인 문맥 없음·불일치·폐기·만료 | `401 AUTHENTICATION_REQUIRED` |
+| CSRF 누락·불일치 | `403 CSRF_INVALID` |
+| 잘못된 UUID·JSON 등 구조 오류 | `400 VALIDATION_FAILED` |
+| 자녀 미존재·미소유 | `404 RESOURCE_NOT_FOUND` |
+| 현재 guardian 없음·만료·PIN 없음·PIN 버전 불일치 | `403 GUARDIAN_UNLOCK_REQUIRED` |
+| 기존 자녀 등록 제한 | `409 CHILD_LIMIT_REACHED` |
+| 인증·guardian 상태 확인 장애 | `503 AUTH_STATE_UNAVAILABLE` |
+| 자녀 업무 DB 장애·예상하지 못한 MVC 업무 오류 | `500 INTERNAL_ERROR` |
+
+소비자의 관계 오류도 같은404를 사용한다. PIN 미설정의 guardian 검사403과 후속 PIN
+unlock/reset operation의409 `PIN_NOT_SET`은 구분한다. 추가 업무 오류·특수 응답은
+[오류 계약](p0/api/08-errors-and-validation.md#section-9)을 따른다.
+MVC는 `ApiErrorResponses.body`, 필터는 `ApiErrorResponses.write`를 재사용한다.
+§10.6의 늦은 재검사 실패는 외곽 필터로 전달해 준비된 성공 본문·길이·Location·세션 쿠키를
+제거한 뒤401/403/503을 출력한다. guardian만 거부된403은 일반 로그인과 대화 연결을 폐기하지 않는다.
+이미 전송된 bytes를 회수하거나 업무 커밋을 자동으로 롤백하는 기능은 아니다.
+
+**트랜잭션·잠금과 남은 연결 작업**
+
+권한 조회는 행 잠금을 잡지 않는다. 변경 트랜잭션에서 현재 로그인 문맥을 잠글 때는
+`SessionSecurityRepository.requireCurrentContextForUpdate(accountId, securityContextId)`를
+사용할 수 있다. 기존 트랜잭션이 필수(`MANDATORY`)이며 `accounts → session_security` 순서다.
+이 함수만으로 guardian 권한까지 잠그거나 미래의 유효성을 보증하지는 않는다.
+PIN·challenge를 변경하는 경로는 [ERD §8.1](p0/Integrated_ERD_Design.md#81-잠금커밋-원칙)의
+`accounts → session_security → guardian_pins → email_verifications → PIN_FAILURE_ACCOUNT`
+중 필요한 행을 같은 순서로 잠그고, 같은 종류의 여러 행은 ID 순으로 처리한다.
+잠금 뒤 최신 DB 시각·버전으로 재검사하며 메일·AI 외부 호출 중 업무 잠금을 유지하지 않는다.
+Part 2의 자녀→대화→발화/연결/음성 잠금 확장은 같은 절의 기술 설계로, 실제 SQL·교착·경합
+검증은 해당 소비자 작업에서 수행한다.
+
+| 후속 작업 | 이번 공통 기반 이후 구현·검증할 것 |
+| --- | --- |
+| [SCRUM-82](https://dodamdodam.atlassian.net/browse/SCRUM-82) | PIN 생성과 일회성 권한 소비. 설정 성공이 자동 unlock을 대신하지 않는다. |
+| [SCRUM-97](https://dodamdodam.atlassian.net/browse/SCRUM-97) | PIN 확인 성공 시 현재 문맥에 DB 시각 기준 최대1800초·실제 문맥 만료 이내의 기한과 최신 PIN 버전을 기록한다. |
+| [SCRUM-98](https://dodamdodam.atlassian.net/browse/SCRUM-98) | 현재 guardian 해제·generation 증가·PIN 목적 권한 폐기. 일반 로그인·대화 연결은 유지한다. |
+| [SCRUM-83](https://dodamdodam.atlassian.net/browse/SCRUM-83) | PIN 변경과 버전 증가로 기존 guardian 무효화·관련 일회성 권한 폐기. 자동 unlock 없음. |
+| SCRUM-86/88/111 등 실제 소비자 | Part 2 모델·migration·API에서 관계 검사와 허용 DTO를 적용하고 각 권한·상태·응답 경합을 연동 검증한다. |
+
+현재 브랜치는 V5 `guardian_pins` 스키마와 조회·판정 함수를 제공하며 PIN 발급 API나
+Part 2 테이블·운영 조회 API는 추가하지 않았다. 정상 권한과 경합은 합성 DB fixture와
+테스트 전용 소비자로 검증했다. 실제 PIN 발급부터 Part 2 응답까지의 연동은 위 후속 작업의
+인수 조건이다. 실제 캐릭터 목록 보류, AI wire·운영 OAuth/HTTPS 설정은 각 기존 작업 범위로 유지한다.
 
 ## 11. FastAPI·AI 팀 연동 기준
 
