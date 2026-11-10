@@ -10,11 +10,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -174,6 +176,42 @@ class SessionCookieLifecycleTests {
         }
         finally {
             if (mode.equals("DB_FAILURE")) jdbc.execute("ALTER TABLE unavailable_cookie_context RENAME TO session_security");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"AUTH", "NATIVE"})
+    void nonGuardianRecheckFailureClearsPreparedSuccessHeaders(String store) throws Exception {
+        var current = authenticated(jdbc, sessions, cookies);
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + PROTECTED
+                        + "/late-store-failure?store=" + store)).timeout(Duration.ofSeconds(10))
+                .header("Cookie", "JSESSIONID=" + current.cookie().getValue())
+                .header("Origin", "http://localhost:5173").GET().build();
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).isEqualTo(503);
+            assertThat(response.headers().firstValue("Location")).isEmpty();
+            assertThat(JsonPath.<String>read(response.body(), "$.error.code")).isEqualTo("AUTH_STATE_UNAVAILABLE");
+            Map<String, Object> envelope = JsonPath.read(response.body(), "$");
+            Map<String, Object> error = JsonPath.read(response.body(), "$.error");
+            assertThat(envelope).containsOnlyKeys("error");
+            assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
+            assertThat((List<?>) error.get("fields")).isEmpty();
+            assertThat(error.get("requestId")).isEqualTo(response.headers().firstValue("X-Request-ID").orElseThrow());
+            assertThat(response.body()).doesNotContain("protected-result", "SELECT ", "org.springframework", "java.lang");
+            assertThat(response.headers().firstValue("Cache-Control").orElseThrow()).contains("no-store");
+            assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).contains("http://localhost:5173");
+            assertThat(response.headers().firstValue("Access-Control-Allow-Credentials")).contains("true");
+            assertThat(response.headers().allValues("Set-Cookie")).anyMatch(value -> value.startsWith("XSRF-TOKEN="));
+            assertThat(response.headers().allValues("Set-Cookie").stream()
+                    .filter(value -> value.startsWith("JSESSIONID=")).map(MockCookie::parse)
+                    .anyMatch(cookie -> cookie.getMaxAge() > 0)).isFalse();
+            response.headers().firstValueAsLong("Content-Length").ifPresent(length ->
+                    assertThat(length).isEqualTo(response.body().getBytes(StandardCharsets.UTF_8).length));
+        }
+        finally {
+            var table = store.equals("AUTH") ? "session_security" : "SPRING_SESSION_ATTRIBUTES";
+            jdbc.execute("ALTER TABLE IF EXISTS unavailable_cookie_success_store RENAME TO " + table);
         }
     }
 
@@ -356,6 +394,22 @@ class SessionCookieLifecycleTests {
         @GetMapping(PROTECTED + "/bad")
         @ResponseStatus(HttpStatus.BAD_REQUEST)
         void rejected() { }
+
+        @GetMapping(PROTECTED + "/late-store-failure")
+        @ResponseStatus(HttpStatus.CREATED)
+        Map<String, String> lateStoreFailure(@RequestParam String store, HttpServletResponse response) {
+            // guardian 없는 인증 요청도 native 재검사 전에 준비한 성공 헤더를 제거해야 한다.
+            var table = switch (store) {
+                case "AUTH" -> "session_security";
+                case "NATIVE" -> "SPRING_SESSION_ATTRIBUTES";
+                default -> throw new IllegalArgumentException(store);
+            };
+            jdbc.execute("ALTER TABLE " + table + " RENAME TO unavailable_cookie_success_store");
+            response.setHeader("Location", PROTECTED + "/protected-result");
+            response.setContentLength("{\"data\":\"protected-result\"}".getBytes(StandardCharsets.UTF_8).length);
+            response.addHeader("Set-Cookie", "XSRF-TOKEN=retained-test-csrf; Path=/; SameSite=Lax");
+            return Map.of("data", "protected-result");
+        }
 
         @GetMapping(PROTECTED + "/change")
         void change(@RequestParam("mode") String mode, @RequestParam(defaultValue = "false") boolean stream,

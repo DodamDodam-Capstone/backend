@@ -1,6 +1,6 @@
 package com.dodamdodam.backend.global.web;
 
-import com.dodamdodam.backend.global.error.ApiErrorResponse;
+import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -13,7 +13,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Objects;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -50,11 +49,13 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
         // Content-Length를 신뢰하지 않고 최대 크기보다 한 바이트만 더 읽어 초과 여부를 판정한다.
         byte[] body = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);
         if (body.length > MAX_BODY_BYTES) {
-            reject(response, 413, "REQUEST_TOO_LARGE", "요청 본문이 허용 크기를 초과했습니다.");
+            ApiErrorResponses.write(jsonMapper, response, 413,
+                    "REQUEST_TOO_LARGE", "요청 본문이 허용 크기를 초과했습니다.");
             return;
         }
         if (!supportsContentType(request, body.length == 0)) {
-            reject(response, 415, "UNSUPPORTED_MEDIA_TYPE", "지원하지 않는 Content-Type입니다.");
+            ApiErrorResponses.write(jsonMapper, response, 415,
+                    "UNSUPPORTED_MEDIA_TYPE", "지원하지 않는 Content-Type입니다.");
             return;
         }
         // 로그아웃의 0바이트 판정과 자녀 JSON 구조 검증은 CSRF·로그인 검사 이후에 수행한다.
@@ -75,15 +76,6 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
         catch (IllegalArgumentException invalid) {
             return false;
         }
-    }
-
-    /** 앞단에서 발급한 요청 ID를 유지하며 입력 원문 없는 공통 오류를 반환한다. */
-    private void reject(HttpServletResponse response, int status, String code, String message) throws IOException {
-        response.setStatus(status);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        jsonMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(new ApiErrorResponse.ErrorDetail(
-                code, message, response.getHeader("X-Request-ID"), List.of())));
     }
 
     /** 크기 검사를 마친 본문을 동기 MVC 처리에서 다시 읽을 수 있게 제공한다. */
