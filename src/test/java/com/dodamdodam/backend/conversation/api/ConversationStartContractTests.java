@@ -98,11 +98,11 @@ class ConversationStartContractTests {
     }
 
     @Test
-    void productionMappingRemainsInactiveUntilCreationServiceExists() {
+    void productionMappingRegistersStartAfterCreationServiceIsAvailable() {
         assertThat(mappings.getHandlerMethods().values())
-                .noneMatch(handler -> handler.getBeanType().equals(ConversationController.class));
+                .anyMatch(handler -> handler.getBeanType().equals(ConversationController.class));
         assertThat(mappings.getHandlerMethods().keySet())
-                .noneMatch(mapping -> mapping.getPatternValues().contains("/api/v1/children/{childId}/conversations"));
+                .anyMatch(mapping -> mapping.getPatternValues().contains("/api/v1/children/{childId}/conversations"));
     }
 
     @Test
