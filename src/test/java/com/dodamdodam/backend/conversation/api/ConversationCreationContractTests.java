@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -98,6 +99,74 @@ class ConversationCreationContractTests {
     }
 
     @Test
+    void sameKeyReplaysUnchangedStartInformationAndNeverRebindsSession() throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        var original = mockMvc.perform(request(current, childId, key))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        var conversation = jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId);
+        var link = jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", current.contextId());
+        doReturn(OPEN_AT.plusHours(3)).when(repository).currentTime();
+
+        // 재전송과 쿠키 재발급 모두 같은 보안 문맥이면 최초 연결·시각을 그대로 보존한다.
+        for (var browser : List.of(current, browserSession(current.accountId(), current.contextId()))) {
+            var replay = mockMvc.perform(request(browser, childId, key)).andExpect(status().isOk())
+                    .andReturn().getResponse();
+            assertThat(replay.getContentAsString()).isEqualTo(original);
+            assertThat(replay.getHeader("Location")).isNull();
+            assertThat(replay.getHeader("Cache-Control")).contains("no-store");
+        }
+        assertThat(jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId)).isEqualTo(conversation);
+        assertThat(jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", current.contextId()))
+                .isEqualTo(link);
+        assertCounts(1, 1);
+    }
+
+    @Test
+    void newLoginNeedsExplicitResumeEvenAfterLearningActiveConversationId() throws Exception {
+        var original = authenticated();
+        var childId = child(original.accountId());
+        var key = UUID.randomUUID();
+        var response = mockMvc.perform(request(original, childId, key))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        String id = JsonPath.read(response.getContentAsString(), "$.data.conversationId");
+        var link = jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", original.contextId());
+        var newLogin = authenticated(original.accountId());
+
+        mockMvc.perform(request(newLogin, childId, UUID.randomUUID())).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ACTIVE_CONVERSATION_EXISTS"))
+                .andExpect(jsonPath("$.error.activeConversationId").value(id));
+        error(request(newLogin, childId, key), 403, "CHILD_SESSION_REQUIRED");
+        error(request(newLogin, childId, key), 403, "CHILD_SESSION_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversation_session_links WHERE session_security_id = ?",
+                Integer.class, newLogin.contextId())).isZero();
+        assertThat(jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", original.contextId()))
+                .isEqualTo(link);
+        assertCounts(1, 1);
+    }
+
+    @Test
+    void sameKeyReplaysFromAnyAlreadyLinkedValidSession() throws Exception {
+        var original = authenticated();
+        var childId = child(original.accountId());
+        var key = UUID.randomUUID();
+        var response = mockMvc.perform(request(original, childId, key))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        String id = JsonPath.read(response.getContentAsString(), "$.data.conversationId");
+        var linked = authenticated(original.accountId());
+        // resume API를 구현하지 않고 이미 존재하는 다른 적격 연결을 fixture로 준비한다.
+        jdbc.update("INSERT INTO conversation_session_links (session_security_id, conversation_id, bound_at) VALUES (?, ?, ?)",
+                linked.contextId(), UUID.fromString(id), OPEN_AT.plusSeconds(1));
+        var links = jdbc.queryForList("SELECT * FROM conversation_session_links ORDER BY session_security_id");
+        doReturn(OPEN_AT.plusHours(1)).when(repository).currentTime();
+        var replay = mockMvc.perform(request(linked, childId, key)).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(replay.getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(jdbc.queryForList("SELECT * FROM conversation_session_links ORDER BY session_security_id")).isEqualTo(links);
+        assertCounts(1, 2);
+    }
+
+    @Test
     void realRouteKeepsAuthenticationCsrfAndOwnershipPolicies() throws Exception {
         var csrf = csrf(null);
         error(post(path(UUID.randomUUID())).cookie(csrf.cookie()).header("X-XSRF-TOKEN", csrf.token())
@@ -139,16 +208,15 @@ class ConversationCreationContractTests {
         assertCounts(1, 1);
     }
 
-    @Test
-    void closingConversationBlocksNewStartWithoutExposingIdInGeneralError() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void closingConversationBlocksSameAndDifferentKeysWithoutExposingId(boolean sameKey) throws Exception {
         var current = authenticated();
         var childId = child(current.accountId());
-        mockMvc.perform(request(current, childId, UUID.randomUUID())).andExpect(status().isCreated());
-        jdbc.update("""
-                UPDATE conversations SET status = 'CLOSING', end_reason = 'MANUAL', end_requested_at = started_at
-                WHERE child_id = ?
-                """, childId);
-        error(request(current, childId, UUID.randomUUID()), 409, "CONVERSATION_CLOSING");
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        markClosing(childId);
+        error(request(current, childId, sameKey ? key : UUID.randomUUID()), 409, "CONVERSATION_CLOSING");
         assertCounts(1, 1);
     }
 
@@ -159,19 +227,121 @@ class ConversationCreationContractTests {
         var childId = child(current.accountId());
         var originalKey = UUID.randomUUID();
         mockMvc.perform(request(current, childId, originalKey)).andExpect(status().isCreated());
-        // 종료 API를 흉내내지 않고 제약을 만족하는 종료 상태를 DB fixture로 준비한다.
-        jdbc.update("""
-                UPDATE conversations SET status = 'ENDED', end_reason = 'MANUAL', end_requested_at = started_at,
-                    ended_at = started_at, summary_status = ?,
-                    summary_started_at = CASE WHEN ? = 'PENDING' THEN started_at ELSE NULL END,
-                    summary_deadline_at = CASE WHEN ? = 'PENDING' THEN started_at + INTERVAL '60 seconds' ELSE NULL END
-                WHERE child_id = ?
-                """, summary, summary, summary, childId);
+        markEnded(childId, summary);
         doReturn(OPEN_AT.plusSeconds(1)).when(repository).currentTime();
         error(request(current, childId, originalKey), 409, "CONVERSATION_ENDED");
         mockMvc.perform(request(current, childId, UUID.randomUUID())).andExpect(status().isCreated());
         assertCounts(2, 2);
         assertThat(jdbc.queryForObject("SELECT count(DISTINCT service_date) FROM conversations", Integer.class)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "CLOSING"})
+    void endedKeyTakesPriorityOverAnotherNewUnendedConversation(String newStatus) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var oldKey = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, oldKey)).andExpect(status().isCreated());
+        markEnded(childId, "PENDING");
+        doReturn(OPEN_AT.plusSeconds(1)).when(repository).currentTime();
+        mockMvc.perform(request(current, childId, UUID.randomUUID())).andExpect(status().isCreated());
+        if (newStatus.equals("CLOSING")) {
+            markClosing(childId);
+        }
+        var rows = jdbc.queryForList("SELECT * FROM conversations ORDER BY id");
+        error(request(current, childId, oldKey), 409, "CONVERSATION_ENDED");
+        assertThat(jdbc.queryForList("SELECT * FROM conversations ORDER BY id")).isEqualTo(rows);
+        assertCounts(2, 2);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ACTIVE,true,true", "ACTIVE,true,false", "ACTIVE,false,false", "CLOSING,true,false",
+            "CLOSING,false,true", "ENDED,true,true", "ENDED,false,true"})
+    void closedHoursPrecedeKeyStateAndLinkDecisions(String state, boolean sameKey, boolean linked) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        if (state.equals("CLOSING")) {
+            markClosing(childId);
+        }
+        else if (state.equals("ENDED")) {
+            markEnded(childId, "EMPTY");
+        }
+        var caller = linked ? current : authenticated(current.accountId());
+        var before = jdbc.queryForList("SELECT * FROM conversations");
+        doReturn(OPEN_AT.withHour(7)).when(repository).currentTime();
+        error(request(caller, childId, sameKey ? key : UUID.randomUUID()), 403, "SERVICE_HOURS_CLOSED");
+        assertThat(jdbc.queryForList("SELECT * FROM conversations")).isEqualTo(before);
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void replayCannotSucceedOrReportMissingLinkAfterCrossingMidnight(boolean linked) throws Exception {
+        var original = authenticated();
+        var childId = child(original.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(original, childId, key)).andExpect(status().isCreated());
+        var caller = linked ? original : authenticated(original.accountId());
+        var call = request(caller, childId, key);
+        var before = jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId);
+        var late = OPEN_AT.withHour(23).withMinute(59).withSecond(59);
+        doReturn(late, late, OPEN_AT.plusDays(1).withHour(0)).when(repository).currentTime();
+        error(call, 403, "SERVICE_HOURS_CLOSED");
+        assertThat(jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId)).isEqualTo(before);
+        assertCounts(1, 1);
+    }
+
+    @Test
+    void previousDatesActiveNeverBecomesSuccessfulReplayBeforeReconciliationIsImplemented() throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        doReturn(OPEN_AT.plusDays(1)).when(repository).currentTime();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ACTIVE_CONVERSATION_EXISTS"));
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"REVOKED", "VERSION", "EXPIRED"})
+    void sameKeyReplayKeepsExistingLoginInvalidationPolicies(String invalidation) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        var call = request(current, childId, key);
+        switch (invalidation) {
+            case "REVOKED" -> jdbc.update("UPDATE session_security SET revoked_at = clock_timestamp() WHERE id = ?", current.contextId());
+            case "VERSION" -> jdbc.update("UPDATE accounts SET session_version = session_version + 1 WHERE id = ?", current.accountId());
+            case "EXPIRED" -> jdbc.update("""
+                    UPDATE session_security SET created_at = clock_timestamp() - INTERVAL '2 minutes',
+                        expires_at = clock_timestamp() - INTERVAL '1 second' WHERE id = ?
+                    """, current.contextId());
+            default -> throw new AssertionError(invalidation);
+        }
+        error(call, 401, "AUTHENTICATION_REQUIRED");
+        assertCounts(1, 1);
+    }
+
+    @Test
+    void linkLookupFailureIs500RatherThanMissingSessionOrConflict() throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        var call = request(current, childId, key);
+        jdbc.execute("ALTER TABLE conversation_session_links RENAME TO unavailable_conversation_links");
+        try {
+            var response = error(call, 500, "INTERNAL_ERROR");
+            assertThat(response.getContentAsString()).doesNotContain("SELECT session_security_id", "unavailable_conversation_links");
+        }
+        finally {
+            jdbc.execute("ALTER TABLE unavailable_conversation_links RENAME TO conversation_session_links");
+        }
+        assertCounts(1, 1);
     }
 
     @Test
@@ -217,9 +387,17 @@ class ConversationCreationContractTests {
 
     private Fixture authenticated() {
         var accountId = UUID.randomUUID();
-        var contextId = UUID.randomUUID();
         jdbc.update("INSERT INTO accounts (id, email) VALUES (?, ?)", accountId, accountId + "@example.invalid");
+        return authenticated(accountId);
+    }
+
+    private Fixture authenticated(UUID accountId) {
+        var contextId = UUID.randomUUID();
         jdbc.update("INSERT INTO session_security (id, account_id, session_version) VALUES (?, ?, 0)", contextId, accountId);
+        return browserSession(accountId, contextId);
+    }
+
+    private Fixture browserSession(UUID accountId, UUID contextId) {
         Session session = sessions.createSession();
         session.setMaxInactiveInterval(Duration.ofSeconds(-1));
         var context = SecurityContextHolder.createEmptyContext();
@@ -232,6 +410,24 @@ class ConversationCreationContractTests {
         cookies.writeCookieValue(new CookieSerializer.CookieValue(new MockHttpServletRequest(), response, session.getId()));
         var setCookie = Objects.requireNonNull(response.getHeader("Set-Cookie"), "테스트 세션 쿠키가 발급되어야 합니다.");
         return new Fixture(accountId, contextId, MockCookie.parse(setCookie));
+    }
+
+    private void markClosing(UUID childId) {
+        jdbc.update("""
+                UPDATE conversations SET status = 'CLOSING', end_reason = 'MANUAL', end_requested_at = started_at
+                WHERE child_id = ? AND status = 'ACTIVE'
+                """, childId);
+    }
+
+    private void markEnded(UUID childId, String summary) {
+        // 종료 API를 흉내내지 않고 제약을 만족하는 종료 상태를 DB fixture로 준비한다.
+        jdbc.update("""
+                UPDATE conversations SET status = 'ENDED', end_reason = 'MANUAL', end_requested_at = started_at,
+                    ended_at = started_at, summary_status = ?,
+                    summary_started_at = CASE WHEN ? = 'PENDING' THEN started_at ELSE NULL END,
+                    summary_deadline_at = CASE WHEN ? = 'PENDING' THEN started_at + INTERVAL '60 seconds' ELSE NULL END
+                WHERE child_id = ? AND status = 'ACTIVE'
+                """, summary, summary, summary, childId);
     }
 
     private UUID child(UUID accountId) {

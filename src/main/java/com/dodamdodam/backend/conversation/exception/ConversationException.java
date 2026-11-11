@@ -36,6 +36,11 @@ public class ConversationException extends RuntimeException {
         return new ConversationException("SERVICE_HOURS_CLOSED", "대화 이용시간이 아닙니다.", List.of(), null, null);
     }
 
+    /** 같은 시작 키라도 현재 보안 문맥에 연결되지 않았다면 명시적 이어하기가 필요하다. */
+    public static ConversationException childSessionRequired() {
+        return new ConversationException("CHILD_SESSION_REQUIRED", "현재 세션에서 대화 이어하기가 필요합니다.", List.of(), null, null);
+    }
+
     /** 현재 ACTIVE가 있는 경우에만 명세가 허용하는 기존 대화 ID를 공개한다. */
     public static ConversationException activeExists(UUID conversationId) {
         return new ConversationException("ACTIVE_CONVERSATION_EXISTS", "진행 중인 대화가 있습니다.", List.of(),

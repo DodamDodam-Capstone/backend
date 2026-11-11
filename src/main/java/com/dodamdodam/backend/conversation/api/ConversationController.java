@@ -33,14 +33,18 @@ public class ConversationController {
         this.conversations = conversations;
     }
 
-    /** 실제 생성 커밋 이후에만 공개 시작 정보와 리소스 식별 URI를 반환한다. */
+    /** 신규 생성은 201과 Location, 같은 키 재전송은 기존 시작 정보만 200으로 반환한다. */
     @PostMapping("/api/v1/children/{childId}/conversations")
     public ResponseEntity<Map<String, StartConversationResult>> start(HttpServletRequest request,
             @PathVariable String childId, @RequestBody JsonNode body) {
         var prepared = prepareStart(request, childId, body);
-        var created = conversations.create(prepared.session(), prepared.childId(), prepared.input());
-        var location = URI.create("/api/v1/children/" + prepared.childId() + "/conversations/" + created.conversationId());
-        return ResponseEntity.created(location).body(Map.of("data", created));
+        var outcome = conversations.create(prepared.session(), prepared.childId(), prepared.input());
+        var bodyData = Map.of("data", outcome.result());
+        if (!outcome.created()) {
+            return ResponseEntity.ok(bodyData);
+        }
+        var location = URI.create("/api/v1/children/" + prepared.childId() + "/conversations/" + outcome.result().conversationId());
+        return ResponseEntity.created(location).body(bodyData);
     }
 
     /** 인증→구조→소유권 순서로 검증한 내부 입력을 준비하며 성공 응답이나 ID를 만들지 않는다. */

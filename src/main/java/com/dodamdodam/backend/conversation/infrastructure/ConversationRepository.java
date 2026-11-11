@@ -9,12 +9,18 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class ConversationRepository {
+
+    private static final String COLUMNS = "id, status, started_at, service_date, scheduled_end_at";
+    private static final RowMapper<StoredConversation> STORED_ROW = (row, _) -> new StoredConversation(
+            row.getObject("id", UUID.class), row.getString("status"), row.getObject("started_at", OffsetDateTime.class),
+            row.getObject("service_date", LocalDate.class), row.getObject("scheduled_end_at", OffsetDateTime.class));
 
     private final JdbcTemplate jdbc;
 
@@ -37,9 +43,8 @@ public class ConversationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<StoredConversation> findRequestForUpdate(UUID childId, UUID clientRequestId) {
         try {
-            return jdbc.query("""
-                    SELECT id, status FROM conversations WHERE child_id = ? AND client_request_id = ? FOR UPDATE
-                    """, (row, _) -> new StoredConversation(row.getObject("id", UUID.class), row.getString("status")),
+            return jdbc.query("SELECT " + COLUMNS + " FROM conversations WHERE child_id = ? AND client_request_id = ? FOR UPDATE",
+                    STORED_ROW,
                     childId, clientRequestId).stream().findFirst();
         }
         catch (DataAccessException failure) {
@@ -51,10 +56,23 @@ public class ConversationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<StoredConversation> findUnendedForUpdate(UUID childId) {
         try {
-            return jdbc.query("""
-                    SELECT id, status FROM conversations WHERE child_id = ? AND status IN ('ACTIVE','CLOSING') FOR UPDATE
-                    """, (row, _) -> new StoredConversation(row.getObject("id", UUID.class), row.getString("status")),
+            return jdbc.query("SELECT " + COLUMNS + " FROM conversations WHERE child_id = ? AND status IN ('ACTIVE','CLOSING') FOR UPDATE",
+                    STORED_ROW,
                     childId).stream().findFirst();
+        }
+        catch (DataAccessException failure) {
+            throw new ConversationException(failure);
+        }
+    }
+
+    /** 대화 잠금 뒤 현재 보안 문맥의 기존 연결만 잠가 확인하며 새 연결은 만들지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean hasLinkForUpdate(UUID securityContextId, UUID conversationId) {
+        try {
+            return !jdbc.queryForList("""
+                    SELECT session_security_id FROM conversation_session_links
+                    WHERE session_security_id = ? AND conversation_id = ? FOR UPDATE
+                    """, UUID.class, securityContextId, conversationId).isEmpty();
         }
         catch (DataAccessException failure) {
             throw new ConversationException(failure);
@@ -96,5 +114,12 @@ public class ConversationRepository {
     }
 
     /** 상태 판정 전용 내부 행이며 그대로 API에 노출하지 않는다. */
-    public record StoredConversation(UUID conversationId, String status) { }
+    public record StoredConversation(UUID conversationId, String status, OffsetDateTime startedAt,
+                                      LocalDate serviceDate, OffsetDateTime scheduledEndAt) {
+
+        /** 새 시각이나 ID를 만들지 않고 저장된 ACTIVE 시작 정보만 공개한다. */
+        public StartConversationResult startResult() {
+            return new StartConversationResult(conversationId, status, startedAt, serviceDate, scheduledEndAt);
+        }
+    }
 }

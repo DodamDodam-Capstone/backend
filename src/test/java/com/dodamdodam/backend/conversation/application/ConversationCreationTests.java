@@ -76,7 +76,9 @@ class ConversationCreationTests {
         var fixture = fixture();
         var request = request();
 
-        var result = service.create(fixture.session(), fixture.childId(), request);
+        var outcome = service.create(fixture.session(), fixture.childId(), request);
+        assertThat(outcome.created()).isTrue();
+        var result = outcome.result();
 
         assertThat(result.status()).isEqualTo("ACTIVE");
         assertThat(result.startedAt().toInstant()).isEqualTo(STARTED_AT.withNano(0).toInstant());
@@ -105,7 +107,7 @@ class ConversationCreationTests {
         var fixture = fixture();
         var now = OffsetDateTime.parse(value);
         doReturn(now).when(repository).currentTime();
-        var result = service.create(fixture.session(), fixture.childId(), request());
+        var result = service.create(fixture.session(), fixture.childId(), request()).result();
         assertThat(result.serviceDate()).isEqualTo(now.toLocalDate());
         assertThat(result.scheduledEndAt()).isEqualTo(now.toLocalDate().plusDays(1).atStartOfDay().atOffset(now.getOffset()));
     }
@@ -139,6 +141,7 @@ class ConversationCreationTests {
     void rollsBackBothRowsIfStorageCrossesMidnight() {
         var fixture = fixture();
         doReturn(OffsetDateTime.parse("2026-10-03T23:59:59.999999+09:00"),
+                OffsetDateTime.parse("2026-10-03T23:59:59.999999+09:00"),
                 OffsetDateTime.parse("2026-10-04T00:00:00+09:00")).when(repository).currentTime();
         var failure = assertThrows(ConversationException.class, () -> service.create(fixture.session(), fixture.childId(), request()));
         assertThat(failure.code()).isEqualTo("SERVICE_HOURS_CLOSED");
@@ -175,6 +178,23 @@ class ConversationCreationTests {
             start.countDown();
             assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
                     .containsExactlyInAnyOrder("CREATED", "ACTIVE_CONVERSATION_EXISTS");
+        }
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void concurrentSameKeyCreatesOnceAndOnlyReplaysForTheLinkedContext(boolean sameContext) throws Exception {
+        var fixture = fixture();
+        var secondSession = sameContext ? fixture.session() : security.createLoginContext(fixture.session().accountId(), null);
+        var key = request();
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var first = workers.submit(() -> { start.await(); return attempt(fixture.session(), fixture.childId(), key); });
+            var second = workers.submit(() -> { start.await(); return attempt(secondSession, fixture.childId(), key); });
+            start.countDown();
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("CREATED", sameContext ? "REPLAY" : "CHILD_SESSION_REQUIRED");
         }
         assertCounts(1, 1);
     }
@@ -296,7 +316,7 @@ class ConversationCreationTests {
     @Test
     void unrelatedUniqueViolationRemainsStorageFailureInsteadOf409() {
         var first = fixture();
-        var stored = service.create(first.session(), first.childId(), request());
+        var stored = service.create(first.session(), first.childId(), request()).result();
         var second = fixture();
         var failure = assertThrows(ConversationException.class, () -> repository.insertActive(stored.conversationId(),
                 second.childId(), UUID.randomUUID(), STARTED_AT, ConversationServiceHours.requireOpen(STARTED_AT)));
@@ -327,8 +347,7 @@ class ConversationCreationTests {
 
     private String attempt(AuthenticatedSession session, UUID childId, StartConversationRequest request) {
         try {
-            service.create(session, childId, request);
-            return "CREATED";
+            return service.create(session, childId, request).created() ? "CREATED" : "REPLAY";
         }
         catch (ConversationException failure) {
             return failure.code();

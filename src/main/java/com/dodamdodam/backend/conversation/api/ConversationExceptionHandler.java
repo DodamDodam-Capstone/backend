@@ -20,7 +20,7 @@ public class ConversationExceptionHandler {
     public ResponseEntity<?> handle(ConversationException exception, HttpServletResponse response) {
         var status = switch (exception.code()) {
             case "VALIDATION_FAILED" -> HttpStatus.BAD_REQUEST;
-            case "SERVICE_HOURS_CLOSED" -> HttpStatus.FORBIDDEN;
+            case "SERVICE_HOURS_CLOSED", "CHILD_SESSION_REQUIRED" -> HttpStatus.FORBIDDEN;
             case "ACTIVE_CONVERSATION_EXISTS", "CONVERSATION_CLOSING", "CONVERSATION_ENDED" -> HttpStatus.CONFLICT;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
