@@ -301,6 +301,71 @@ class ConversationCreationContractTests {
         assertCounts(0, 0);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"text/plain", "application/xml", "application/octet-stream", "application/problem+json",
+            "application/json;charset=ISO-8859-1", "not a media type"})
+    void unsupportedMediaTypePrecedesCsrfAndAuthentication(String type) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        // 전송 형식은 정상 인증·CSRF, 각각의 누락, 동시 누락보다 먼저 거부한다.
+        error(request(current, childId, key).contentType(type), 415, "UNSUPPORTED_MEDIA_TYPE");
+        error(post(path(childId)).cookie(current.cookie()).contentType(type).content(body(key)),
+                415, "UNSUPPORTED_MEDIA_TYPE");
+        var anonymousCsrf = csrf(null);
+        error(post(path(childId)).cookie(anonymousCsrf.cookie()).header("X-XSRF-TOKEN", anonymousCsrf.token())
+                .contentType(type).content(body(key)), 415, "UNSUPPORTED_MEDIA_TYPE");
+        error(post(path(childId)).contentType(type).content(body(key)), 415, "UNSUPPORTED_MEDIA_TYPE");
+        assertCounts(0, 0);
+    }
+
+    @Test
+    void missingContentTypeIs415EvenWithValidAuthenticationAndCsrf() throws Exception {
+        var current = authenticated();
+        var call = request(current, child(current.accountId()), UUID.randomUUID()).with(request -> {
+            // MockMvc 빌더는 null 형식을 거부하므로 실제 요청의 헤더 누락을 구성한다.
+            request.setContentType(null);
+            return request;
+        });
+        error(call, 415, "UNSUPPORTED_MEDIA_TYPE");
+        assertCounts(0, 0);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"application/json;charset=UTF-8", "APPLICATION/JSON;charset=utf-8"})
+    void explicitUtf8JsonKeepsRealCreationAndReplay(String type) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        mockMvc.perform(request(current, childId, key).contentType(type)).andExpect(status().isCreated());
+        mockMvc.perform(request(current, childId, key).contentType(type)).andExpect(status().isOk());
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{", "[]", "null", "{\"clientRequestId\":123}"})
+    void invalidJsonRemains400AfterAuthenticationAndCsrf(String input) throws Exception {
+        var current = authenticated();
+        error(request(current, child(current.accountId()), UUID.randomUUID()).content(input),
+                400, "VALIDATION_FAILED");
+        assertCounts(0, 0);
+    }
+
+    @Test
+    void validMediaTypeKeepsCsrfBeforeLoginAndJsonValidation() throws Exception {
+        var childId = UUID.randomUUID();
+        error(post(path(childId)).contentType("application/json").content("{"), 403, "CSRF_INVALID");
+        var anonymousCsrf = csrf(null);
+        error(post(path(childId)).cookie(anonymousCsrf.cookie()).header("X-XSRF-TOKEN", anonymousCsrf.token())
+                .contentType("application/json").content("{"), 401, "AUTHENTICATION_REQUIRED");
+        var current = authenticated();
+        var currentCsrf = csrf(current.cookie());
+        error(post(path(child(current.accountId()))).cookie(current.cookie(), currentCsrf.cookie())
+                .header("X-XSRF-TOKEN", currentCsrf.token() + "invalid")
+                .contentType("application/json").content("{"), 403, "CSRF_INVALID");
+        assertCounts(0, 0);
+    }
+
     @Test
     void existingActiveReturnsItsIdThroughDedicatedConflictSchema() throws Exception {
         var current = authenticated();

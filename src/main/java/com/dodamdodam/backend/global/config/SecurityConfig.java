@@ -4,6 +4,7 @@ import com.dodamdodam.backend.auth.session.AuthStateErrorHandler;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.auth.session.LoginSessionAuthenticationStrategy;
 import com.dodamdodam.backend.global.web.Part1JsonRequestGuardFilter;
+import com.dodamdodam.backend.global.web.Part2JsonRequestGuardFilter;
 import com.dodamdodam.backend.global.auth.CsrfAccessDeniedHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
@@ -41,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableConfigurationProperties(AppSecurityProperties.class)
 public class SecurityConfig {
 
-    /** 공통 인증·CSRF와 Part 1 전송 검사를 순서대로 연결한다. */
+    /** 공통 인증·CSRF와 Part 1·2 전송 검사를 순서대로 연결한다. */
     @Bean
     SecurityFilterChain applicationSecurityFilterChain(
             HttpSecurity http,
@@ -92,6 +93,7 @@ public class SecurityConfig {
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 // 전송 크기·형식만 CSRF보다 먼저 검사하고 JSON 구조 검증은 MVC에 남긴다.
                 .addFilterBefore(new Part1JsonRequestGuardFilter(jsonMapper), CsrfFilter.class)
+                .addFilterBefore(new Part2JsonRequestGuardFilter(jsonMapper), Part1JsonRequestGuardFilter.class)
                 .requestCache(cache -> cache.disable())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authStateErrorHandler)

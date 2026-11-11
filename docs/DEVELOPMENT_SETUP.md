@@ -747,10 +747,21 @@ UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃�
 읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
 자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java)에서
 400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
+
+[Part2JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part2JsonRequestGuardFilter.java)는
+Part 1 필터 바로 앞에 한 번 등록하며 `POST /api/v1/children/{childId}/conversations`에만 적용합니다.
+`application/json`과 생략 또는 UTF-8인 charset만 허용하며, Content-Type 누락·미지원·문법 오류는
+CSRF·로그인보다 먼저 공통 오류 형식의 415 `UNSUPPORTED_MEDIA_TYPE`으로 반환합니다.
+본문은 소비·복사·파싱하지 않으며 미확정인 Part 2 크기 제한이나 Part 1의 16 KiB 제한을 적용하지 않습니다.
+정상 형식의 JSON 구조 검증은 CSRF·로그인 이후 기존 MVC·DTO에서 수행합니다.
+Part 1 경로와 resume/end·음성 등 다른 Part 2 경로는 이 필터의 대상이 아닙니다.
+[ConversationMediaTypeExceptionHandler](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationMediaTypeExceptionHandler.java)는
+대화 시작 컨트롤러에서 발생한 MVC 미지원 미디어 타입 예외도 415로 변환하며,
+다른 컨트롤러와 공통 예외 처리기의 동작은 변경하지 않습니다.
 관련 검사 순서는 다음과 같습니다.
 
 ```text
-CORS → 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 본문·업무 검증
+CORS → Part 2 Content-Type → Part 1 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 본문·업무 검증
 ```
 
 CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
@@ -764,6 +775,10 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
 `Part1JsonRequestGuardTests`는 크기 경계·UTF-8 재읽기·Content-Length 누락/허위와 제한 읽기를,
 `LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
+`global.web.Part2JsonRequestGuardFilterTests`는 형식·UTF-8·미소비·경로 격리를,
+`conversation.api.ConversationCreationContractTests`는 PostgreSQL에서 시작 요청의 415 우선순위와
+정상 201/200·입력 400·인증 401·CSRF 403·소유권 404를 확인합니다.
+`conversation.api.ConversationMediaTypeExceptionHandlerTests`는 필터 밖 MVC 예외의 415와 처리 범위를 확인합니다.
 `child.api.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
 입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
 `child.application.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
@@ -793,12 +808,13 @@ flowchart TB
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
         INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
         CORS["5 CorsFilter"]
-        GUARD["6 Part1JsonRequestGuardFilter<br/>로그아웃·자녀 등록 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
-        CSRF["7 CsrfFilter<br/>실패 403 CSRF_INVALID"]
-        OAUTH["8 OAuth2AuthorizationRequestRedirectFilter<br/>9 OAuth2LoginAuthenticationFilter"]
-        INTERMEDIATE["10 SecurityContextHolderAwareRequestFilter<br/>11 AnonymousAuthenticationFilter<br/>12 SessionManagementFilter<br/>13 ExceptionTranslationFilter"]
-        AUTHZ["14 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
-        INITIAL --> CORS --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
+        PART2["6 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
+        GUARD["7 Part1JsonRequestGuardFilter<br/>로그아웃·자녀 등록 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
+        CSRF["8 CsrfFilter<br/>실패 403 CSRF_INVALID"]
+        OAUTH["9 OAuth2AuthorizationRequestRedirectFilter<br/>10 OAuth2LoginAuthenticationFilter"]
+        INTERMEDIATE["11 SecurityContextHolderAwareRequestFilter<br/>12 AnonymousAuthenticationFilter<br/>13 SessionManagementFilter<br/>14 ExceptionTranslationFilter"]
+        AUTHZ["15 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
+        INITIAL --> CORS --> PART2 --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
     end
     CLIENT --> HEADERS
     PROXY --> INITIAL
