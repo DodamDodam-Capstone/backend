@@ -309,6 +309,12 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
 | `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
+| `SUMMARY_PROCESSING_TIMEOUT` | 기본값 없음, 명시적 Duration 필수 | 요약 접수부터의 처리 기한. 양수·마이크로초 정밀도이며 D13/D14 수치는 별도 확정 |
+
+`SUMMARY_PROCESSING_TIMEOUT`은 운영 기본값을 두지 않는다. `.env.example`의 빈 값을
+확정한 양의 Duration으로 채우거나 실행 환경에서 명시해야 하며, 미설정·0·음수는 기동 오류다.
+기존 개인 `.env`는 자동으로 수정하지 않는다. 테스트의 `src/test/resources/application.properties`에
+지정한 60초는 합성 fixture용 값이며 운영 정책을 확정한 값이 아니다.
 
 세션 쿠키 `JSESSIONID`는 HttpOnly이며, `XSRF-TOKEN`은 기존 FE 호환을 위해
 HttpOnly=false를 유지합니다. 두 쿠키 모두 Path=/, Domain 미설정(host-only)으로

@@ -294,14 +294,16 @@ class ConversationCreationContractTests {
     }
 
     @Test
-    void previousDatesActiveNeverBecomesSuccessfulReplayBeforeReconciliationIsImplemented() throws Exception {
+    void previousDatesActiveIsEndedBeforeOldKeyIsRejected() throws Exception {
         var current = authenticated();
         var childId = child(current.accountId());
         var key = UUID.randomUUID();
         mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
         doReturn(OPEN_AT.plusDays(1)).when(repository).currentTime();
         mockMvc.perform(request(current, childId, key)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("ACTIVE_CONVERSATION_EXISTS"));
+                .andExpect(jsonPath("$.error.code").value("CONVERSATION_ENDED"));
+        assertThat(jdbc.queryForMap("SELECT status, summary_status, end_reason FROM conversations WHERE child_id = ?", childId))
+                .containsEntry("status", "ENDED").containsEntry("summary_status", "EMPTY").containsEntry("end_reason", "MIDNIGHT");
         assertCounts(1, 1);
     }
 
@@ -413,6 +415,13 @@ class ConversationCreationContractTests {
     }
 
     private void markClosing(UUID childId) {
+        // 종료 조정 후에도 CLOSING인 경우는 원래 기한이 남은 실제 PROCESSING으로 구성한다.
+        jdbc.update("""
+                INSERT INTO conversation_turns (id, conversation_id, client_request_id, request_hash, sequence, status,
+                    child_text_visibility, reply_text_visibility, created_at, processing_deadline_at)
+                SELECT ?, id, ?, ?, 1, 'PROCESSING', 'OMITTED', 'OMITTED', started_at, started_at + INTERVAL '2 hours'
+                FROM conversations WHERE child_id = ? AND status = 'ACTIVE'
+                """, UUID.randomUUID(), UUID.randomUUID(), "a".repeat(64), childId);
         jdbc.update("""
                 UPDATE conversations SET status = 'CLOSING', end_reason = 'MANUAL', end_requested_at = started_at
                 WHERE child_id = ? AND status = 'ACTIVE'
