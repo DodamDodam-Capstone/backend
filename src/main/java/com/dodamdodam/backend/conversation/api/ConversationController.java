@@ -39,6 +39,8 @@ public class ConversationController {
             @PathVariable String childId, @RequestBody JsonNode body) {
         var prepared = prepareStart(request, childId, body);
         var outcome = conversations.create(prepared.session(), prepared.childId(), prepared.input());
+        ConversationStartResponseFilter.protect(request, prepared.session(), prepared.childId(),
+                prepared.input().clientRequestId(), outcome.result().conversationId());
         var bodyData = Map.of("data", outcome.result());
         if (!outcome.created()) {
             return ResponseEntity.ok(bodyData);

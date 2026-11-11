@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(basePackages = "com.dodamdodam.backend")
 public class ConversationExceptionHandler {
 
+    /** 응답 전 재검사 실패는 MVC에서 출력하지 않고 전용 필터가 성공 응답부터 비우게 한다. */
+    @ExceptionHandler(ConversationStartResponseFilter.ResponseRejected.class)
+    void propagateResponseRejection(ConversationStartResponseFilter.ResponseRejected rejection) {
+        throw rejection;
+    }
+
     /** 대화 업무 오류만 변환하고 인증·소유권·JSON 읽기 오류는 기존 처리기에 맡긴다. */
     @ExceptionHandler(ConversationException.class)
     public ResponseEntity<?> handle(ConversationException exception, HttpServletResponse response) {

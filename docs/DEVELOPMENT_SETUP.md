@@ -701,6 +701,7 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
+| [ConversationStartResponseFilter](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationStartResponseFilter.java) | Security 위임 필터 order + 1, 기본 `-99` | 보안 체인이 다음 서블릿 필터를 호출하는 동안 인증 문맥을 유지한 채 대화 시작 성공 응답을 전송 전에 재검사합니다. |
 
 `H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.2의 기본값을 사용합니다.
 프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
@@ -715,6 +716,26 @@ Spring Session native 저장
 → AuthStateErrorFilter의 보호자 권한 재조회(검사 성공 표식이 있는 400 미만 응답)
 → 실제 HTTP 응답 전송
 ```
+
+대화 시작 POST에는 위 응답 흐름 앞에 Part 2 전용 전송 검사가 추가됩니다.
+`ConversationStartResponseFilter`는 `SecurityFilterProperties`의 실제 order + 1로 서블릿에 한 번 등록합니다.
+별도의 Security 체인 등록이나 Part 1 필터 변경은 없습니다. 보안 체인의 하위 서블릿 필터이므로
+callback과 미커밋 반환 검사 중에도 기존 `AuthenticatedSessionService`를 사용할 수 있습니다.
+Controller가 실제 201/200 성공 후 기록한 서버 문맥·시작 키·대화 ID만 재검사하며,
+Part 1·다른 Part 2 경로·400 이상 응답에는 적용하지 않습니다.
+
+첫 본문 전송/flush/Content-Length 충족 직전과 미커밋 반환 시 현재 로그인을 먼저 확인한 뒤,
+새 업무 Tx에서 계정 → 현재 보안 문맥 → 소유 아이 → 반환 대상 대화 → 기존 link를 잠가 다시 읽습니다.
+잠금 대기 뒤 DB `clock_timestamp()`로 start의 시간 우선순위, 당일 ACTIVE, 현재 연결을 확인합니다.
+자정/기존 CLOSING 정리가 필요하면 기존 공통 조정기를 사용하며 새 대화나 link는 만들지 않습니다.
+정상 종료 정리는 커밋한 뒤 403/409를 전달하고, 생성 Tx는 이미 커밋됐으므로 전송 거부로 되돌리지 않습니다.
+
+검사 실패는 MVC가 일반 500으로 소비하지 않고 Part 2 필터까지 전달합니다. 아직 커밋되지 않은
+성공 본문·Content-Length·Location·JSESSIONID 갱신 쿠키를 제거한 다음 기존 업무 오류 처리기로
+403/404/409/500 JSON을 만듭니다. requestId·no-store·CORS는 유지합니다.
+인증 무효/확인 장애는 기존 외곽 필터의 401/503 처리로 넘깁니다. 이미 전송한 바이트를 회수하거나
+DB 판정과 네트워크 전송을 하나의 원자적 작업으로 보장하는 기능은 아닙니다.
+현재 시작 API의 동기 MVC 응답에 적용하며, 후속 스트리밍/비동기 API는 별도 계약 검증이 필요합니다.
 
 두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
 컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
@@ -803,6 +824,7 @@ flowchart TB
         COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
         SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
         PROXY["springSecurityFilterChain · -100"]
+        START_RESPONSE["ConversationStartResponseFilter · 기본 -99<br/>대화 시작 성공 응답 전 보호"]
         HEADERS --> ERROR --> COOKIE --> SESSION --> PROXY
     end
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
@@ -818,7 +840,8 @@ flowchart TB
     end
     CLIENT --> HEADERS
     PROXY --> INITIAL
-    AUTHZ -->|허용| MVC["DispatcherServlet → Controller"]
+    AUTHZ -->|허용| START_RESPONSE
+    START_RESPONSE --> MVC["DispatcherServlet → Controller"]
     MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
 
     subgraph LOGIN["SessionConfig: 공유 로그인 연결"]

@@ -2,10 +2,16 @@ package com.dodamdodam.backend.conversation.api;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
+import com.dodamdodam.backend.conversation.application.ConversationClosureCoordinator;
 import com.dodamdodam.backend.conversation.application.ConversationService;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationRepository;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -15,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -24,10 +31,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.mock.web.MockCookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -42,6 +56,11 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+import tools.jackson.databind.json.JsonMapper;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,9 +71,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, ConversationCreationContractTests.ResponseGate.class})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
-@SpringBootTest(properties = {"spring.session.jdbc.cleanup-cron=-", "logging.level.org.springframework.security=INFO",
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {"spring.session.jdbc.cleanup-cron=-", "logging.level.org.springframework.security=INFO",
         "logging.level.org.springframework.session=INFO", "app.security.allowed-origins=http://localhost:5173"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ConversationCreationContractTests {
@@ -64,12 +84,16 @@ class ConversationCreationContractTests {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JdbcIndexedSessionRepository sessions;
     @Autowired private SessionSecurityRepository security;
+    @Autowired private ConversationClosureCoordinator closure;
+    @Autowired private ResponseGate responseGate;
+    @LocalServerPort private int port;
     @Autowired @Qualifier("cookieSerializer") private CookieSerializer cookies;
     @MockitoSpyBean private ConversationRepository repository;
     @MockitoSpyBean private ConversationService service;
 
     @BeforeEach
     void clearDatabase() {
+        responseGate.reset();
         jdbc.update("DELETE FROM conversation_session_links");
         jdbc.update("DELETE FROM conversation_turns");
         jdbc.update("DELETE FROM conversations");
@@ -231,6 +255,160 @@ class ConversationCreationContractTests {
                     .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
         }
         // 늦은 권한 거부는 이미 완료된 업무 커밋을 취소하지 않으며, 재전송도 새 행을 만들지 못한다.
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,MIDNIGHT,403,SERVICE_HOURS_CLOSED", "true,MIDNIGHT,403,SERVICE_HOURS_CLOSED",
+            "false,CLOSING,409,CONVERSATION_CLOSING", "true,CLOSING,409,CONVERSATION_CLOSING",
+            "false,ENDED,409,CONVERSATION_ENDED", "true,ENDED,409,CONVERSATION_ENDED",
+            "false,UNLINKED,403,CHILD_SESSION_REQUIRED", "true,UNLINKED,403,CHILD_SESSION_REQUIRED",
+            "false,OWNER_CHANGED,404,RESOURCE_NOT_FOUND", "true,OWNER_CHANGED,404,RESOURCE_NOT_FOUND",
+            "false,CLOSED_AND_ENDED,403,SERVICE_HOURS_CLOSED", "true,CLOSED_AND_ENDED,403,SERVICE_HOURS_CLOSED",
+            "false,AUTH_AND_MIDNIGHT,401,AUTHENTICATION_REQUIRED", "true,AUTH_AND_MIDNIGHT,401,AUTHENTICATION_REQUIRED",
+            "false,ENDED_WITH_NEW_ACTIVE,409,CONVERSATION_ENDED", "true,ENDED_WITH_NEW_ACTIVE,409,CONVERSATION_ENDED",
+            "false,CONVERSATION_DELETED,404,RESOURCE_NOT_FOUND", "true,CONVERSATION_DELETED,404,RESOURCE_NOT_FOUND",
+            "false,LINK_STORAGE_FAILURE,500,INTERNAL_ERROR", "true,LINK_STORAGE_FAILURE,500,INTERNAL_ERROR",
+            "false,AUTH_STORAGE_FAILURE,503,AUTH_STATE_UNAVAILABLE", "true,AUTH_STORAGE_FAILURE,503,AUTH_STATE_UNAVAILABLE"})
+    @Timeout(25)
+    void delayedResponseRechecksCommittedConversationBeforeSending(boolean replay, String change,
+            int expectedStatus, String expectedCode) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var key = UUID.randomUUID();
+        if (replay) {
+            mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
+        }
+        var call = request(current, childId, key).header("Origin", "http://localhost:5173");
+        var pause = responseGate.pauseNext();
+        UUID storedId;
+        MockHttpServletResponse response;
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            var pending = worker.submit(() -> mockMvc.perform(call).andReturn().getResponse());
+            try {
+                // Controller가 반환한 뒤 멈추므로 서비스 내부의 최종 검사로는 이 경합을 막을 수 없다.
+                assertThat(pause.ready.await(10, TimeUnit.SECONDS)).isTrue();
+                storedId = Objects.requireNonNull(jdbc.queryForObject(
+                        "SELECT id FROM conversations WHERE child_id = ?", UUID.class, childId));
+                switch (change) {
+                    case "MIDNIGHT" -> doReturn(OPEN_AT.plusDays(1).withHour(0)).when(repository).currentTime();
+                    case "CLOSING" -> {
+                        jdbc.update("""
+                                INSERT INTO conversation_turns (id, conversation_id, client_request_id, request_hash,
+                                    sequence, status, child_text_visibility, reply_text_visibility, created_at, processing_deadline_at)
+                                VALUES (?, ?, ?, ?, 1, 'PROCESSING', 'OMITTED', 'OMITTED', ?, ?)
+                                """, UUID.randomUUID(), storedId, UUID.randomUUID(), "a".repeat(64), OPEN_AT, OPEN_AT.plusHours(2));
+                        doReturn(OPEN_AT.plusSeconds(1)).when(repository).currentTime();
+                        closure.reconcile(current.accountId(), childId, storedId, ConversationClosureCoordinator.Trigger.REQUEST_END);
+                    }
+                    case "ENDED", "CLOSED_AND_ENDED", "ENDED_WITH_NEW_ACTIVE" -> {
+                        doReturn(OPEN_AT.plusSeconds(1)).when(repository).currentTime();
+                        closure.reconcile(current.accountId(), childId, storedId, ConversationClosureCoordinator.Trigger.REQUEST_END);
+                        if (change.equals("CLOSED_AND_ENDED")) {
+                            doReturn(OPEN_AT.plusDays(1).withHour(0)).when(repository).currentTime();
+                        }
+                        if (change.equals("ENDED_WITH_NEW_ACTIVE")) {
+                            mockMvc.perform(request(current, childId, UUID.randomUUID())).andExpect(status().isCreated());
+                        }
+                    }
+                    case "UNLINKED" -> jdbc.update("DELETE FROM conversation_session_links WHERE conversation_id = ?", storedId);
+                    case "OWNER_CHANGED" -> jdbc.update("UPDATE children SET account_id = ? WHERE id = ?",
+                            authenticated().accountId(), childId);
+                    case "AUTH_AND_MIDNIGHT" -> {
+                        assertThat(security.revokeCurrentContext(current.accountId(), current.contextId())).isTrue();
+                        doReturn(OPEN_AT.plusDays(1).withHour(0)).when(repository).currentTime();
+                    }
+                    case "CONVERSATION_DELETED" -> {
+                        jdbc.update("DELETE FROM conversation_session_links WHERE conversation_id = ?", storedId);
+                        jdbc.update("DELETE FROM conversations WHERE id = ?", storedId);
+                    }
+                    case "LINK_STORAGE_FAILURE" -> jdbc.execute(
+                            "ALTER TABLE conversation_session_links RENAME TO unavailable_response_links");
+                    case "AUTH_STORAGE_FAILURE" -> jdbc.execute(
+                            "ALTER TABLE session_security RENAME TO unavailable_response_context");
+                    default -> throw new AssertionError(change);
+                }
+            }
+            finally {
+                pause.resume.countDown();
+            }
+            try {
+                response = pending.get(10, TimeUnit.SECONDS);
+            }
+            finally {
+                if (change.equals("LINK_STORAGE_FAILURE")) {
+                    jdbc.execute("ALTER TABLE unavailable_response_links RENAME TO conversation_session_links");
+                }
+                if (change.equals("AUTH_STORAGE_FAILURE")) {
+                    jdbc.execute("ALTER TABLE unavailable_response_context RENAME TO session_security");
+                }
+            }
+        }
+        assertThat(response.getStatus()).isEqualTo(expectedStatus);
+        Map<String, Object> detail = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(detail).containsOnlyKeys("code", "message", "requestId", "fields")
+                .containsEntry("code", expectedCode).containsEntry("fields", List.of());
+        assertThat(detail.get("requestId")).isEqualTo(response.getHeader("X-Request-ID"));
+        assertThat(response.getContentAsString()).doesNotContain("\"data\"", "startedAt", storedId.toString());
+        assertThat(response.getHeader("Location")).isNull();
+        assertThat(response.getHeader("Content-Length")).isNull();
+        assertThat(response.getHeader("Cache-Control")).contains("no-store");
+        assertThat(response.getHeader("Access-Control-Allow-Origin")).isEqualTo("http://localhost:5173");
+        assertThat(response.getHeaders("Set-Cookie").stream().filter(value -> value.startsWith("JSESSIONID="))
+                .map(MockCookie::parse).anyMatch(cookie -> cookie.getMaxAge() > 0)).isFalse();
+        // 전송 거부는 이미 커밋된 생성·재전송을 취소하거나 새 대화를 추가하지 않는다.
+        int rows = change.equals("CONVERSATION_DELETED") ? 0 : change.equals("ENDED_WITH_NEW_ACTIVE") ? 2 : 1;
+        assertCounts(rows, change.equals("UNLINKED") ? 0 : rows);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MIDNIGHT", "ENDED"})
+    @Timeout(25)
+    void realHttpResponseDiscardsDelayedSuccessWithoutTruncatingError(String change) throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var csrf = csrf(current.cookie());
+        var call = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path(childId)))
+                .timeout(Duration.ofSeconds(15)).header("Content-Type", "application/json")
+                .header("Origin", "http://localhost:5173")
+                .header("X-XSRF-TOKEN", csrf.token())
+                .header("Cookie", "JSESSIONID=" + current.cookie().getValue() + "; XSRF-TOKEN=" + csrf.cookie().getValue())
+                .POST(HttpRequest.BodyPublishers.ofString(body(UUID.randomUUID()))).build();
+        var pause = responseGate.pauseNext();
+        UUID storedId;
+        HttpResponse<String> response;
+        try (var client = HttpClient.newHttpClient()) {
+            var pending = client.sendAsync(call, HttpResponse.BodyHandlers.ofString());
+            try {
+                assertThat(pause.ready.await(10, TimeUnit.SECONDS)).isTrue();
+                storedId = Objects.requireNonNull(jdbc.queryForObject(
+                        "SELECT id FROM conversations WHERE child_id = ?", UUID.class, childId));
+                if (change.equals("MIDNIGHT")) {
+                    doReturn(OPEN_AT.plusDays(1).withHour(0)).when(repository).currentTime();
+                }
+                else {
+                    doReturn(OPEN_AT.plusSeconds(1)).when(repository).currentTime();
+                    closure.reconcile(current.accountId(), childId, storedId, ConversationClosureCoordinator.Trigger.REQUEST_END);
+                }
+            }
+            finally {
+                pause.resume.countDown();
+            }
+            response = pending.get(15, TimeUnit.SECONDS);
+        }
+        assertThat(response.statusCode()).isEqualTo(change.equals("MIDNIGHT") ? 403 : 409);
+        Map<String, Object> envelope = JsonPath.read(response.body(), "$");
+        Map<String, Object> detail = JsonPath.read(response.body(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(detail).containsOnlyKeys("code", "message", "requestId", "fields")
+                .containsEntry("code", change.equals("MIDNIGHT") ? "SERVICE_HOURS_CLOSED" : "CONVERSATION_ENDED");
+        assertThat(detail.get("requestId")).isEqualTo(response.headers().firstValue("X-Request-ID").orElseThrow());
+        assertThat(response.body()).doesNotContain("\"data\"", "startedAt", storedId.toString());
+        assertThat(response.headers().firstValue("Location")).isEmpty();
+        response.headers().firstValueAsLong("Content-Length").ifPresent(length ->
+                assertThat(length).isEqualTo(response.body().getBytes(StandardCharsets.UTF_8).length));
+        assertThat(response.headers().firstValue("Cache-Control").orElseThrow()).contains("no-store");
+        assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).contains("http://localhost:5173");
         assertCounts(1, 1);
     }
 
@@ -639,4 +817,60 @@ class ConversationCreationContractTests {
 
     private record Fixture(UUID accountId, UUID contextId, Cookie cookie) { }
     private record Csrf(Cookie cookie, String token) { }
+
+    static class Pause {
+        final CountDownLatch ready = new CountDownLatch(1);
+        final CountDownLatch resume = new CountDownLatch(1);
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    @ControllerAdvice(assignableTypes = ConversationController.class)
+    @NullMarked
+    static class ResponseGate implements ResponseBodyAdvice<Object> {
+        private final AtomicReference<@Nullable Pause> next = new AtomicReference<>();
+        private final JsonMapper json;
+
+        ResponseGate(JsonMapper json) {
+            this.json = json;
+        }
+
+        Pause pauseNext() {
+            var pause = new Pause();
+            assertThat(next.compareAndSet(null, pause)).isTrue();
+            return pause;
+        }
+
+        void reset() {
+            var pause = next.getAndSet(null);
+            if (pause != null) {
+                pause.resume.countDown();
+            }
+        }
+
+        @Override
+        public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+            return true;
+        }
+
+        @Override
+        public @Nullable Object beforeBodyWrite(@Nullable Object body, MethodParameter returnType, MediaType contentType,
+                Class<? extends HttpMessageConverter<?>> converterType, ServerHttpRequest request, ServerHttpResponse response) {
+            var pause = body instanceof Map<?, ?> data && data.containsKey("data") ? next.getAndSet(null) : null;
+            if (pause != null) {
+                pause.ready.countDown();
+                try {
+                    if (!pause.resume.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("응답 경합 대기가 끝나지 않았습니다.");
+                    }
+                }
+                catch (InterruptedException failure) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(failure);
+                }
+                // 실제 성공 본문의 길이로 첫 전송 전 callback과 오래된 길이 제거도 검증한다.
+                response.getHeaders().setContentLength(json.writeValueAsBytes(body).length);
+            }
+            return body;
+        }
+    }
 }

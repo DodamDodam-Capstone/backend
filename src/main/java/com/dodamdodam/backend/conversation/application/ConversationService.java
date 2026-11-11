@@ -3,6 +3,7 @@ package com.dodamdodam.backend.conversation.application;
 import com.dodamdodam.backend.auth.session.AuthenticatedSession;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.child.application.ChildService;
+import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.conversation.domain.ConversationServiceHours;
 import com.dodamdodam.backend.conversation.domain.ConversationServiceHours.ServiceWindow;
 import com.dodamdodam.backend.conversation.dto.StartConversationRequest;
@@ -43,6 +44,38 @@ public class ConversationService {
             throw decision.rejection();
         }
         return decision.outcome();
+    }
+
+    /** 생성 Tx 이후 새 Tx에서 반환 대상만 재검사하며 대화 생성·암묵적 연결은 수행하지 않는다. */
+    public void verifyStartResponse(AuthenticatedSession session, UUID childId, UUID clientRequestId, UUID conversationId) {
+        ConversationException rejection = transaction.execute(_ -> {
+            // 기존 변경 경로와 같은 상위 잠금 순서로 재조회해 종료·소유권 변경과 직렬화한다.
+            security.requireCurrentContextForUpdate(session.accountId(), session.securityContextId());
+            children.requireChildAccessForUpdate(session.accountId(), childId);
+            var current = repository.findRequestForUpdate(childId, clientRequestId)
+                    .filter(row -> row.conversationId().equals(conversationId)).orElseThrow(ChildException::notFound);
+            security.requireCurrentContextForUpdate(session.accountId(), session.securityContextId());
+            var checkedAt = repository.currentTime();
+            if (current.status().equals("CLOSING") || !checkedAt.isBefore(current.scheduledEndAt())) {
+                closure.reconcile(session.accountId(), childId, conversationId, ConversationClosureCoordinator.Trigger.OBSERVE);
+                current = repository.findRequestForUpdate(childId, clientRequestId)
+                        .filter(row -> row.conversationId().equals(conversationId)).orElseThrow(ChildException::notFound);
+                security.requireCurrentContextForUpdate(session.accountId(), session.securityContextId());
+                checkedAt = repository.currentTime();
+            }
+            // start의 이용시간 우선순위를 유지하며 종료 정리는 정상 거부 전에 커밋한다.
+            if (!ConversationServiceHours.isOpen(checkedAt)) {
+                return ConversationException.serviceHoursClosed();
+            }
+            if (!current.status().equals("ACTIVE")) {
+                return conflictFor(current);
+            }
+            replay(session, current, ConversationServiceHours.requireOpen(checkedAt));
+            return null;
+        });
+        if (rejection != null) {
+            throw rejection;
+        }
     }
 
     /** 자녀 잠금 아래 이전 날짜 종료 조정과 시작 판정을 같은 업무 트랜잭션에서 수행한다. */
