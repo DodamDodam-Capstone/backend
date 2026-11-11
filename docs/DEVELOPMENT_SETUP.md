@@ -1002,10 +1002,12 @@ Part 2의 자녀→대화→발화/연결/음성 잠금 확장은 같은 절의 
 | [SCRUM-83](https://dodamdodam.atlassian.net/browse/SCRUM-83) | PIN 변경과 버전 증가로 기존 guardian 무효화·관련 일회성 권한 폐기. 자동 unlock 없음. |
 | SCRUM-86/88/111 등 실제 소비자 | Part 2 모델·migration·API에서 관계 검사와 허용 DTO를 적용하고 각 권한·상태·응답 경합을 연동 검증한다. |
 
-현재 브랜치는 V5 `guardian_pins` 스키마와 조회·판정 함수를 제공하며 PIN 발급 API나
-Part 2 테이블·운영 조회 API는 추가하지 않았다. 정상 권한과 경합은 합성 DB fixture와
-테스트 전용 소비자로 검증했다. 실제 PIN 발급부터 Part 2 응답까지의 연동은 위 후속 작업의
-인수 조건이다. 실제 캐릭터 목록 보류, AI wire·운영 OAuth/HTTPS 설정은 각 기존 작업 범위로 유지한다.
+이 절의 SCRUM-96 공통 기반은 V5 `guardian_pins` 스키마와 조회·판정 함수를 제공한다.
+해당 작업의 정상 권한과 경합은 합성 DB fixture와 테스트 전용 소비자로 검증했다.
+현재 구현된 Part 2의 스키마·시작·응답 보호·종료 조정기와 후속 책임은
+[대화 공통 기반 인계서](CONVERSATION_HANDOFF.md)에서 함께 관리한다.
+PIN 발급부터 후속 Part 2 API까지의 실제 연동 인수, 캐릭터 목록 보류,
+AI wire·운영 OAuth/HTTPS 설정은 각 기존 작업 범위로 유지한다.
 
 ## 11. FastAPI·AI 팀 연동 기준
 
