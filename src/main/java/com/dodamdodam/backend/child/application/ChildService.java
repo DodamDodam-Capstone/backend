@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -53,6 +54,12 @@ public class ChildService {
     /** 소유 자녀를 반환하며, 미소유와 미존재를 같은 오류로 처리한다. */
     public ChildView requireChildAccess(UUID accountId, UUID childId) {
         return repository.findOwned(accountId, childId).orElseThrow(ChildException::notFound);
+    }
+
+    /** 계정·보안 문맥 잠금을 먼저 획득한 호출자의 트랜잭션에서 소유 자녀를 잠근다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ChildView requireChildAccessForUpdate(UUID accountId, UUID childId) {
+        return repository.findOwnedForUpdate(accountId, childId).orElseThrow(ChildException::notFound);
     }
 
     /** requireAuthenticatedSession → requireChildAccess 순서로 검증한 뒤 호출하는 내부 조회다. */
