@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,6 +137,107 @@ class ConversationClosureCoordinatorTests {
         assertThat(reconcile(fixture).endedNow()).isFalse();
         assertThat(conversation(fixture)).isEqualTo(snapshot);
         assertThat(jdbc.queryForList("SELECT * FROM conversation_session_links")).isEqualTo(links);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void mixedTerminalAndProcessingTurnsDrainWithoutOverwritingResultsThenAllowNewStart(boolean allowedFailedText) {
+        var fixture = fixture();
+        var succeeded = turn(fixture, "SUCCEEDED", "OMITTED", "OMITTED", NOW.minusHours(1));
+        var failed = turn(fixture, "FAILED", allowedFailedText ? "REDACTED" : "OMITTED", "OMITTED", NOW.minusHours(1));
+        var deadline = NOW.plusMinutes(1);
+        var processing = turn(fixture, "PROCESSING", "OMITTED", "OMITTED", deadline);
+        var terminalRows = jdbc.queryForList("SELECT * FROM conversation_turns WHERE id IN (?, ?) ORDER BY sequence", succeeded, failed);
+        var processingBefore = jdbc.queryForMap("SELECT * FROM conversation_turns WHERE id = ?", processing);
+
+        var closing = reconcile(fixture);
+        assertThat(closing.state().status()).isEqualTo("CLOSING");
+        assertThat(closing.state().summaryStatus()).isEqualTo("NOT_STARTED");
+        var blocked = assertThrows(ConversationException.class, () -> start(fixture, UUID.randomUUID()));
+        assertThat(blocked.code()).isEqualTo("CONVERSATION_CLOSING");
+        assertThat(jdbc.queryForMap("SELECT * FROM conversation_turns WHERE id = ?", processing)).isEqualTo(processingBefore);
+
+        // 원래 저장된 deadline의 equality에서 기존 PROCESSING 하나만 만료시킨다.
+        doReturn(deadline).when(clock).currentTime();
+        var ended = reconcile(fixture);
+        assertThat(ended.endedNow()).isTrue();
+        assertThat(ended.state().status()).isEqualTo("ENDED");
+        assertThat(ended.state().summaryStatus()).isEqualTo(allowedFailedText ? "PENDING" : "EMPTY");
+        assertThat(ended.state().endRequestedAt()).isEqualTo(closing.state().endRequestedAt());
+        assertThat(ended.state().endedAt().toInstant()).isEqualTo(deadline.toInstant());
+        assertThat(jdbc.queryForList("SELECT * FROM conversation_turns WHERE id IN (?, ?) ORDER BY sequence", succeeded, failed))
+                .isEqualTo(terminalRows);
+        assertThat(jdbc.queryForMap("SELECT status, error_code FROM conversation_turns WHERE id = ?", processing))
+                .containsEntry("status", "FAILED").containsEntry("error_code", "AI_TIMEOUT");
+        assertThat(time("SELECT processing_deadline_at FROM conversation_turns WHERE id = ?", processing).toInstant())
+                .isEqualTo(deadline.toInstant());
+        assertThat(time("SELECT completed_at FROM conversation_turns WHERE id = ?", processing).toInstant()).isEqualTo(deadline.toInstant());
+        assertThat(recovery(fixture.session().securityContextId()).toInstant()).isEqualTo(deadline.plusSeconds(600).toInstant());
+
+        var oldConversation = conversation(fixture);
+        var created = start(fixture, UUID.randomUUID());
+        assertThat(created.created()).isTrue();
+        assertThat(created.result().conversationId()).isNotEqualTo(fixture.conversationId());
+        assertThat(conversation(fixture)).isEqualTo(oldConversation);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversations", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversation_session_links", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversations WHERE status IN ('ACTIVE','CLOSING')", Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void simultaneousClosureTriggersProduceOnlyOneFirstEndedTransition() throws Exception {
+        var fixture = fixture();
+        turn(fixture, "FAILED", "REDACTED", "OMITTED", NOW.minusHours(1));
+        var processing = turn(fixture, "PROCESSING", "OMITTED", "OMITTED", NOW);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var pending = List.of(Trigger.OBSERVE, Trigger.REQUEST_END).stream().map(trigger -> workers.submit(() -> {
+                ready.countDown();
+                assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                return coordinator.reconcile(fixture.session().accountId(), fixture.childId(), fixture.conversationId(), trigger);
+            })).toList();
+            try {
+                assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            finally {
+                start.countDown();
+            }
+            var results = List.of(pending.get(0).get(10, TimeUnit.SECONDS), pending.get(1).get(10, TimeUnit.SECONDS));
+            assertThat(results).extracting(ConversationClosureCoordinator.ClosureResult::endedNow)
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(results.get(0).state()).isEqualTo(results.get(1).state());
+            assertThat(results.get(0).state().status()).isEqualTo("ENDED");
+            assertThat(results.get(0).state().endReason()).isEqualTo("MIDNIGHT");
+            assertThat(results.get(0).state().summaryStatus()).isEqualTo("PENDING");
+        }
+        assertThat(jdbc.queryForMap("SELECT status, error_code FROM conversation_turns WHERE id = ?", processing))
+                .containsEntry("status", "FAILED").containsEntry("error_code", "AI_TIMEOUT");
+        assertThat(time("SELECT ended_at FROM conversations WHERE id = ?", fixture.conversationId()).toInstant()).isEqualTo(NOW.toInstant());
+        assertThat(recovery(fixture.session().securityContextId()).toInstant()).isEqualTo(NOW.plusSeconds(600).toInstant());
+    }
+
+    @Test
+    void actualManualClosureAllowsSameDateRestartWhileSummaryIsPending() {
+        var fixture = fixture();
+        turn(fixture, "FAILED", "REDACTED", "OMITTED", NOW.minusHours(1));
+        var manualAt = START.plusSeconds(10);
+        doReturn(manualAt).when(clock).currentTime();
+        var ended = coordinator.reconcile(fixture.session().accountId(), fixture.childId(), fixture.conversationId(), Trigger.REQUEST_END);
+        assertThat(ended.state().status()).isEqualTo("ENDED");
+        assertThat(ended.state().endReason()).isEqualTo("MANUAL");
+        assertThat(ended.state().endRequestedAt().toInstant()).isEqualTo(manualAt.toInstant());
+        assertThat(ended.state().summaryStatus()).isEqualTo("PENDING");
+        var snapshot = conversation(fixture);
+        doReturn(manualAt.plusSeconds(1)).when(clock).currentTime();
+        var created = start(fixture, UUID.randomUUID());
+        assertThat(created.created()).isTrue();
+        assertThat(created.result().serviceDate()).isEqualTo(START.toLocalDate());
+        assertThat(created.result().conversationId()).isNotEqualTo(fixture.conversationId());
+        assertThat(conversation(fixture)).isEqualTo(snapshot);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversations", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(DISTINCT service_date) FROM conversations", Integer.class)).isEqualTo(1);
     }
 
     @Test

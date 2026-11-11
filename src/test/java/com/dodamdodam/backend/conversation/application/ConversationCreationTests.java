@@ -11,6 +11,7 @@ import com.dodamdodam.backend.conversation.infrastructure.ConversationRepository
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -223,6 +224,38 @@ class ConversationCreationTests {
     }
 
     @Test
+    void reloadsConversationStateCommittedWhileWaitingForChildLock() throws Exception {
+        var fixture = fixture();
+        var priorSession = security.createLoginContext(fixture.session().accountId(), null);
+        var priorId = UUID.randomUUID();
+        var key = request();
+        var entered = new CompletableFuture<Integer>();
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            var pending = transaction().execute(_ -> {
+                int blocker = backendPid();
+                jdbc.queryForList("SELECT id FROM children WHERE id = ? FOR UPDATE", UUID.class, fixture.childId());
+                var attempt = worker.submit(() -> assertThrows(ConversationException.class, () -> transaction().execute(_ -> {
+                    jdbc.execute("SET LOCAL statement_timeout = '15s'");
+                    entered.complete(backendPid());
+                    return service.create(fixture.session(), fixture.childId(), key);
+                })));
+                awaitBlocked(entered.orTimeout(5, TimeUnit.SECONDS).join(), blocker);
+                // 대기 중 독립 Tx가 유효한 대화·연결을 실제 저장소로 함께 커밋한다.
+                repository.insertActive(priorId, fixture.childId(), UUID.randomUUID(), STARTED_AT,
+                        ConversationServiceHours.requireOpen(STARTED_AT)).orElseThrow();
+                repository.insertLink(priorSession.securityContextId(), priorId, STARTED_AT);
+                return attempt;
+            });
+            var conflict = pending.get(10, TimeUnit.SECONDS);
+            assertThat(conflict.code()).isEqualTo("ACTIVE_CONVERSATION_EXISTS");
+            assertThat(conflict.activeConversationId()).isEqualTo(priorId);
+        }
+        assertCounts(1, 1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversations WHERE client_request_id = ?",
+                Integer.class, key.clientRequestId())).isZero();
+    }
+
+    @Test
     void blockedChildDoesNotPreventAnotherAccountsCreation() throws Exception {
         var blocked = fixture();
         var independent = fixture();
@@ -366,7 +399,7 @@ class ConversationCreationTests {
     }
 
     private int backendPid() {
-        return jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+        return Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class), "DB 연결 PID가 필요합니다.");
     }
 
     private TransactionTemplate transaction() {

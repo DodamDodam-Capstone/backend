@@ -1,6 +1,8 @@
 package com.dodamdodam.backend.conversation.api;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
+import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
+import com.dodamdodam.backend.conversation.application.ConversationService;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationRepository;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
@@ -10,8 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -38,6 +44,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,8 +63,10 @@ class ConversationCreationContractTests {
     @Autowired private MockMvc mockMvc;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JdbcIndexedSessionRepository sessions;
+    @Autowired private SessionSecurityRepository security;
     @Autowired @Qualifier("cookieSerializer") private CookieSerializer cookies;
     @MockitoSpyBean private ConversationRepository repository;
+    @MockitoSpyBean private ConversationService service;
 
     @BeforeEach
     void clearDatabase() {
@@ -99,27 +109,128 @@ class ConversationCreationContractTests {
     }
 
     @Test
-    void sameKeyReplaysUnchangedStartInformationAndNeverRebindsSession() throws Exception {
+    void lostCreationResponseCanBeRecoveredWithOriginalKeyWithoutRebinding() throws Exception {
         var current = authenticated();
         var childId = child(current.accountId());
         var key = UUID.randomUUID();
-        var original = mockMvc.perform(request(current, childId, key))
-                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        // 서버 커밋 뒤 응답 본문이 유실된 상황으로, 최초 응답의 ID·본문은 복구에 사용하지 않는다.
+        mockMvc.perform(request(current, childId, key)).andExpect(status().isCreated());
         var conversation = jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId);
         var link = jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", current.contextId());
+        var expected = Map.of("conversationId", conversation.get("id").toString(), "status", "ACTIVE",
+                "startedAt", "2026-10-03T08:00:00+09:00", "serviceDate", "2026-10-03",
+                "scheduledEndAt", "2026-10-04T00:00:00+09:00");
         doReturn(OPEN_AT.plusHours(3)).when(repository).currentTime();
 
         // 재전송과 쿠키 재발급 모두 같은 보안 문맥이면 최초 연결·시각을 그대로 보존한다.
         for (var browser : List.of(current, browserSession(current.accountId(), current.contextId()))) {
             var replay = mockMvc.perform(request(browser, childId, key)).andExpect(status().isOk())
                     .andReturn().getResponse();
-            assertThat(replay.getContentAsString()).isEqualTo(original);
+            Map<String, Object> data = JsonPath.read(replay.getContentAsString(), "$.data");
+            assertThat(data).isEqualTo(expected);
             assertThat(replay.getHeader("Location")).isNull();
             assertThat(replay.getHeader("Cache-Control")).contains("no-store");
         }
         assertThat(jdbc.queryForMap("SELECT * FROM conversations WHERE child_id = ?", childId)).isEqualTo(conversation);
         assertThat(jdbc.queryForMap("SELECT * FROM conversation_session_links WHERE session_security_id = ?", current.contextId()))
                 .isEqualTo(link);
+        assertCounts(1, 1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,true", "true,true", "true,false"})
+    @Timeout(25)
+    void concurrentHttpStartsRespectKeyAndCurrentContext(boolean sameKey, boolean sameContext) throws Exception {
+        var first = authenticated();
+        var second = sameContext ? first : authenticated(first.accountId());
+        var childId = child(first.accountId());
+        var key = UUID.randomUUID();
+        var calls = List.of(request(first, childId, key), request(second, childId, sameKey ? key : UUID.randomUUID()));
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var pending = calls.stream().map(call -> workers.submit(() -> {
+                ready.countDown();
+                assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                return mockMvc.perform(call).andReturn().getResponse();
+            })).toList();
+            try {
+                assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            finally {
+                start.countDown();
+            }
+            var responses = List.of(pending.get(0).get(10, TimeUnit.SECONDS), pending.get(1).get(10, TimeUnit.SECONDS));
+            int otherStatus = !sameKey ? 409 : sameContext ? 200 : 403;
+            assertThat(responses).extracting(MockHttpServletResponse::getStatus).containsExactlyInAnyOrder(201, otherStatus);
+            var created = responses.stream().filter(response -> response.getStatus() == 201).findFirst().orElseThrow();
+            var other = responses.stream().filter(response -> response.getStatus() != 201).findFirst().orElseThrow();
+            String id = JsonPath.read(created.getContentAsString(), "$.data.conversationId");
+            assertThat(created.getHeader("Location")).isEqualTo(path(childId) + "/" + id);
+            assertThat(other.getHeader("Location")).isNull();
+            if (otherStatus == 200) {
+                assertThat(other.getContentAsString()).isEqualTo(created.getContentAsString());
+            }
+            else {
+                String code = JsonPath.read(other.getContentAsString(), "$.error.code");
+                assertThat(code).isEqualTo(otherStatus == 409 ? "ACTIVE_CONVERSATION_EXISTS" : "CHILD_SESSION_REQUIRED");
+                if (otherStatus == 409) {
+                    String activeId = JsonPath.read(other.getContentAsString(), "$.error.activeConversationId");
+                    assertThat(activeId).isEqualTo(id);
+                }
+            }
+            assertThat(jdbc.queryForObject("SELECT id FROM conversations WHERE child_id = ?", UUID.class, childId))
+                    .isEqualTo(UUID.fromString(id));
+            var winner = responses.indexOf(created) == 0 ? first : second;
+            assertThat(jdbc.queryForObject("SELECT session_security_id FROM conversation_session_links WHERE conversation_id = ?",
+                    UUID.class, UUID.fromString(id))).isEqualTo(winner.contextId());
+        }
+        assertCounts(1, 1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM conversations WHERE status IN ('ACTIVE','CLOSING')", Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(25)
+    void invalidationAfterCreationCommitRemovesSuccessBodyLocationAndRenewedCookie() throws Exception {
+        var current = authenticated();
+        var childId = child(current.accountId());
+        var call = request(current, childId, UUID.randomUUID());
+        var committed = new CountDownLatch(1);
+        var deliver = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            var outcome = invocation.callRealMethod();
+            // 실제 업무 커밋과 HTTP 응답 사이에 독립 트랜잭션의 문맥 폐기를 끼워 넣는다.
+            committed.countDown();
+            assertThat(deliver.await(10, TimeUnit.SECONDS)).isTrue();
+            return outcome;
+        }).when(service).create(any(), any(), any());
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            var pending = worker.submit(() -> mockMvc.perform(call).andReturn().getResponse());
+            UUID storedId;
+            try {
+                assertThat(committed.await(10, TimeUnit.SECONDS)).isTrue();
+                storedId = jdbc.queryForObject("SELECT id FROM conversations WHERE child_id = ?", UUID.class, childId);
+                assertThat(security.revokeCurrentContext(current.accountId(), current.contextId())).isTrue();
+            }
+            finally {
+                deliver.countDown();
+            }
+            var response = pending.get(10, TimeUnit.SECONDS);
+            assertThat(response.getStatus()).isEqualTo(401);
+            Map<String, Object> detail = JsonPath.read(response.getContentAsString(), "$.error");
+            assertThat(detail).containsOnlyKeys("code", "message", "requestId", "fields")
+                    .containsEntry("code", "AUTHENTICATION_REQUIRED");
+            assertThat(detail.get("requestId")).isEqualTo(response.getHeader("X-Request-ID"));
+            assertThat(response.getHeader("Location")).isNull();
+            assertThat(response.getHeader("Cache-Control")).contains("no-store");
+            assertThat(response.getContentAsString()).doesNotContain("\"data\"", "startedAt", Objects.requireNonNull(storedId).toString());
+            assertThat(response.getHeaders("Set-Cookie").stream().filter(value -> value.startsWith("JSESSIONID="))
+                    .map(MockCookie::parse).anyMatch(cookie -> cookie.getMaxAge() > 0)).isFalse();
+            mockMvc.perform(call).andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+        }
+        // 늦은 권한 거부는 이미 완료된 업무 커밋을 취소하지 않으며, 재전송도 새 행을 만들지 못한다.
         assertCounts(1, 1);
     }
 
