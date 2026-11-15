@@ -70,6 +70,17 @@ public class ChildRepository {
         }
     }
 
+    /** 현재 업무 트랜잭션에서 소유 자녀 행을 잠가 자녀별 변경을 직렬화한다. */
+    public Optional<ChildView> findOwnedForUpdate(UUID accountId, UUID childId) {
+        try {
+            return jdbc.query("SELECT " + COLUMNS + " FROM children WHERE id = ? AND account_id = ? FOR UPDATE",
+                    CHILD_ROW, childId, accountId).stream().findFirst();
+        }
+        catch (DataAccessException failure) {
+            throw new ChildException(failure);
+        }
+    }
+
     /** 선행 소유권 검사를 마친 내부 문맥 조회에 사용할 프로필을 읽는다. */
     public Optional<ChildView> findById(UUID childId) {
         try {
