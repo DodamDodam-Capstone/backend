@@ -1,5 +1,6 @@
 package com.dodamdodam.backend.conversation.infrastructure;
 
+import com.dodamdodam.backend.conversation.application.AllowedTextPolicy.AllowedText;
 import com.dodamdodam.backend.conversation.domain.TextVisibility;
 import com.dodamdodam.backend.conversation.domain.TurnStatus;
 import com.dodamdodam.backend.conversation.dto.TurnView;
@@ -43,6 +44,45 @@ public class ConversationTurnRepository {
             return jdbc.query("SELECT " + COLUMNS
                     + " FROM conversation_turns WHERE conversation_id = ? AND client_request_id = ? FOR UPDATE",
                     STORED_ROW, conversationId, clientRequestId).stream().findFirst();
+        }
+        catch (DataAccessException failure) {
+            throw new ConversationException(failure);
+        }
+    }
+
+    /** 결과 문맥에 묶인 발화만 조회하며 대화 잠금 이후에 호출한다. */
+    public Optional<StoredTurn> findForUpdate(UUID conversationId, UUID turnId) {
+        try {
+            return jdbc.query("SELECT " + COLUMNS + " FROM conversation_turns WHERE conversation_id = ? AND id = ? FOR UPDATE",
+                    STORED_ROW, conversationId, turnId).stream().findFirst();
+        }
+        catch (DataAccessException failure) {
+            throw new ConversationException(failure);
+        }
+    }
+
+    /** 계정 잠금 뒤 원래 문맥을 먼저 잠근다. 만료·폐기·정리 여부는 기접수 결과의 저장 권한을 취소하지 않는다. */
+    public void lockAcceptedContext(UUID accountId, UUID securityContextId) {
+        try {
+            jdbc.queryForList("SELECT id FROM session_security WHERE account_id = ? AND id = ? FOR UPDATE",
+                    UUID.class, accountId, securityContextId);
+        }
+        catch (DataAccessException failure) {
+            throw new ConversationException(failure);
+        }
+    }
+
+    /** 허용 정책을 통과한 결과만 원래 기한 내 PROCESSING에 반영하며 terminal은 덮어쓰지 않는다. */
+    public int completeProcessing(UUID conversationId, UUID turnId, TurnStatus status, String errorCode,
+                                  AllowedText child, AllowedText reply, OffsetDateTime checkedAt) {
+        try {
+            return jdbc.update("""
+                    UPDATE conversation_turns SET status = ?, completed_at = ?, error_code = ?,
+                        child_text = ?, child_text_visibility = ?, reply_text = ?, reply_text_visibility = ?
+                    WHERE conversation_id = ? AND id = ? AND status = 'PROCESSING' AND completed_at IS NULL
+                        AND processing_deadline_at > ?
+                    """, status.name(), checkedAt, errorCode, child.text(), child.visibility().name(), reply.text(), reply.visibility().name(),
+                    conversationId, turnId, checkedAt);
         }
         catch (DataAccessException failure) {
             throw new ConversationException(failure);

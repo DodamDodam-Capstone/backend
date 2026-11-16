@@ -72,10 +72,10 @@ public class ConversationClosureRepository {
         }
     }
 
-    /** 원래 기한에 도달한 PROCESSING만 실패시키고 terminal 결과·기한·텍스트는 변경하지 않는다. */
-    public void expireProcessing(UUID conversationId, OffsetDateTime checkedAt) {
+    /** 원래 기한에 도달한 PROCESSING만 실패시키고 terminal 결과·기한·텍스트는 변경하지 않으며 영향 행 수를 반환한다. */
+    public int expireProcessing(UUID conversationId, OffsetDateTime checkedAt) {
         try {
-            jdbc.update("""
+            return jdbc.update("""
                     UPDATE conversation_turns SET status = 'FAILED', error_code = 'AI_TIMEOUT', completed_at = ?
                     WHERE conversation_id = ? AND status = 'PROCESSING' AND completed_at IS NULL AND processing_deadline_at <= ?
                     """, checkedAt, conversationId, checkedAt);

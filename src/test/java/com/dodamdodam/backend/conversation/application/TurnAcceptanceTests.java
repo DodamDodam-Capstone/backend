@@ -90,6 +90,7 @@ class TurnAcceptanceTests {
         var result = accept(fixture, key, AUDIO);
 
         assertThat(result.newlyAccepted()).isTrue();
+        assertThat(result.completionPermit()).isPresent();
         assertThat(result.turn().sequence()).isEqualTo(1);
         assertThat(result.turn().status()).isEqualTo(TurnStatus.PROCESSING);
         assertThat(result.processingDeadlineAt().toInstant()).isEqualTo(CREATED_AT.plusSeconds(60).toInstant());
@@ -151,6 +152,7 @@ class TurnAcceptanceTests {
 
         var replay = accept(fixture, key, AUDIO.clone());
         assertThat(replay.newlyAccepted()).isFalse();
+        assertThat(replay.completionPermit()).isEmpty();
         assertThat(replay.turn().turnId()).isEqualTo(first.turn().turnId());
         assertThat(replay.turn().status()).isEqualTo(status);
         assertThat(replay.turn().sequence()).isEqualTo(1);
