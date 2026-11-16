@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/** 필드별 허용 텍스트와 공개 처리 결과만 담으며 요청 키·해시·처리기한·세션 정보는 제외한다. */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record TurnView(
         UUID turnId,

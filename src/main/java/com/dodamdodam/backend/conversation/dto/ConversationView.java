@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/** 공개 읽기 모델 11필드만 담으며 시작 키·서비스 날짜·요약 작업 내부 정보는 포함하지 않는다. */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record ConversationView(
         UUID conversationId,

@@ -1,11 +1,20 @@
 package com.dodamdodam.backend.conversation.infrastructure;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
+import com.dodamdodam.backend.conversation.application.AllowedTextPolicy;
+import com.dodamdodam.backend.conversation.domain.ConversationStatus;
+import com.dodamdodam.backend.conversation.domain.EndReason;
+import com.dodamdodam.backend.conversation.domain.SummaryStatus;
+import com.dodamdodam.backend.conversation.domain.TextVisibility;
+import com.dodamdodam.backend.conversation.domain.TurnStatus;
+import com.dodamdodam.backend.conversation.dto.ConversationView;
+import com.dodamdodam.backend.conversation.dto.TurnView;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import javax.sql.DataSource;
@@ -13,16 +22,19 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.DataClassRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +51,85 @@ class ConversationSchemaTests {
     private static final OffsetDateTime TURN_CREATED_AT = SERVICE_DATE.atTime(9, 0).atOffset(KST);
     @Autowired private JdbcTemplate jdbc;
     @Autowired private DataSource dataSource;
+    @Autowired private JsonMapper jsonMapper;
+
+    @ParameterizedTest
+    @CsvSource({"ACTIVE,", "CLOSING,MANUAL", "CLOSING,MIDNIGHT", "ENDED,MANUAL", "ENDED,MIDNIGHT"})
+    void mapsV6LifecycleToExistingConversationView(ConversationStatus status, EndReason reason) {
+        var childId = child();
+        var id = conversation(childId);
+        if (status != ConversationStatus.ACTIVE) {
+            jdbc.update("""
+                    UPDATE conversations SET status = 'CLOSING', end_reason = ?, end_requested_at =
+                        CASE WHEN ? = 'MIDNIGHT' THEN scheduled_end_at ELSE started_at + INTERVAL '2 hours' END
+                    WHERE id = ?
+                    """, reason.name(), reason.name(), id);
+        }
+        if (status == ConversationStatus.ENDED) {
+            jdbc.update("""
+                    UPDATE conversations SET status = 'ENDED', summary_status = 'EMPTY',
+                        ended_at = end_requested_at + INTERVAL '1 second' WHERE id = ?
+                    """, id);
+        }
+
+        var view = conversationView(id);
+        assertThat(view.conversationId()).isEqualTo(id);
+        assertThat(view.childId()).isEqualTo(childId);
+        assertThat(view.status()).isEqualTo(status);
+        assertThat(view.endReason()).isEqualTo(reason);
+        assertThat(view.summaryStatus()).isEqualTo(status == ConversationStatus.ENDED
+                ? SummaryStatus.EMPTY : SummaryStatus.NOT_STARTED);
+        var json = publicJson(view);
+        assertThat(json).containsOnlyKeys("conversationId", "childId", "status", "startedAt", "endRequestedAt",
+                "endReason", "endedAt", "title", "topic", "summary", "summaryStatus");
+        assertThat(json).containsEntry("startedAt", "2026-10-03T08:00:00+09:00")
+                .containsEntry("title", null).containsEntry("topic", null).containsEntry("summary", null);
+        if (status == ConversationStatus.ACTIVE) {
+            assertThat(view.endRequestedAt()).isNull();
+        } else {
+            assertThat(view.endRequestedAt()).isEqualTo(reason == EndReason.MIDNIGHT
+                    ? SERVICE_DATE.plusDays(1).atStartOfDay().atOffset(KST) : SERVICE_DATE.atTime(10, 0).atOffset(KST));
+        }
+        if (status == ConversationStatus.ENDED) {
+            assertThat(view.endedAt()).isAfter(view.endRequestedAt());
+        } else {
+            assertThat(view.endedAt()).isNull();
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(TurnStatus.class)
+    void mapsV6TurnAndAllowedTextPolicyToExistingPublicView(TurnStatus status) {
+        var id = processing(conversation(child()), 1, UUID.randomUUID());
+        var policy = new AllowedTextPolicy();
+        var child = policy.select(TextVisibility.REDACTED, true, true, "[test] permitted processed child");
+        var reply = policy.select(TextVisibility.VISIBLE, true, null, "[test] unconfirmed reply");
+        var errorCode = status == TurnStatus.FAILED ? "AI_UPSTREAM_FAILED" : null;
+        if (status != TurnStatus.PROCESSING) {
+            // 정책 결과만 바인딩하여 불명확한 원문이 실제 저장 행과 공개 DTO에 남지 않는지 확인한다.
+            jdbc.update("""
+                    UPDATE conversation_turns SET status = ?, completed_at = created_at + INTERVAL '30 seconds',
+                        error_code = ?, child_text = ?, child_text_visibility = ?, reply_text = ?, reply_text_visibility = ?
+                    WHERE id = ?
+                    """, status.name(), errorCode, child.text(), child.visibility().name(), reply.text(), reply.visibility().name(), id);
+        }
+
+        var view = turnView(id);
+        assertThat(view.turnId()).isEqualTo(id);
+        assertThat(view.sequence()).isEqualTo(1);
+        assertThat(view.status()).isEqualTo(status);
+        assertThat(view.childText()).isEqualTo(status == TurnStatus.PROCESSING ? null : child.text());
+        assertThat(view.childTextVisibility()).isEqualTo(status == TurnStatus.PROCESSING ? TextVisibility.OMITTED : child.visibility());
+        assertThat(view.replyText()).isNull();
+        assertThat(view.replyTextVisibility()).isEqualTo(TextVisibility.OMITTED);
+        assertThat(view.errorCode()).isEqualTo(errorCode);
+        var json = publicJson(view);
+        assertThat(json).containsOnlyKeys("turnId", "sequence", "status", "childText", "childTextVisibility",
+                "replyText", "replyTextVisibility", "createdAt", "completedAt", "errorCode");
+        assertThat(json).containsEntry("createdAt", "2026-10-03T09:00:00+09:00")
+                .containsEntry("completedAt", status == TurnStatus.PROCESSING ? null : "2026-10-03T09:00:30+09:00");
+        assertThat(jsonMapper.writeValueAsString(view)).doesNotContain("[test] unconfirmed reply");
+    }
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -203,28 +294,29 @@ class ConversationSchemaTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"EMPTY", "PENDING", "READY", "FAILED"})
-    void acceptsEachEndedSummaryState(String state) {
+    @EnumSource(value = SummaryStatus.class, names = "NOT_STARTED", mode = EnumSource.Mode.EXCLUDE)
+    void acceptsEachEndedSummaryState(SummaryStatus state) {
         var id = conversation(child());
         end(id);
-        if (!state.equals("EMPTY")) {
+        if (state != SummaryStatus.EMPTY) {
             pendingSummary(id);
         }
-        if (state.equals("READY")) {
+        if (state == SummaryStatus.READY) {
             jdbc.update("""
                     UPDATE conversations SET summary_status = 'READY',
                         summary_completed_at = summary_deadline_at - INTERVAL '1 microsecond',
                         title = '제목', topic = '주제', summary = '허용된 요약' WHERE id = ?
                     """, id);
         }
-        if (state.equals("FAILED")) {
+        if (state == SummaryStatus.FAILED) {
             jdbc.update("""
                     UPDATE conversations SET summary_status = 'FAILED', summary_completed_at = summary_deadline_at,
                         summary_error_code = 'AI_TIMEOUT' WHERE id = ?
                     """, id);
         }
         assertThat(jdbc.queryForObject("SELECT summary_status FROM conversations WHERE id = ?", String.class, id))
-                .isEqualTo(state);
+                .isEqualTo(state.name());
+        assertThat(conversationView(id).summaryStatus()).isEqualTo(state);
     }
 
     @ParameterizedTest
@@ -304,14 +396,19 @@ class ConversationSchemaTests {
             "OMITTED,OMITTED", "VISIBLE,OMITTED", "REDACTED,OMITTED", "OMITTED,VISIBLE", "OMITTED,REDACTED",
             "VISIBLE,VISIBLE", "VISIBLE,REDACTED", "REDACTED,VISIBLE", "REDACTED,REDACTED"
     })
-    void acceptsIndependentTextVisibilityForSuccessfulTurn(String childVisibility, String replyVisibility) {
+    void acceptsIndependentTextVisibilityForSuccessfulTurn(TextVisibility childVisibility, TextVisibility replyVisibility) {
         var id = processing(conversation(child()), 1, UUID.randomUUID());
         jdbc.update("""
                 UPDATE conversation_turns SET status = 'SUCCEEDED',
                     completed_at = processing_deadline_at - INTERVAL '1 microsecond',
                     child_text = ?, child_text_visibility = ?, reply_text = ?, reply_text_visibility = ? WHERE id = ?
-                """, childVisibility.equals("OMITTED") ? null : "허용된 아이 말", childVisibility,
-                replyVisibility.equals("OMITTED") ? null : "허용된 답변", replyVisibility, id);
+                """, childVisibility == TextVisibility.OMITTED ? null : "허용된 아이 말", childVisibility.name(),
+                replyVisibility == TextVisibility.OMITTED ? null : "허용된 답변", replyVisibility.name(), id);
+        var view = turnView(id);
+        assertThat(view.childTextVisibility()).isEqualTo(childVisibility);
+        assertThat(view.replyTextVisibility()).isEqualTo(replyVisibility);
+        assertThat(view.childText()).isEqualTo(childVisibility == TextVisibility.OMITTED ? null : "허용된 아이 말");
+        assertThat(view.replyText()).isEqualTo(replyVisibility == TextVisibility.OMITTED ? null : "허용된 답변");
     }
 
     @ParameterizedTest
@@ -452,6 +549,27 @@ class ConversationSchemaTests {
             }
             default -> throw new AssertionError(target);
         }
+    }
+
+    /** 실제 V6 행의 공개 컬럼만 표준 JDBC 매퍼로 읽어 기존 DTO·Enum과의 호환성을 검증한다. */
+    private ConversationView conversationView(UUID id) {
+        return jdbc.queryForObject("""
+                SELECT id AS conversation_id, child_id, status, started_at, end_requested_at, end_reason,
+                    ended_at, title, topic, summary, summary_status FROM conversations WHERE id = ?
+                """, DataClassRowMapper.newInstance(ConversationView.class), id);
+    }
+
+    /** 요청 해시·키·기한을 제외한 공개 발화 매핑만 시험하며 조회 API를 구현하지 않는다. */
+    private TurnView turnView(UUID id) {
+        return jdbc.queryForObject("""
+                SELECT id AS turn_id, sequence, status, child_text, child_text_visibility, reply_text,
+                    reply_text_visibility, created_at, completed_at, error_code FROM conversation_turns WHERE id = ?
+                """, DataClassRowMapper.newInstance(TurnView.class), id);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> publicJson(Object view) {
+        return jsonMapper.readValue(jsonMapper.writeValueAsString(view), Map.class);
     }
 
     private UUID child() {

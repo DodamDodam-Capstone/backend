@@ -4,6 +4,7 @@ import com.dodamdodam.backend.conversation.domain.TextVisibility;
 
 public final class AllowedTextPolicy {
 
+    /** 각 텍스트에 독립 적용하며, REDACTED에는 이미 명시적으로 허용된 가공문만 전달한다. */
     public AllowedText select(TextVisibility visibility, Boolean storageAllowed,
                               Boolean displayAllowed, String permittedText) {
         if (visibility == null || visibility == TextVisibility.OMITTED
