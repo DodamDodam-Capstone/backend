@@ -9,6 +9,7 @@ SCRUM-86에서 구현한 대화 기반을 SCRUM-87/88/101/102/103이 재사용�
 - 검증일: 2026-11-11. 응답 직전 재검사와 415 수정까지 포함한다.
 - 계약 원본: [대화 API §7.1·§8](p0/api/06-conversations.md), [JSON 스키마](p0/api/schemas/conversations.md), [공통 API](p0/api/01-common.md), [ERD §5·§8·§12.2](p0/Integrated_ERD_Design.md).
 - 이 문서는 구현 사용법과 검증 범위를 기록한다. 통합 API/ERD v3.1이나 미확정 정책을 변경하지 않는다.
+- 위 HEAD·검증일은 SCRUM-86 기준이다. SCRUM-88 내부 발화 접수의 후속 구현은 §9를 따른다.
 
 | 구현 위치 | 제공하는 계약 |
 | --- | --- |
@@ -221,8 +222,8 @@ ENDED 200의 conversationId/status/endedAt/summaryStatus 네 필드만이다. �
 
 | Task | 현재 재사용할 것 | 후속 구현·인수 대상 |
 | --- | --- | --- |
-| [SCRUM-87](https://dodamdodam.atlassian.net/browse/SCRUM-87) | 대화 상태·현재 문맥 연결·인증/소유권·정순서 잠금 | 음성 업로드·AI 요청, 접수 커밋 후 잠금 밖 외부 호출, 음성 허용/자산/삭제 연동. 실제 AI wire·용량/시간 수치 확정 |
-| [SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) | V6 전체 conversation_turns, 상태/visibility/원래 deadline/부분 UNIQUE | 신규 접수·원본 audio 바이트 SHA-256·대화 잠금 아래 sequence 부여·정상/실패 조건부 저장·허용 텍스트 처리. 공통 스키마 중복 생성·중복 작업량 산정 금지 |
+| [SCRUM-87](https://dodamdodam.atlassian.net/browse/SCRUM-87) | 대화 상태·현재 문맥 연결·인증/소유권·정순서 잠금·§9 내부 접수 서비스 | 음성 업로드·AI 요청, 접수 커밋 후 잠금 밖 외부 호출, 음성 허용/자산/삭제 연동. 실제 AI wire·용량/시간 수치 확정 |
+| [SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) | V6 전체 conversation_turns, 기존 모델·허용 정책·§9 신규 접수·해시·멱등성·sequence | 정상/실패 조건부 결과 저장·허용 텍스트 저장 연계. 공통 스키마 중복 생성·중복 작업량 산정 금지 |
 | [SCRUM-101](https://dodamdodam.atlassian.net/browse/SCRUM-101) | ACTIVE/당일/이용시간·현재 보안 문맥·links PK | 명시 resume, 기존 허용 turns 복원·현재 문맥 연결 및 최초 bound_at 보존. CLOSING/ENDED 새 연결 차단 |
 | [SCRUM-102](https://dodamdodam.atlassian.net/browse/SCRUM-102) | reconcile/REQUEST_END·최초 경계·원래 deadline drain·원자적 ENDED | 수동 /end API, 발화 접수와 같은 대화 잠금/CAS 경합, timer 등 실제 조정 호출. 응답·음성 삭제·후속 작업 연동 |
 | [SCRUM-103](https://dodamdodam.atlassian.net/browse/SCRUM-103) | 기존 적격 links의 고정 end_recovery_until·endedAt | 종료 확인 권한·600초 equality·내용 없는 receipt·응답 유실 복구·현재 로그인 무효화 우선·기한 불변 테스트 |
@@ -235,8 +236,8 @@ API별 전송·인증·응답 보호를 직접 확인해야 한다. start의 전
 | 구분 | 코드 기준 현재 상태 |
 | --- | --- |
 | 구현 완료 | 3개 공통 스키마, 시작 입력/접근/시간/멱등성/동시성/원자성, 415, 응답 직전 보호, 호출 가능한 공통 종료 최소 기반 |
-| 부분 구현 | 대화 수명주기는 공통 조정기·PENDING/EMPTY·복구기한 기록까지. 정상 turn 결과·요약 실행·HTTP 종료/복구 접근·자동 실행자는 아직 없음 |
-| 후속 API·worker 미구현 | 음성/발화 접수·정상 AI 결과·resume·/end·receipt·timer/catch-up/sweep·요약 실행/timeout·음성 자산 삭제 |
+| 부분 구현 | 대화 수명주기는 공통 조정기·PENDING/EMPTY·복구기한 기록까지. §9 내부 PROCESSING 접수는 구현. 정상 turn 결과·요약 실행·HTTP 종료/복구 접근·자동 실행자는 아직 없음 |
+| 후속 API·worker 미구현 | 음성 HTTP 접수·정상 AI 결과·resume·/end·receipt·timer/catch-up/sweep·요약 실행/timeout·음성 자산 삭제 |
 | Part 2 413 | 명세에는 REQUEST_TOO_LARGE가 있으나 JSON/음성 크기 정책 미확정으로 현재 크기 검사는 없음. 승인된 수치·범위 확정 후 별도 연결, Part 1 16 KiB를 복사하지 않음 |
 | 공통 429 | 현재 시작 경로에 API_IP/auth_rate_limits 요청량 예약 실행부가 없음. 공통 담당 범위·연계 기준 확인 후 429/Retry-After/별도 예약 커밋을 검증해야 함 |
 | 실제 아이 등록·AI·운영 | 기존 캐릭터 목록 연결, 실제 AI 자료·운영 timeout/OAuth/HTTPS 등은 별도 기존 범위. 합성 fixture 테스트가 신규 사용자부터 전체 운영 흐름의 인수를 대신하지 않음 |
@@ -295,3 +296,40 @@ API별 전송·인증·응답 보호를 직접 확인해야 한다. start의 전
 
 SCRUM-86의 구현·로컬 검증 충족과 Jira Task의 최종 Done은 구분한다.
 후속 API·공통 의존성의 책임과 인수 범위를 명시하고, 최종 완료는 [팀 실행 규칙](AGENT_WORKFLOW.md#3-상태-전환)의 실제 CI·리뷰·병합·Jira 결과로 확인한다.
+
+## 9. SCRUM-88 내부 발화 접수 (Commit 02)
+
+[TurnAcceptanceService](../src/main/java/com/dodamdodam/backend/conversation/application/TurnAcceptanceService.java)의
+`accept(AuthenticatedSession, childId, conversationId, clientRequestId, byte[] originalAudio)`를 사용한다.
+로그인 문맥은 HTTP 계층이 서버에서 얻어 전달하며 클라이언트 본문으로 구성하지 않는다.
+원본 바이트를 호출 중 수정하지 않는다. multipart·파일 형식/크기/길이 검증·CSRF·HTTP 상태 매핑·실제 AI 호출은 SCRUM-87/89 범위다.
+
+- 해시는 업무 Tx 밖에서 원본 audio 바이트만 SHA-256 소문자 hex64로 계산한다. 파일명·MIME·boundary·요청 키·재인코딩 결과는 입력에 없다.
+- 외부 업무 Tx에서의 호출은 NEVER로 거부한다. 내부 TransactionTemplate의 접수 커밋 성공 후에만 `Acceptance`를 반환한다.
+- 계정→현재 문맥→소유 아이→대화→기존 요청/PROCESSING→기존 link 순으로 잠근다. 링크까지 잠근 뒤 현재 문맥·DB 시각을 재검사한다.
+- ENDED→이용시간→CLOSING/당일/예정 종료→현재 연결 검사를 통과한 뒤 키·해시를 판정한다. 신규 저장 후에도 문맥·시각을 확인하며 자정 경과는 rollback한다.
+- 같은 키·같은 해시는 기존 PROCESSING/SUCCEEDED/FAILED를 그대로 재사용하고 원래 기한을 연장하지 않는다. 같은 키·다른 해시는 IDEMPOTENCY_CONFLICT, 새 키·기존 PROCESSING은 TURN_IN_PROGRESS다.
+- 대화 잠금 아래 모든 상태의 MAX(sequence)+1로 순번을 부여한다. INSERT는 PROCESSING·양쪽 OMITTED/null이며 요청/순번 UNIQUE와 PROCESSING 부분 UNIQUE는 V6를 그대로 사용한다.
+
+[ConversationTurnRepository](../src/main/java/com/dodamdodam/backend/conversation/infrastructure/ConversationTurnRepository.java)는
+기존 요청 잠금 조회·PROCESSING 잠금·다음 순번·신규 INSERT만 담당하며 기존 업무 Tx가 필수다.
+대화 조회·잠금과 DB clock_timestamp는 기존 ConversationRepository를 재사용한다. 저장 장애·무관한 제약 위반을 업무 충돌로 일괄 변환하지 않는다.
+
+`app.conversation.turn.processing-timeout` / `TURN_PROCESSING_TIMEOUT`은 기본값 없이 양의 마이크로초 정밀도 Duration을 요구한다.
+테스트의 60초는 합성 설정이며 D13/D14의 운영 수치를 확정하지 않는다. 기존 PROCESSING의 기한 만료·자동 재시도는 이번 접수에서 수행하지 않는다.
+
+### 내부 반환값과 Commit 03 연결
+
+| `Acceptance` 필드 | 의미 |
+| --- | --- |
+| turn | 기존 공개 10필드 TurnView. 요청 키·해시·기한·세션은 포함하지 않음 |
+| processingDeadlineAt | DB에 저장된 원래 처리 기한. 내부 결과 저장 판정용이며 공개 응답에 그대로 직렬화하지 않음 |
+| newlyAccepted | 이번 신규 접수가 커밋된 실행자만 true. 재전송은 false이며 crash/재시작 후 AI 재실행 권한이 아님 |
+
+SCRUM-87/89는 새 접수의 true 결과를 받은 실행자만 업무 잠금 밖에서 AI를 한 번 시도하도록 연결한다.
+접수 성공은 최종 HTTP 내용 전달 권한을 보장하지 않으므로 응답 직전 로그인·소유권·시간·상태·연결을 별도로 재검사해야 한다.
+
+Commit 03 결과 저장 진입점은 내부 account/child/conversation/turn ID와 필드별 AllowedTextPolicy 결과를 전달받는 별도 업무 Tx로 연결한다.
+접수 결과의 turnId와 저장된 원래 deadline을 기준으로 상위 잠금부터 다시 획득하고 PROCESSING 조건부 전이를 수행해야 한다.
+정상/실패 결과 저장·AI wire 타입·결과 저장 메서드 자체는 Commit 02에서 선언하거나 구현하지 않았다.
+이전 접수 결과나 newlyAccepted를 현재 상태·원래 기한의 재검사 대신 신뢰해서는 안 된다.
