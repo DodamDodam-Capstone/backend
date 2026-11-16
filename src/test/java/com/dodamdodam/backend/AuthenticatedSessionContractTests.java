@@ -5,6 +5,7 @@ import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -246,9 +248,17 @@ class AuthenticatedSessionContractTests {
     private MockHttpServletResponse assertError(MockHttpServletRequestBuilder request, int code, String errorCode) throws Exception {
         var response = mockMvc.perform(request)
                 .andExpect(status().is(code))
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(content().encoding(StandardCharsets.UTF_8))
                 .andExpect(jsonPath("$.error.code").value(errorCode))
+                .andExpect(jsonPath("$.error.fields").isArray())
                 .andExpect(jsonPath("$.error.fields").isEmpty())
                 .andReturn().getResponse();
+        Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
+        Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
+        assertThat((String) error.get("message")).isNotBlank();
         String requestId = JsonPath.read(response.getContentAsString(), "$.error.requestId");
         assertThat(requestId).isEqualTo(response.getHeader("X-Request-ID"));
         assertThat(requestId).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");

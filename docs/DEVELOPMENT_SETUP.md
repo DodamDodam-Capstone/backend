@@ -309,6 +309,12 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
 | `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
+| `SUMMARY_PROCESSING_TIMEOUT` | 기본값 없음, 명시적 Duration 필수 | 요약 접수부터의 처리 기한. 양수·마이크로초 정밀도이며 D13/D14 수치는 별도 확정 |
+
+`SUMMARY_PROCESSING_TIMEOUT`은 운영 기본값을 두지 않는다. `.env.example`의 빈 값을
+확정한 양의 Duration으로 채우거나 실행 환경에서 명시해야 하며, 미설정·0·음수는 기동 오류다.
+기존 개인 `.env`는 자동으로 수정하지 않는다. 테스트의 `src/test/resources/application.properties`에
+지정한 60초는 합성 fixture용 값이며 운영 정책을 확정한 값이 아니다.
 
 세션 쿠키 `JSESSIONID`는 HttpOnly이며, `XSRF-TOKEN`은 기존 FE 호환을 위해
 HttpOnly=false를 유지합니다. 두 쿠키 모두 Path=/, Domain 미설정(host-only)으로
@@ -420,8 +426,10 @@ V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NUL
 무효/비로그인은 `401 AUTHENTICATION_REQUIRED`, 저장소 읽기·쓰기·역직렬화 실패는
 `503 AUTH_STATE_UNAVAILABLE` 공통 JSON으로 처리합니다. CSRF 실패의 403은 인증 판정보다
 먼저 처리하고, API 인증 실패에 로그인 페이지 redirect나 익명 요청 저장용 세션을 만들지 않습니다.
-현재 미처리 DB 예외의 fallback은 인증 저장소 기준이므로 다른 업무 저장소가 추가되면
-그 도메인의 오류 변환을 연결해야 합니다.
+Backend 컨트롤러의 명시적 인증 저장소 장애는 `503 AUTH_STATE_UNAVAILABLE`, 그 밖의
+미처리 업무 오류는 원문 없는 `500 INTERNAL_ERROR`로 변환합니다. JSON·UUID 구조 오류는
+400이며 자녀 기능의 404·409 처리가 공통 fallback보다 우선합니다. 진행 중 로그인 실패는
+외곽 필터로 전달해 보상 폐기하며, MVC 밖의 Spring Session 저장 장애도 기존 503 경로를 유지합니다.
 
 로그인 소비자는 **자격 검증 트랜잭션을 마친 뒤** 공유
 `SessionAuthenticationStrategy.onAuthentication(authentication, request, response)`를 호출하고,
@@ -689,12 +697,13 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | 서블릿 필터 | order | 배치 이유 |
 | --- | --- | --- |
 | [ApiResponseHeadersFilter](../src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java) | `H` | 뒤 단계의 성공·실패 응답에 서버 생성 요청 ID와 `no-store`를 적용합니다. |
-| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증과 실패 보상을 수행합니다. |
+| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증·실패 보상과 보호자 응답 재검사를 수행합니다. |
 | [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
+| [ConversationStartResponseFilter](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationStartResponseFilter.java) | Security 위임 필터 order + 1, 기본 `-99` | 보안 체인이 다음 서블릿 필터를 호출하는 동안 인증 문맥을 유지한 채 대화 시작 성공 응답을 전송 전에 재검사합니다. |
 
-`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.1의 기본값을 사용합니다.
+`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.2의 기본값을 사용합니다.
 프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
 
 앞단 필터가 응답을 감싼 뒤 다음 필터를 호출하므로, 정상 응답의 관련 처리는 안쪽부터
@@ -704,23 +713,76 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 Spring Session native 저장
 → SessionCookieRenewalFilter의 저장 상태 재조회·쿠키 갱신
 → AuthStateErrorFilter의 로그인 최종 검증(로그인 요청일 때)
+→ AuthStateErrorFilter의 보호자 권한 재조회(검사 성공 표식이 있는 400 미만 응답)
 → 실제 HTTP 응답 전송
 ```
+
+대화 시작 POST에는 위 응답 흐름 앞에 Part 2 전용 전송 검사가 추가됩니다.
+`ConversationStartResponseFilter`는 `SecurityFilterProperties`의 실제 order + 1로 서블릿에 한 번 등록합니다.
+별도의 Security 체인 등록이나 Part 1 필터 변경은 없습니다. 보안 체인의 하위 서블릿 필터이므로
+callback과 미커밋 반환 검사 중에도 기존 `AuthenticatedSessionService`를 사용할 수 있습니다.
+Controller가 실제 201/200 성공 후 기록한 서버 문맥·시작 키·대화 ID만 재검사하며,
+Part 1·다른 Part 2 경로·400 이상 응답에는 적용하지 않습니다.
+
+첫 본문 전송/flush/Content-Length 충족 직전과 미커밋 반환 시 현재 로그인을 먼저 확인한 뒤,
+새 업무 Tx에서 계정 → 현재 보안 문맥 → 소유 아이 → 반환 대상 대화 → 기존 link를 잠가 다시 읽습니다.
+잠금 대기 뒤 DB `clock_timestamp()`로 start의 시간 우선순위, 당일 ACTIVE, 현재 연결을 확인합니다.
+자정/기존 CLOSING 정리가 필요하면 기존 공통 조정기를 사용하며 새 대화나 link는 만들지 않습니다.
+정상 종료 정리는 커밋한 뒤 403/409를 전달하고, 생성 Tx는 이미 커밋됐으므로 전송 거부로 되돌리지 않습니다.
+
+검사 실패는 MVC가 일반 500으로 소비하지 않고 Part 2 필터까지 전달합니다. 아직 커밋되지 않은
+성공 본문·Content-Length·Location·JSESSIONID 갱신 쿠키를 제거한 다음 기존 업무 오류 처리기로
+403/404/409/500 JSON을 만듭니다. requestId·no-store·CORS는 유지합니다.
+인증 무효/확인 장애는 기존 외곽 필터의 401/503 처리로 넘깁니다. 이미 전송한 바이트를 회수하거나
+DB 판정과 네트워크 전송을 하나의 원자적 작업으로 보장하는 기능은 아닙니다.
+현재 시작 API의 동기 MVC 응답에 적용하며, 후속 스트리밍/비동기 API는 별도 계약 검증이 필요합니다.
 
 두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
 컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
 저장·재검증이 실패하면 바깥 `AuthStateErrorFilter`가 아직 전송되지 않은 성공 본문과
-인증 쿠키를 제거하고 401·503으로 처리합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
+`Content-Length`·`Location`·인증 쿠키를 제거하고 401·403·503으로 처리합니다.
+서버 요청 ID·`no-store`·CORS 헤더는 유지합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
 갱신보다 우선합니다. 이미 전송된 응답은 재작성할 수 없습니다.
 
+`GuardianAccessService.requireGuardianAccess` 성공 시에만 같은 요청의 계정·문맥 표식을
+남기고, 응답 커밋 직전과 미커밋 종료 시 `verifyResponseAccess`로 현재 DB 권한을 다시
+읽습니다. 표식 자체는 현재 권한을 보증하지 않으며 최초 기한이나 HTTP 세션의 guardian
+속성을 재사용하지 않습니다. 일반 요청과 이미 오류 상태인 응답은 guardian 재검사 대상이
+아닙니다. 재검사 대상의 늦은 guardian·인증 확인 예외는 MVC handler가 소비하지 않고
+외곽 필터로 넘겨 성공 본문·헤더를 먼저 비웁니다. 명시적인 인증 확인 장애는 guardian
+표식 없이도 같은503 경로를 사용하며 native 세션 재조회 실패도 포함합니다. guardian만
+거부된 403은 일반 로그인을 폐기하지 않습니다. 이 연결은 동기 MVC 응답을 대상으로 합니다.
+
 Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
-`SecurityConfig`는 [LogoutRequestGuardFilter](../src/main/java/com/dodamdodam/backend/auth/session/LogoutRequestGuardFilter.java)를
+`SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
-로그아웃의 관련 검사 순서는 다음과 같습니다.
+검사 대상은 `POST /api/v1/auth/logout`와 `POST /api/v1/children`입니다. 두 경로 모두
+실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
+Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
+UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
+
+크기·형식 검사를 통과한 본문은 동기 MVC용 request wrapper에 보관해 후속 코드가 다시
+읽을 수 있습니다. 로그아웃은 기존 `EMPTY_BODY` 속성으로 실제 0바이트 여부를 확인합니다.
+자녀 JSON은 로그인 검증 이후 [ChildController](../src/main/java/com/dodamdodam/backend/child/api/ChildController.java)에서
+읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
+자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java)에서
+400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
+
+[Part2JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part2JsonRequestGuardFilter.java)는
+Part 1 필터 바로 앞에 한 번 등록하며 `POST /api/v1/children/{childId}/conversations`에만 적용합니다.
+`application/json`과 생략 또는 UTF-8인 charset만 허용하며, Content-Type 누락·미지원·문법 오류는
+CSRF·로그인보다 먼저 공통 오류 형식의 415 `UNSUPPORTED_MEDIA_TYPE`으로 반환합니다.
+본문은 소비·복사·파싱하지 않으며 미확정인 Part 2 크기 제한이나 Part 1의 16 KiB 제한을 적용하지 않습니다.
+정상 형식의 JSON 구조 검증은 CSRF·로그인 이후 기존 MVC·DTO에서 수행합니다.
+Part 1 경로와 resume/end·음성 등 다른 Part 2 경로는 이 필터의 대상이 아닙니다.
+[ConversationMediaTypeExceptionHandler](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationMediaTypeExceptionHandler.java)는
+대화 시작 컨트롤러에서 발생한 MVC 미지원 미디어 타입 예외도 415로 변환하며,
+다른 컨트롤러와 공통 예외 처리기의 동작은 변경하지 않습니다.
+관련 검사 순서는 다음과 같습니다.
 
 ```text
-CORS → 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 실제 0바이트 본문 확인
+CORS → Part 2 Content-Type → Part 1 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 본문·업무 검증
 ```
 
 CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
@@ -732,6 +794,20 @@ CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실�
 `SessionCookieLifecycleTests`·`LoginSessionPersistenceTests`·`LogoutContractTests`·
 `CsrfLifecycleContractTests` 등 관련 계약 테스트로 저장 후 갱신, 실패 시 성공 응답 차단,
 로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
+`Part1JsonRequestGuardTests`는 크기 경계·UTF-8 재읽기·Content-Length 누락/허위와 제한 읽기를,
+`LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
+`global.web.Part2JsonRequestGuardFilterTests`는 형식·UTF-8·미소비·경로 격리를,
+`conversation.api.ConversationCreationContractTests`는 PostgreSQL에서 시작 요청의 415 우선순위와
+정상 201/200·입력 400·인증 401·CSRF 403·소유권 404를 확인합니다.
+`conversation.api.ConversationMediaTypeExceptionHandlerTests`는 필터 밖 MVC 예외의 415와 처리 범위를 확인합니다.
+`child.api.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
+입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
+`child.application.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
+동시 등록의 잠금 대기를 확인합니다. 같은 계정은 201/409와 한 행, 다른 계정은 같은 애칭으로도
+독립 등록을 검증하며, 테스트 전용 응답 advice와 latch로 등록 커밋 후 폐기 순서를 고정합니다.
+응답 직전 재검사에서 폐기를 확인하면 자녀 본문·Location 없이 401을 반환하고 세션 쿠키를
+갱신하지 않습니다. 이미 등록이 확정됐을 수 있으므로 POST를 자동 재실행하지 않고,
+재로그인 후 목록으로 확인하는 계약을 SCRUM-81에 인계합니다. 목록 API는 이 작업에 포함하지 않습니다.
 
 **전체 Spring 구성과 요청·응답 흐름**
 
@@ -744,25 +820,28 @@ flowchart TB
     CLIENT["브라우저 / API 클라이언트"]
     subgraph SERVLET["서블릿 필터: 요청 진입"]
         HEADERS["ApiResponseHeadersFilter · H<br/>요청 ID · no-store"]
-        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상"]
+        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상 · guardian 재검사"]
         COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
         SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
         PROXY["springSecurityFilterChain · -100"]
+        START_RESPONSE["ConversationStartResponseFilter · 기본 -99<br/>대화 시작 성공 응답 전 보호"]
         HEADERS --> ERROR --> COOKIE --> SESSION --> PROXY
     end
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
         INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
         CORS["5 CorsFilter"]
-        GUARD["6 LogoutRequestGuardFilter<br/>로그아웃 크기 413 · 형식 415"]
-        CSRF["7 CsrfFilter<br/>실패 403 CSRF_INVALID"]
-        OAUTH["8 OAuth2AuthorizationRequestRedirectFilter<br/>9 OAuth2LoginAuthenticationFilter"]
-        INTERMEDIATE["10 SecurityContextHolderAwareRequestFilter<br/>11 AnonymousAuthenticationFilter<br/>12 SessionManagementFilter<br/>13 ExceptionTranslationFilter"]
-        AUTHZ["14 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
-        INITIAL --> CORS --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
+        PART2["6 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
+        GUARD["7 Part1JsonRequestGuardFilter<br/>로그아웃·자녀 등록 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
+        CSRF["8 CsrfFilter<br/>실패 403 CSRF_INVALID"]
+        OAUTH["9 OAuth2AuthorizationRequestRedirectFilter<br/>10 OAuth2LoginAuthenticationFilter"]
+        INTERMEDIATE["11 SecurityContextHolderAwareRequestFilter<br/>12 AnonymousAuthenticationFilter<br/>13 SessionManagementFilter<br/>14 ExceptionTranslationFilter"]
+        AUTHZ["15 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
+        INITIAL --> CORS --> PART2 --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
     end
     CLIENT --> HEADERS
     PROXY --> INITIAL
-    AUTHZ -->|허용| MVC["DispatcherServlet → Controller"]
+    AUTHZ -->|허용| START_RESPONSE
+    START_RESPONSE --> MVC["DispatcherServlet → Controller"]
     MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
 
     subgraph LOGIN["SessionConfig: 공유 로그인 연결"]
@@ -784,10 +863,12 @@ flowchart TB
         AUTH["AuthenticatedSessionService<br/>native · principal · UUID 결합 검사<br/>DB 폐기·버전·만료 검사"]
         BUSINESS["SessionSecurityRepository<br/>계정 → 문맥 → PIN 잠금<br/>업무 자격 원자적 폐기"]
         NATIVE["JdbcIndexedSessionRepository<br/>일반 인증 timeout -1 · 익명 30분<br/>즉시 저장 · 명시적 ID 삭제"]
-        BIZDB[("accounts · session_security<br/>email_verifications · Flyway V2–V3")]
+        GUARDIAN["GuardianAccessService · GuardianAccessRepository<br/>요청의 계정·문맥으로 guardian 기한·PIN 버전 재검사"]
+        BIZDB[("accounts · session_security · guardian_pins<br/>email_verifications · Flyway V2–V3, V5")]
         SESSIONDB[("SPRING_SESSION<br/>SPRING_SESSION_ATTRIBUTES · Flyway V1")]
         AUTH -. 현재 문맥 확인 .-> BUSINESS
         BUSINESS --> BIZDB
+        GUARDIAN --> BIZDB
         NATIVE --> SESSIONDB
     end
     AUTHZ -. 보호 경로 검사 .-> AUTH
@@ -803,16 +884,17 @@ flowchart TB
     subgraph RESPONSE["응답: 안쪽에서 바깥쪽, 실제 전송 전"]
         SAVE["1 Spring Session native 저장·쿠키 기록"]
         RENEW["2 SessionCookieRenewalFilter<br/>저장 상태 재검사 → 유효한 인증 쿠키 365일 갱신<br/>로그아웃 Max-Age=0 우선"]
-        VERIFY["3 AuthStateErrorFilter<br/>로그인 요청 최종 검증"]
+        VERIFY["3 AuthStateErrorFilter<br/>로그인 최종 검증 · guardian 응답 재검사"]
         WIRE["4 HTTP 응답 전송"]
         SAVE --> RENEW --> VERIFY --> WIRE
     end
     RENEW -. 실제 저장 재조회 .-> NATIVE
     RENEW -. 재검증 .-> AUTH
     VERIFY -. 로그인일 때 .-> LIFE
+    VERIFY -. guardian 표식이 있는 성공 응답 .-> GUARDIAN
     COOKIECONFIG["Boot CookieSerializer<br/>JSESSIONID · HttpOnly · Path=/ · SameSite · Secure"] -. 동일 설정 사용 .-> RENEW
     COOKIECONFIG -. 동일 설정 사용 .-> SESSION
-    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>AuthStateErrorFilter: 성공 본문·인증 쿠키 제거, 공통 헤더 보존<br/>AuthStateErrorHandler: 인증 무효 401 / 저장·검증 장애 503"]
+    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>성공 본문·길이·Location·인증 쿠키 제거, 공통 헤더 보존<br/>인증 무효 401 / guardian 확인 필요 403 / 확인 장애 503"]
     FAILURE --> WIRE
     WIRE --> CLIENTOUT["클라이언트 응답 수신"]
 ```
@@ -826,6 +908,106 @@ Spring Boot 자동 구성을 사용합니다. 세션 저장과 업무 폐기는 
 `SessionConcurrencyTests`는 실제 HTTP 요청을 latch로 정지시켜 **이전 요청의 세션 조회 →
 로그아웃/재로그인 완료 → 이전 요청의 늦은 저장** 순서를 검증합니다. 늦은 응답과 이전 쿠키는
 401이며, 폐기된 문맥·guardian·PIN 자격이 복구되지 않고 재로그인한 새 세션은 유지되어야 합니다.
+
+### 10.7 Backend 공통 권한 사용과 Part 2 인계
+
+[SCRUM-96](https://dodamdodam.atlassian.net/browse/SCRUM-96)은 기존 로그인·자녀 소유권
+서비스와 DB 기준 보호자 검사를 공통으로 제공합니다. 제품별 적용 경로·응답 DTO는
+[공통 API](p0/api/01-common.md#section-3)와 각 operation이 기준이며, 아래는 현재 코드의 사용법입니다.
+
+**호출 순서와 반환값**
+
+```java
+var authenticated = authentication.requireAuthenticatedSession(request);
+var child = children.requireChildAccess(authenticated.accountId(), childId);
+// conversation/turn 경로는 이 위치에서 아래의 리소스 관계를 검사한다. 실패는 404다.
+var until = guardian.requireGuardianAccess(request, authenticated); // 보호자 경로에만 적용
+```
+
+- `authentication`은 `auth.session.AuthenticatedSessionService`, `children`은
+  `child.application.ChildService`, `guardian`은 `guardian.application.GuardianAccessService`다.
+  `accountId`·`securityContextId`는 같은 요청에서 검증한 `AuthenticatedSession`에서만 얻는다.
+- `requireChildAccess`는 소유 `ChildView`를 반환한다. 내부 AI 입력 등에 쓰는
+  `getChildContext(childId)`도 인증·소유권 검사를 마친 뒤 호출한다.
+- `requireGuardianAccess`는 현재 문맥과 PIN이 유효하고 기한이 DB 시각보다 미래일 때만
+  `OffsetDateTime` 기한을 반환한다. 기한과 DB 시각이 같으면 403이다. 다른 문맥의 확인이나
+  오래된 HTTP 세션 속성은 사용할 수 없다. 조회로 기한·PIN·문맥을 갱신하지 않는다.
+- 반환한 기한은 요청 이후의 권한을 보증하지 않는다. 성공 시 요청 표식이 남아 §10.6의
+  응답 직전 DB 재검사가 적용된다. 소비자가 기한을 캐시하거나 직접 필터를 추가할 필요는 없다.
+
+전송 크기·형식 → CSRF → 로그인 → 구조 → 소유권·리소스 관계 → 필요한 guardian →
+업무 상태 순서로 검사한다. 현재 전송 guard의 적용 경로는 §10.6에 한정되어 있으며,
+후속 API의 형식·크기·요청량 제한은 각 구현에서 연결해야 한다.
+
+**대화·발화 소비자의 관계 검사**
+
+[SCRUM-86](https://dodamdodam.atlassian.net/browse/SCRUM-86) /
+[SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) /
+[SCRUM-111](https://dodamdodam.atlassian.net/browse/SCRUM-111) 연동에서는 검증한 자녀 아래의
+리소스임을 guardian·업무 상태 검사보다 먼저 확인해야 한다.
+
+- 대화 조회는 요청 `conversationId`와 검증된 `child.childId()`를 함께 조건으로 사용한다.
+- 발화 조회는 위 자녀·대화 조건에 `conversation_turns.conversation_id`와 요청 `turnId`까지
+  결합한다. 경로의 ID들이 각각 존재하는 것만으로 관계 검사를 마친 것으로 간주하지 않는다.
+- 미존재·미소유·잘못된 조합은 모두 `404 RESOURCE_NOT_FOUND`다. 관계 확인 전 상태·텍스트·
+  음성을 노출하지 않고, 이후 실제 업무 조회·갱신에도 같은 자녀·리소스 조건을 유지한다.
+- 응답에는 해당 operation이 허용한 DTO 필드만 매핑한다. `AuthenticatedSession`,
+  `GuardianAccessState`, 저장소 row, PIN 해시·보안 문맥·예외 원인을 그대로 직렬화하지 않는다.
+  보호자 기록과 아이 대화의 차이는 [기록 API](p0/api/05-records.md)와
+  [대화 API](p0/api/06-conversations.md)를 따른다.
+
+**공통 오류와 응답 처리**
+
+일반 오류 본문은 `error.code/message/requestId/fields`이며 `fields`는 없으면 `[]`다.
+`requestId`는 서버의 `X-Request-ID`와 같고 `Cache-Control: no-store`를 유지한다.
+원문 입력·자격·금지 텍스트·SQL을 메시지나 검증 필드에 복사하지 않는다.
+
+| 상황 | 현재 공통 처리 |
+| --- | --- |
+| 현재 로그인 문맥 없음·불일치·폐기·만료 | `401 AUTHENTICATION_REQUIRED` |
+| CSRF 누락·불일치 | `403 CSRF_INVALID` |
+| 잘못된 UUID·JSON 등 구조 오류 | `400 VALIDATION_FAILED` |
+| 자녀 미존재·미소유 | `404 RESOURCE_NOT_FOUND` |
+| 현재 guardian 없음·만료·PIN 없음·PIN 버전 불일치 | `403 GUARDIAN_UNLOCK_REQUIRED` |
+| 기존 자녀 등록 제한 | `409 CHILD_LIMIT_REACHED` |
+| 인증·guardian 상태 확인 장애 | `503 AUTH_STATE_UNAVAILABLE` |
+| 자녀 업무 DB 장애·예상하지 못한 MVC 업무 오류 | `500 INTERNAL_ERROR` |
+
+소비자의 관계 오류도 같은404를 사용한다. PIN 미설정의 guardian 검사403과 후속 PIN
+unlock/reset operation의409 `PIN_NOT_SET`은 구분한다. 추가 업무 오류·특수 응답은
+[오류 계약](p0/api/08-errors-and-validation.md#section-9)을 따른다.
+MVC는 `ApiErrorResponses.body`, 필터는 `ApiErrorResponses.write`를 재사용한다.
+§10.6의 늦은 재검사 실패는 외곽 필터로 전달해 준비된 성공 본문·길이·Location·세션 쿠키를
+제거한 뒤401/403/503을 출력한다. guardian만 거부된403은 일반 로그인과 대화 연결을 폐기하지 않는다.
+이미 전송된 bytes를 회수하거나 업무 커밋을 자동으로 롤백하는 기능은 아니다.
+
+**트랜잭션·잠금과 남은 연결 작업**
+
+권한 조회는 행 잠금을 잡지 않는다. 변경 트랜잭션에서 현재 로그인 문맥을 잠글 때는
+`SessionSecurityRepository.requireCurrentContextForUpdate(accountId, securityContextId)`를
+사용할 수 있다. 기존 트랜잭션이 필수(`MANDATORY`)이며 `accounts → session_security` 순서다.
+이 함수만으로 guardian 권한까지 잠그거나 미래의 유효성을 보증하지는 않는다.
+PIN·challenge를 변경하는 경로는 [ERD §8.1](p0/Integrated_ERD_Design.md#81-잠금커밋-원칙)의
+`accounts → session_security → guardian_pins → email_verifications → PIN_FAILURE_ACCOUNT`
+중 필요한 행을 같은 순서로 잠그고, 같은 종류의 여러 행은 ID 순으로 처리한다.
+잠금 뒤 최신 DB 시각·버전으로 재검사하며 메일·AI 외부 호출 중 업무 잠금을 유지하지 않는다.
+Part 2의 자녀→대화→발화/연결/음성 잠금 확장은 같은 절의 기술 설계로, 실제 SQL·교착·경합
+검증은 해당 소비자 작업에서 수행한다.
+
+| 후속 작업 | 이번 공통 기반 이후 구현·검증할 것 |
+| --- | --- |
+| [SCRUM-82](https://dodamdodam.atlassian.net/browse/SCRUM-82) | PIN 생성과 일회성 권한 소비. 설정 성공이 자동 unlock을 대신하지 않는다. |
+| [SCRUM-97](https://dodamdodam.atlassian.net/browse/SCRUM-97) | PIN 확인 성공 시 현재 문맥에 DB 시각 기준 최대1800초·실제 문맥 만료 이내의 기한과 최신 PIN 버전을 기록한다. |
+| [SCRUM-98](https://dodamdodam.atlassian.net/browse/SCRUM-98) | 현재 guardian 해제·generation 증가·PIN 목적 권한 폐기. 일반 로그인·대화 연결은 유지한다. |
+| [SCRUM-83](https://dodamdodam.atlassian.net/browse/SCRUM-83) | PIN 변경과 버전 증가로 기존 guardian 무효화·관련 일회성 권한 폐기. 자동 unlock 없음. |
+| SCRUM-86/88/111 등 실제 소비자 | Part 2 모델·migration·API에서 관계 검사와 허용 DTO를 적용하고 각 권한·상태·응답 경합을 연동 검증한다. |
+
+이 절의 SCRUM-96 공통 기반은 V5 `guardian_pins` 스키마와 조회·판정 함수를 제공한다.
+해당 작업의 정상 권한과 경합은 합성 DB fixture와 테스트 전용 소비자로 검증했다.
+현재 구현된 Part 2의 스키마·시작·응답 보호·종료 조정기와 후속 책임은
+[대화 공통 기반 인계서](CONVERSATION_HANDOFF.md)에서 함께 관리한다.
+PIN 발급부터 후속 Part 2 API까지의 실제 연동 인수, 캐릭터 목록 보류,
+AI wire·운영 OAuth/HTTPS 설정은 각 기존 작업 범위로 유지한다.
 
 ## 11. FastAPI·AI 팀 연동 기준
 

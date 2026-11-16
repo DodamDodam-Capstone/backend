@@ -5,7 +5,7 @@ API, domain, database, 인증·인가, 외부 시스템 연결과 Backend 테스
 
 ## 작업 원칙
 
-- 한국어로 간결하게 설명하고 요청 범위의 최소 변경으로 작업을 완료한다.
+- 한국어로 간결하게 설명하고 요청 범위의 최소 변경으로 완료한다. 작성·수정 코드에는 짧은 한국어 주석을 남기며 [주석·가독성 기준](docs/AGENT_GUIDE.md#주석과-가독성)을 따른다.
 - 기존 구현 → 표준 라이브러리 → 설치된 의존성 순서로 재사용한다. 버그는 호출 흐름과 원인을 확인한 뒤 수정한다.
 - 작업 전 Git 상태와 관련 소스·테스트를 확인하고 사용자 변경을 보존한다.
 - 실행하지 못한 검증과 실패를 성공으로 보고하지 않는다. 비밀값·실제 `.env`·개인정보를 코드·문서·이슈·로그에 기록하지 않는다.
@@ -27,7 +27,7 @@ API, domain, database, 인증·인가, 외부 시스템 연결과 Backend 테스
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
 | Git·Jira 계획·상태·포인트·일정·업로드 | [Backend 실행 규칙](docs/AGENT_WORKFLOW.md), [팀 업무 가이드](docs/TEAM_WORKFLOW_GUIDE.md) |
-| 코드·DB·인증·서비스 계약 변경 | [Backend 상세 지침](docs/AGENT_GUIDE.md) |
+| 코드·DB·인증·서비스 계약 변경 | [Backend 상세 지침](docs/AGENT_GUIDE.md), [패키지 구조 표준](docs/AGENT_GUIDE.md#기능별-패키지-표준) |
 | 도구 버전·포트·환경변수·OAuth callback·설치 변경 | [개발 환경 문서](docs/DEVELOPMENT_SETUP.md) |
 | AGENTS·CLAUDE 지침·CI 정책 생성·수정 | [문서 분리·유지 규칙](docs/AGENT_DOCUMENTATION.md) |
 

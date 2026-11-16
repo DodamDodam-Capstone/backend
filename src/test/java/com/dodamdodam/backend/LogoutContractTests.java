@@ -10,6 +10,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -152,6 +154,19 @@ class LogoutContractTests {
     }
 
     @ParameterizedTest
+    @CsvSource({"16385,application/json,413,REQUEST_TOO_LARGE", "2,text/plain,415,UNSUPPORTED_MEDIA_TYPE",
+            "2,application/json,403,CSRF_INVALID", "0,,415,UNSUPPORTED_MEDIA_TYPE",
+            "0,application/json,403,CSRF_INVALID"})
+    void childrenTransportGuardsPrecedeCsrfAndAuthentication(int size, String type, int expectedStatus, String code)
+            throws Exception {
+        var call = post("/api/v1/children").content(" ".repeat(size).getBytes(StandardCharsets.UTF_8));
+        if (type != null) {
+            call.contentType(type);
+        }
+        error(call, expectedStatus, code);
+    }
+
+    @ParameterizedTest
     @CsvSource({"0,204", "2,400", "16384,400", "16385,413"})
     void chunkedRequestsWithoutContentLengthUseActualBytes(int size, int expectedStatus) throws Exception {
         var current = authenticated();
@@ -231,8 +246,15 @@ class LogoutContractTests {
 
     private MockHttpServletResponse error(MockHttpServletRequestBuilder call, int status, String code) throws Exception {
         var response = mockMvc.perform(call).andExpect(status().is(status))
-                .andExpect(jsonPath("$.error.code").value(code)).andExpect(jsonPath("$.error.fields").isEmpty())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.error.code").value(code))
+                .andExpect(jsonPath("$.error.fields").isArray()).andExpect(jsonPath("$.error.fields").isEmpty())
                 .andReturn().getResponse();
+        Map<String, Object> envelope = JsonPath.read(response.getContentAsString(), "$");
+        Map<String, Object> error = JsonPath.read(response.getContentAsString(), "$.error");
+        assertThat(envelope).containsOnlyKeys("error");
+        assertThat(error).containsOnlyKeys("code", "message", "requestId", "fields");
+        assertThat((String) error.get("message")).isNotBlank();
         assertHeaders(response);
         assertThat(JsonPath.<String>read(response.getContentAsString(), "$.error.requestId"))
                 .isEqualTo(response.getHeader("X-Request-ID"));
