@@ -383,6 +383,9 @@ class ConversationSchemaTests {
             "status = 'SUCCEEDED', completed_at = processing_deadline_at + INTERVAL '1 microsecond'",
             "status = 'SUCCEEDED', completed_at = created_at - INTERVAL '1 microsecond'",
             "status = 'SUCCEEDED', completed_at = created_at, error_code = 'ERROR'",
+            "status = 'FAILED', error_code = 'ERROR'",
+            "status = 'FAILED', completed_at = created_at",
+            "status = 'FAILED', completed_at = created_at - INTERVAL '1 microsecond', error_code = 'ERROR'",
             "status = 'FAILED', completed_at = processing_deadline_at, error_code = ''",
             "status = 'FAILED', completed_at = '-infinity'::timestamptz, error_code = 'ERROR'",
             "status = 'FAILED', completed_at = 'infinity'::timestamptz, error_code = 'ERROR'"

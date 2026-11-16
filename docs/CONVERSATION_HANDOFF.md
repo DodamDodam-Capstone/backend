@@ -383,6 +383,55 @@ terminal/기한의 SQL 조건·원래 기한 불변·독립 visibility·무효 �
 업무 시각은 기존 DB 시각 조회의 반환값을 고정/이동하며 실제 row lock 대기는 pg_blocking_pids로 확인한다.
 실제 운영 AI·브라우저·여러 서버·주기 worker 인수를 수행했다고 확대하지 않는다.
 
-추가 검증 대상으로 결과/end/만료 3자 경합, 다중 기존 세션의 복구기한과 잠금 대기 중 자정·세션 정리,
-ENDED 직후 새 대화와 이전 callback의 분리, 재시작으로 처리 문맥이 소실된 PROCESSING의 기한 정리를 추가 검증한다.
-실제 catch-up/sweep/요약 AI 실행자는 후속 Jira 범위를 유지한다.
+결과/end/만료 3자 경합·다중 기존 세션 복구기한·원래 문맥 정리 후 저장·새 대화와 이전 callback 분리는 §11에서 검증한다.
+실제 프로세스 재시작·catch-up/sweep·요약 AI 실행자는 후속 Jira 범위를 유지한다.
+
+## 11. PostgreSQL 통합·동시성 검증 근거
+
+기준은 P0 v3.1과 [SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88)의 저장·허용 텍스트 수용 조건이다.
+JDK 25·Gradle Wrapper·`postgres:18.6-alpine`은 현재 브랜치 설정을 따르며 기존 TestcontainersConfiguration을 사용한다.
+별도 DB 인프라·운영 Controller·migration을 추가하지 않는다. 모든 데이터는 합성 계정·텍스트·바이트 배열이다.
+
+| 검증 범위 | 실제 테스트 근거 |
+| --- | --- |
+| FK·요청/순번 UNIQUE·PROCESSING 부분 UNIQUE·hex64·sequence≥1 | [ConversationSchemaTests](../src/test/java/com/dodamdodam/backend/conversation/infrastructure/ConversationSchemaTests.java)의 실제 PostgreSQL 허용/거부 사례 |
+| 상태별 NULL·visibility·완료/처리기한 CHECK·V5 업그레이드·Flyway 재실행 | ConversationSchemaTests의 상태/시간/이관 경계 검사 |
+| 독립 Tx의 인덱스 충돌 대기·실패와 rollback | [TurnAcceptanceTests](../src/test/java/com/dodamdodam/backend/conversation/application/TurnAcceptanceTests.java)의 databaseUniqueWaitsForOtherTransactionAndRejectsOnlyConflictingInsert. 충돌 원인별 SQLSTATE 23505와 실제 제약 이름 확인 |
+| 첫/후속/FAILED 이후 sequence·같은 키/해시 재사용·다른 해시/PROCESSING 충돌·신규 커밋 실행자 | TurnAcceptanceTests의 접수·멱등성·순번·두 동시 요청·저장/커밋 실패 검사 |
+| 조건부 SUCCEEDED/FAILED·terminal 불변·원래 deadline·equality부터 ACTIVE/CLOSING 만료 | [TurnResultTests](../src/test/java/com/dodamdodam/backend/conversation/application/TurnResultTests.java)의 상태/기한 SQL 검사 및 결과/timeout 경합 |
+| completed_at의 실제 DB 판정 시각 | TurnResultTests의 timeoutStoresTheExactUnmockedPostgresqlDecisionTime. 실제 clock_timestamp 반환값과 저장 시각을 비교하며 만료 fixture 날짜도 DB 현재일에서 계산 |
+| 접수 선행/종료 선행·MANUAL/MIDNIGHT 불변·종료 후 신규 접수 차단 | TurnAcceptanceTests, TurnResultTests 및 [ConversationClosureCoordinatorTests](../src/test/java/com/dodamdodam/backend/conversation/application/ConversationClosureCoordinatorTests.java)의 실제 서비스 경합 |
+| 결과/end/timeout의 선행 실행자 각각·상위 잠금 순서·최초 ENDED 1회·다중 600초 복구 | TurnResultTests의 threeWayRaceFollowsParentLocksAndIssuesOneEndWithFixedRecovery. 기한 직전/equality 각각 세 실행자를 선행시킨 독립 Tx 검사 |
+| 빈 대화/전부 OMITTED의 EMPTY·허용 FAILED의 PENDING·같은 날 새 시작 | ConversationClosureCoordinatorTests와 TurnResultTests의 요약 입력/새 대화 검사 |
+| 이전 callback/timeout이 새 대화의 PROCESSING·sequence·deadline을 변경하지 않음 | TurnResultTests의 oldCallbackCannotModifyNewConversationStartedWhileOldSummaryIsPending |
+| 세션 만료·폐기·버전 변경·원래 문맥 정리 후 저장과 현재 내용 접근 차단 | TurnAcceptanceTests와 TurnResultTests의 서버 문맥/소유권/연결 검사. 새 로그인에 연결을 자동 생성하지 않음 |
+| 금지 원문의 DB·로그·예외·진단 문자열 미보관·독립 visibility·REDACTED 허용문 | [AllowedTextPolicyTests](../src/test/java/com/dodamdodam/backend/conversation/application/AllowedTextPolicyTests.java), TurnResultTests의 허용 입력/출력 캡처 검사 |
+| 공개 필드·NULL·KST 초 정밀도·순차 성공/실패 샘플 | [ConversationViewSerializationTests](../src/test/java/com/dodamdodam/backend/conversation/dto/ConversationViewSerializationTests.java) 및 실제 저장 결과의 TurnView 직렬화 검사 |
+
+3자 경합은 첫 계정 잠금 보유자를 정하고 나머지 두 Tx의 PostgreSQL 대기를 확인한 뒤 진행한다.
+다중 대기자의 tuple 잠금 큐를 고려해 pg_blocking_pids의 직접/간접 경로가 최초 보유자에 도달하는지 확인하며,
+pg_stat_activity의 계정 FOR UPDATE·Lock 대기와 하위 행 NOWAIT 검사도 함께 사용한다. Thread.sleep으로 경합 성공을 추정하지 않는다.
+
+관련 테스트 명령은 다음과 같다. 반복 검증은 전체 DB 구성을 바꾸지 않고 새 경합 메서드만 다시 실행한다.
+
+```powershell
+.\gradlew.bat test --tests 'com.dodamdodam.backend.conversation.*' --no-daemon --no-build-cache --console=plain
+.\gradlew.bat test --tests '*TurnAcceptanceTests.databaseUniqueWaitsForOtherTransactionAndRejectsOnlyConflictingInsert' --tests '*TurnResultTests.threeWayRaceFollowsParentLocksAndIssuesOneEndWithFixedRecovery' --rerun-tasks --no-daemon --no-build-cache --console=plain
+.\gradlew.bat clean check --no-daemon --no-build-cache --console=plain
+```
+
+2026-11-17 KST 실행 결과는 다음과 같다. 각 실행은 서로 겹치는 범위이므로 건수를 합산하지 않는다.
+
+| 실행 범위 | 결과 |
+| --- | --- |
+| 대화 전체, 빌드 캐시 비활성 | 15 suites / 670 tests, 실패·오류·건너뜀 0 |
+| UNIQUE 대기 3건 + 3자 경합 6건 강제 재실행 | 2 suites / 9 tests, 실패·오류·건너뜀 0 |
+| 전체 clean check, 빌드 캐시 비활성 | 42 suites / 1,201 tests, 실패·오류·건너뜀 0 |
+
+기존 검증에 16개 사례를 추가했으며 운영 코드·V1~V6·Testcontainers 구성은 변경하지 않았다.
+다중 대기자가 최초 보유자를 직접 차단자로 표시한다는 테스트 가정은 실제 PostgreSQL 대기 경로 확인으로 수정했다.
+환경 장애나 운영 코드 오류를 수정한 결과로 보고하지 않는다.
+
+합성 문맥 정리는 실제 서버 재시작 시험이 아니며 실제 AI wire·음성 파일·브라우저·운영 worker 실행을 검증했다고 확대하지 않는다.
+v2 운영 DB 이관도 수행하지 않는다. 이 저장소는 V4부터 nickname 필수이고 V6가 대화 테이블을 처음 생성하며,
+실제 v2 대상 DB가 지정되지 않았으므로 검증 범위는 기존 migration 재현·V5→V6 보존까지다.

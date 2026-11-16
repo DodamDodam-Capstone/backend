@@ -5,29 +5,36 @@ import com.dodamdodam.backend.auth.session.AuthenticatedSession;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.conversation.application.AllowedTextPolicy.AllowedText;
+import com.dodamdodam.backend.conversation.application.ConversationClosureCoordinator.ClosureResult;
 import com.dodamdodam.backend.conversation.application.TurnAcceptanceService.Acceptance;
 import com.dodamdodam.backend.conversation.application.TurnAcceptanceService.AcceptedTurn;
 import com.dodamdodam.backend.conversation.domain.TextVisibility;
 import com.dodamdodam.backend.conversation.domain.TurnStatus;
+import com.dodamdodam.backend.conversation.dto.StartConversationRequest;
 import com.dodamdodam.backend.conversation.exception.ConversationException;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationClosureRepository;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationRepository;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationTurnRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -37,6 +44,8 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -72,6 +81,7 @@ class TurnResultTests {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TurnAcceptanceService acceptance;
     @Autowired private TurnResultService results;
+    @Autowired private ConversationService starts;
     @Autowired private ConversationClosureCoordinator closure;
     @Autowired private SessionSecurityRepository security;
     @Autowired private PlatformTransactionManager transactions;
@@ -534,6 +544,176 @@ class TurnResultTests {
         assertThat(turnRow(fixture)).containsEntry("status", "PROCESSING");
     }
 
+    @ParameterizedTest
+    @CsvSource({"RESULT,true", "END,true", "TIMEOUT,true", "RESULT,false", "END,false", "TIMEOUT,false"})
+    void threeWayRaceFollowsParentLocksAndIssuesOneEndWithFixedRecovery(String first, boolean beforeDeadline) throws Exception {
+        var fixture = fixture();
+        var checkedAt = beforeDeadline ? fixture.accepted().processingDeadlineAt().minusNanos(1_000)
+                : fixture.accepted().processingDeadlineAt();
+        var linked = security.createLoginContext(fixture.session().accountId(), null);
+        var onBoundary = security.createLoginContext(fixture.session().accountId(), null);
+        link(linked, fixture, CREATED_AT);
+        link(onBoundary, fixture, checkedAt);
+        now(checkedAt);
+
+        var reserved = new AtomicBoolean();
+        var firstLocked = new CompletableFuture<Integer>();
+        var waitingPids = new ConcurrentLinkedQueue<Integer>();
+        var othersEntered = new CountDownLatch(2);
+        var release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            int pid = backendPid();
+            boolean leading = reserved.compareAndSet(false, true);
+            if (!leading) {
+                waitingPids.add(pid);
+                othersEntered.countDown();
+            }
+            var locked = invocation.callRealMethod();
+            if (leading) {
+                firstLocked.complete(pid);
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            return locked;
+        }).when(closureSpy()).lockAccount(any());
+
+        Map<String, Callable<ClosureResult>> operations = Map.of(
+                "RESULT", () -> results.succeed(permit(fixture), visible("[test] permitted child"), null).closure(),
+                "END", () -> closure.reconcile(fixture.session().accountId(), fixture.childId(), fixture.conversationId(),
+                        ConversationClosureCoordinator.Trigger.REQUEST_END),
+                "TIMEOUT", () -> results.expireOverdue(fixture.session().accountId(), fixture.childId(), fixture.conversationId()).closure());
+        try (var workers = Executors.newFixedThreadPool(3)) {
+            try {
+                var leader = workers.submit(operations.get(first));
+                int blocker = firstLocked.orTimeout(5, TimeUnit.SECONDS).join();
+                // 계정을 먼저 잡은 시점에는 하위 문맥·아이·대화를 먼저 보유하지 않아야 한다.
+                transaction().executeWithoutResult(_ -> {
+                    jdbc.queryForList("SELECT id FROM session_security WHERE id = ? FOR UPDATE NOWAIT", fixture.session().securityContextId());
+                    jdbc.queryForList("SELECT id FROM children WHERE id = ? FOR UPDATE NOWAIT", fixture.childId());
+                    jdbc.queryForList("SELECT id FROM conversations WHERE id = ? FOR UPDATE NOWAIT", fixture.conversationId());
+                });
+                var followers = operations.entrySet().stream().filter(entry -> !entry.getKey().equals(first))
+                        .map(entry -> workers.submit(entry.getValue())).toList();
+                assertThat(othersEntered.await(5, TimeUnit.SECONDS)).isTrue();
+                // 두 독립 Tx가 실제 PostgreSQL 계정 잠금에서 대기한 뒤에만 첫 실행자를 진행시킨다.
+                for (var pid : waitingPids) {
+                    awaitBlockedThroughQueue(pid, blocker);
+                }
+                release.countDown();
+                int endedNow = leader.get(10, TimeUnit.SECONDS).endedNow() ? 1 : 0;
+                for (var follower : followers) {
+                    endedNow += follower.get(10, TimeUnit.SECONDS).endedNow() ? 1 : 0;
+                }
+                assertThat(endedNow).isEqualTo(1);
+            } finally {
+                release.countDown();
+            }
+        }
+        var conversation = jdbc.queryForMap("SELECT * FROM conversations WHERE id = ?", fixture.conversationId());
+        var turn = turnRow(fixture);
+        assertThat(conversation).containsEntry("status", "ENDED").containsEntry("end_reason", "MANUAL")
+                .containsEntry("summary_status", beforeDeadline ? "PENDING" : "EMPTY");
+        assertThat(turn).containsEntry("status", beforeDeadline ? "SUCCEEDED" : "FAILED")
+                .containsEntry("error_code", beforeDeadline ? null : "AI_TIMEOUT")
+                .containsEntry("child_text", beforeDeadline ? "[test] permitted child" : null);
+        var until = checkedAt.plusSeconds(600);
+        assertThat(recovery(fixture.session())).isEqualTo(until);
+        assertThat(recovery(linked)).isEqualTo(until);
+        assertThat(recovery(onBoundary)).isNull();
+        assertOriginalDeadline(fixture);
+
+        now(checkedAt.plusSeconds(10));
+        assertThat(results.fail(permit(fixture), "AI_UPSTREAM_FAILED", null, null).changed()).isFalse();
+        results.expireOverdue(fixture.session().accountId(), fixture.childId(), fixture.conversationId());
+        assertThat(jdbc.queryForMap("SELECT * FROM conversations WHERE id = ?", fixture.conversationId())).isEqualTo(conversation);
+        assertThat(turnRow(fixture)).isEqualTo(turn);
+        assertThat(recovery(linked)).isEqualTo(until);
+    }
+
+    @Test
+    void oldCallbackCannotModifyNewConversationStartedWhileOldSummaryIsPending() {
+        var fixture = fixture();
+        requestEnd(fixture, CREATED_AT.plusSeconds(1));
+        now(CREATED_AT.plusSeconds(2));
+        assertThat(results.fail(permit(fixture), "AI_UPSTREAM_FAILED", visible("[test] old child"), null)
+                .closure().state().summaryStatus()).isEqualTo("PENDING");
+        var oldRow = turnRow(fixture);
+        var restarted = starts.create(fixture.session(), fixture.childId(), new StartConversationRequest(UUID.randomUUID()));
+        assertThat(restarted.created()).isTrue();
+        assertThat(restarted.result().conversationId()).isNotEqualTo(fixture.conversationId());
+        var next = acceptance.accept(fixture.session(), fixture.childId(), restarted.result().conversationId(), UUID.randomUUID(), AUDIO);
+        assertThat(next.turn().sequence()).isEqualTo(1);
+        now(CREATED_AT.plusSeconds(3));
+
+        assertThat(results.succeed(permit(fixture), null, visible("[test] old late reply")).changed()).isFalse();
+        results.expireOverdue(fixture.session().accountId(), fixture.childId(), fixture.conversationId());
+        assertThat(turnRow(fixture)).isEqualTo(oldRow);
+        assertThat(jdbc.queryForMap("SELECT * FROM conversation_turns WHERE id = ?", next.turn().turnId()))
+                .containsEntry("status", "PROCESSING").containsEntry("sequence", 1)
+                .containsEntry("child_text", null).containsEntry("reply_text", null);
+        var nextDeadline = jdbc.queryForObject("SELECT processing_deadline_at FROM conversation_turns WHERE id = ?",
+                (row, _) -> row.getObject(1, OffsetDateTime.class), next.turn().turnId());
+        assertThat(nextDeadline).isEqualTo(next.processingDeadlineAt());
+    }
+
+    @Test
+    void acceptedResultSurvivesOriginalContextCleanupButNewLoginCannotReadWithoutLink() {
+        var fixture = fixture();
+        jdbc.update("DELETE FROM conversation_session_links WHERE session_security_id = ?", fixture.session().securityContextId());
+        jdbc.update("DELETE FROM session_security WHERE id = ?", fixture.session().securityContextId());
+        now(CREATED_AT.plusSeconds(1));
+        assertThat(results.succeed(permit(fixture), visible("[test] retained child"), null).status()).isEqualTo(TurnStatus.SUCCEEDED);
+        var newLogin = security.createLoginContext(fixture.session().accountId(), null);
+        var denied = assertThrows(ConversationException.class,
+                () -> acceptance.accept(newLogin, fixture.childId(), fixture.conversationId(), fixture.key(), AUDIO));
+        assertThat(denied.code()).isEqualTo("CHILD_SESSION_REQUIRED");
+        assertThat(turnRow(fixture)).containsEntry("child_text", "[test] retained child");
+    }
+
+    @Test
+    void timeoutStoresTheExactUnmockedPostgresqlDecisionTime() {
+        var databaseNow = jdbc.queryForObject("SELECT clock_timestamp()", (row, _) -> row.getObject(1, OffsetDateTime.class));
+        var previousOpening = Objects.requireNonNull(databaseNow).atZoneSameInstant(ZoneId.of("Asia/Seoul"))
+                .toLocalDate().minusDays(1).atTime(8, 0).atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime();
+        var fixture = fixture(previousOpening);
+        var decision = new AtomicReference<OffsetDateTime>();
+        doAnswer(invocation -> {
+            var observed = (OffsetDateTime) invocation.callRealMethod();
+            decision.compareAndSet(null, observed);
+            return observed;
+        }).when(conversations).currentTime();
+
+        var expired = results.expireOverdue(fixture.session().accountId(), fixture.childId(), fixture.conversationId());
+        assertThat(expired.expired()).isEqualTo(1);
+        assertThat(completedAt(fixture)).isEqualTo(decision.get());
+        assertThat(completedAt(fixture)).isAfter(fixture.accepted().processingDeadlineAt());
+        assertOriginalDeadline(fixture);
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void rejectedOriginalNeverAppearsInDatabaseLogsOrValidationError(CapturedOutput output) {
+        var fixture = fixture();
+        now(CREATED_AT.plusSeconds(1));
+        var child = policy.select(TextVisibility.VISIBLE, false, true, FORBIDDEN);
+        var reply = policy.select(TextVisibility.REDACTED, true, null, FORBIDDEN);
+        var settled = results.fail(permit(fixture), "AI_UPSTREAM_FAILED", child, reply);
+        var invalid = assertThrows(ConversationException.class, () -> results.fail(permit(fixture), FORBIDDEN, child, reply));
+        assertThat(turnRow(fixture).values().toString()).doesNotContain(FORBIDDEN);
+        assertThat(invalid.toString()).doesNotContain(FORBIDDEN);
+        assertThat(settled.toString()).doesNotContain(FORBIDDEN);
+        assertThat(output.getAll()).doesNotContain(FORBIDDEN);
+    }
+
+    private void link(AuthenticatedSession session, Fixture fixture, OffsetDateTime boundAt) {
+        jdbc.update("INSERT INTO conversation_session_links (session_security_id, conversation_id, bound_at) VALUES (?, ?, ?)",
+                session.securityContextId(), fixture.conversationId(), boundAt);
+    }
+
+    private OffsetDateTime recovery(AuthenticatedSession session) {
+        return jdbc.queryForObject("SELECT end_recovery_until FROM conversation_session_links WHERE session_security_id = ?",
+                (row, _) -> row.getObject(1, OffsetDateTime.class), session.securityContextId());
+    }
+
     private TurnResultService.Settlement settle(Fixture fixture, TurnStatus status, AllowedText child, AllowedText reply) {
         return status == TurnStatus.SUCCEEDED ? results.succeed(permit(fixture), child, reply)
                 : results.fail(permit(fixture), "AI_UPSTREAM_FAILED", child, reply);
@@ -586,7 +766,29 @@ class TurnResultTests {
             }
             Thread.yield();
         }
-        throw new AssertionError("결과 저장이 지정한 발화 잠금을 기다리지 않았습니다.");
+        throw new AssertionError("업무 처리가 지정한 PostgreSQL 행 잠금을 기다리지 않았습니다.");
+    }
+
+    private void awaitBlockedThroughQueue(int worker, int owner) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            // 뒤 대기자는 앞 대기자의 tuple 잠금에 막힐 수 있으므로 최초 보유자까지 실제 대기 경로를 따라간다.
+            var blocked = jdbc.queryForObject("""
+                    WITH RECURSIVE blockers(pid) AS (
+                        SELECT unnest(pg_blocking_pids(?))
+                        UNION
+                        SELECT unnest(pg_blocking_pids(blockers.pid)) FROM blockers
+                    )
+                    SELECT EXISTS (SELECT 1 FROM blockers WHERE pid = ?)
+                        AND EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = ? AND wait_event_type = 'Lock'
+                            AND query LIKE '%FROM accounts%FOR UPDATE%')
+                    """, Boolean.class, worker, owner, worker);
+            if (Boolean.TRUE.equals(blocked)) {
+                return;
+            }
+            Thread.yield();
+        }
+        throw new AssertionError("계정 잠금의 대기 경로가 최초 PostgreSQL 잠금 보유자에 도달하지 않았습니다.");
     }
 
     private int backendPid() { return Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)); }
@@ -597,6 +799,7 @@ class TurnResultTests {
 
     private Fixture fixture(OffsetDateTime acceptedAt) {
         now(acceptedAt);
+        var date = acceptedAt.atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDate();
         var accountId = UUID.randomUUID();
         var childId = UUID.randomUUID();
         var conversationId = UUID.randomUUID();
@@ -609,8 +812,9 @@ class TurnResultTests {
                 """, childId, accountId);
         jdbc.update("""
                 INSERT INTO conversations (id, child_id, client_request_id, service_date, scheduled_end_at, status, summary_status, started_at)
-                VALUES (?, ?, ?, '2026-10-03', '2026-10-04T00:00:00+09:00', 'ACTIVE', 'NOT_STARTED', '2026-10-03T08:00:00+09:00')
-                """, conversationId, childId, UUID.randomUUID());
+                VALUES (?, ?, ?, ?, ?, 'ACTIVE', 'NOT_STARTED', ?)
+                """, conversationId, childId, UUID.randomUUID(), date, date.plusDays(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toOffsetDateTime(),
+                date.atTime(8, 0).atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime());
         jdbc.update("INSERT INTO conversation_session_links (session_security_id, conversation_id, bound_at) VALUES (?, ?, ?)",
                 session.securityContextId(), conversationId, acceptedAt.minusSeconds(1));
         var accepted = acceptance.accept(session, childId, conversationId, key, AUDIO);

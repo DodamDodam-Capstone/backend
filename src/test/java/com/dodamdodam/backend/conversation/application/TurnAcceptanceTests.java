@@ -8,6 +8,7 @@ import com.dodamdodam.backend.conversation.domain.TurnStatus;
 import com.dodamdodam.backend.conversation.exception.ConversationException;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationRepository;
 import com.dodamdodam.backend.conversation.infrastructure.ConversationTurnRepository;
+import java.sql.SQLException;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.test.annotation.DirtiesContext;
@@ -340,6 +342,43 @@ class TurnAcceptanceTests {
         }
         assertCount(1);
         assertThat(jdbc.queryForObject("SELECT sequence FROM conversation_turns", Integer.class)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"REQUEST,uq_turn_request", "SEQUENCE,uq_turn_sequence", "PROCESSING,uq_turns_processing_conversation"})
+    void databaseUniqueWaitsForOtherTransactionAndRejectsOnlyConflictingInsert(String kind, String constraint) throws Exception {
+        var fixture = fixture();
+        var firstId = UUID.randomUUID();
+        var firstKey = UUID.randomUUID();
+        var entered = new CompletableFuture<Integer>();
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            var pending = transaction().execute(_ -> {
+                int blocker = backendPid();
+                turns.insertProcessing(firstId, fixture.conversationId(), firstKey, "a".repeat(64), 1,
+                        CREATED_AT, CREATED_AT.plusSeconds(60));
+                if (!kind.equals("PROCESSING")) {
+                    complete(firstId, TurnStatus.SUCCEEDED);
+                }
+                // 서비스 사전 검사 없이 별도 Tx의 실제 UNIQUE 인덱스 대기·실패를 확인한다.
+                var attempt = worker.submit(() -> assertThrows(ConversationException.class, () -> transaction().execute(_ -> {
+                    entered.complete(backendPid());
+                    return turns.insertProcessing(UUID.randomUUID(), fixture.conversationId(),
+                            kind.equals("REQUEST") ? firstKey : UUID.randomUUID(), "b".repeat(64),
+                            kind.equals("SEQUENCE") ? 1 : 2, CREATED_AT, CREATED_AT.plusSeconds(60));
+                })));
+                awaitBlocked(entered.orTimeout(5, TimeUnit.SECONDS).join(), blocker);
+                return attempt;
+            });
+            var failure = pending.get(10, TimeUnit.SECONDS);
+            assertThat(failure.code()).isEqualTo("INTERNAL_ERROR");
+            assertThat(failure.getCause()).isInstanceOfSatisfying(DataIntegrityViolationException.class,
+                    cause -> assertThat(cause.getMostSpecificCause()).isInstanceOfSatisfying(SQLException.class, sql -> {
+                        assertThat(sql.getSQLState()).isEqualTo("23505");
+                        assertThat(sql.getMessage()).contains(constraint);
+                    }));
+        }
+        assertCount(1);
+        assertThat(jdbc.queryForObject("SELECT id FROM conversation_turns", UUID.class)).isEqualTo(firstId);
     }
 
     @ParameterizedTest
