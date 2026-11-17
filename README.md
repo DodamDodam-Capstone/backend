@@ -53,7 +53,7 @@ curl http://localhost:8080/actuator/health
 ./gradlew clean check
 ./gradlew bootRun
 docker compose up -d postgres
-docker compose --profile full up --build
+./scripts/compose-local.sh up --build
 docker compose stop
 ```
 

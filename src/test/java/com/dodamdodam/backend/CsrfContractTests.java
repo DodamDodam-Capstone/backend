@@ -1,5 +1,8 @@
 package com.dodamdodam.backend;
 
+import com.dodamdodam.backend.auth.infrastructure.SmtpEmailVerificationSender;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 @SpringBootTest
 class CsrfContractTests {
 
+    @MockitoBean
+    private SmtpEmailVerificationSender mailSender;
+
     private static final String LOGIN_PATH = "/api/v1/auth/login";
     private static final String CSRF_HEADER = "X-XSRF-TOKEN";
 
@@ -52,7 +58,6 @@ class CsrfContractTests {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/api/v1/auth/email-verifications",
             "/api/v1/auth/email-verifications/verify",
             "/api/v1/auth/signup",
             LOGIN_PATH,
@@ -66,6 +71,20 @@ class CsrfContractTests {
                         .cookie(csrf.cookie())
                         .header(CSRF_HEADER, csrf.token()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void emailVerificationAcceptsIssuedCookieAndHeaderAtRealEndpoint() throws Exception {
+        var csrf = issuedCsrf();
+        // 구현된 이메일 경로는 임시204 probe 대신 실제 JSON 요청·200 응답으로 검증한다.
+        mockMvc.perform(post("/api/v1/auth/email-verifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":\"SIGNUP\",\"email\":\"" + java.util.UUID.randomUUID() + "@example.invalid\"}")
+                        .cookie(csrf.cookie())
+                        .header(CSRF_HEADER, csrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.challengeId").isNotEmpty())
+                .andExpect(jsonPath("$.data.expiresAt").isNotEmpty());
     }
 
     @Test
@@ -178,7 +197,6 @@ class CsrfContractTests {
     static class AuthProbe {
 
         @PostMapping({
-                "/api/v1/auth/email-verifications",
                 "/api/v1/auth/email-verifications/verify",
                 "/api/v1/auth/signup",
                 LOGIN_PATH,

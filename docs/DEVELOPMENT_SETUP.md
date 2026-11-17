@@ -167,6 +167,9 @@ cp .env.example .env
 ./gradlew bootRun
 ```
 
+API를 호출하기 전에 §6의 이메일 발급·요청 제한 키 파일을 준비합니다. 키가 없으면 health는
+기동 확인에 사용할 수 있지만 보호 대상 API는503을 반환합니다. 실제 `.env`는 덮어쓰지 않습니다.
+
 `spring-boot-docker-compose`가 `compose.yaml`을 발견해 PostgreSQL을 시작하고,
 연결 정보를 애플리케이션에 제공합니다. 설정은 `start-only`이므로 애플리케이션을
 종료해도 PostgreSQL은 계속 실행됩니다.
@@ -290,6 +293,45 @@ reload합니다. 그래도 26이 사용되면 Gradle JVM을 다시 `Project SDK`
 cache이므로 팀 문서나 commit에 포함하지 않습니다.
 
 ## 6. 환경변수와 비밀값
+
+### 이메일 발급과 전역 요청 제한 키
+
+SCRUM-77은 `AUTH_RATE_LIMIT_KEY_FILE`, `EMAIL_CODE_KEY_FILE`의 **서로 다른 raw 32바이트 파일**을
+사용합니다. 파일은 프로세스 시작 시 읽으므로 변경 뒤 모든 인스턴스를 재시작합니다. 키가 없거나 길이가
+틀리면 해당 보안 처리를 503으로 거부하며 상수 키로 대체하지 않습니다. 제한 키 누락은 API/OAuth 진입을
+거부하지만 health/static에는 적용하지 않습니다. 번호 키·SMTP 설정만 빠진 경우 다른 API는 유지합니다.
+
+개발자가 로컬에서 직접 준비하는 예시입니다. 아래 명령은 키 내용을 출력하지 않습니다.
+
+```bash
+mkdir -p .secrets
+chmod 700 .secrets
+umask 077
+openssl rand -out .secrets/rate-limit.key 32
+openssl rand -out .secrets/email-code.key 32
+```
+
+`.secrets/`는 Git·Docker build에서 제외하며 full Compose는 `/run/secrets`에 읽기 전용으로
+마운트합니다. 로컬 macOS/Linux/WSL에서는 `./scripts/compose-local.sh up --build`를 사용합니다.
+이 스크립트는 호스트 파일 소유자와 같은 **비루트 UID/GID**로 앱을 실행하므로 디렉터리0700·파일0600을
+그대로 유지합니다. root 실행을 거부하며 비밀 파일을 다른 사용자에게 공개하거나 소유권을 바꾸지 않습니다.
+이미지·일반 Compose의 기본 사용자는 기존10001:10001이며 별도 배포에서는 이 UID/GID에만
+읽기 권한이 있는 비밀 파일 전달 방식을 준비합니다. 앱은 파일을 읽기만 하므로 다른 로컬 UID도 이미지의
+공개 jar를 읽어 실행할 수 있습니다. `.env.example`의 파일 경로는 bootRun 기준이며 Compose 내부 경로는 별도 지정됩니다.
+SMTP 인증 비밀번호는 `SMTP_PASSWORD_FILE`의 UTF-8 파일에 줄바꿈 없이 보관합니다. 파일 내용을
+대화·로그·PR에 붙이지 않습니다. 운영에서는 동일 환경의 모든 인스턴스에 같은 키를 안전하게 배포합니다.
+
+`SMTP_HOST`, `SMTP_PORT`(기본587), `SMTP_FROM`, `SMTP_USERNAME`, `SMTP_PASSWORD_FILE`을
+설정합니다. 기본은 STARTTLS 필수이며 implicit TLS는 `SMTP_SSL=true`, `SMTP_STARTTLS=false`로
+구성합니다. 서버 인증서·호스트 이름 검사를 유지합니다. 평문은 인증 없는 loopback 테스트 서버에만
+허용합니다. 연결·읽기·쓰기 timeout은 모두 `SMTP_TIMEOUT_MS`(기술 기준5000ms, 양의 int)입니다.
+설정 오류·발송 거부·timeout·결과 불명확은 해당 challenge를 별도 Tx에서 폐기한 뒤503으로 처리합니다.
+
+키 교체는 발급/검증/소비를 중단하고 진행 중 작업을 마친 유지보수 시간에 수행합니다. 번호 키를 바꾸기
+전에 기존 미소비·미폐기 challenge를 폐기하며 소비 완료 행·세션·제한 예산을 초기화하지 않습니다.
+제한 키 교체로 활성 예산이 초기화되므로 활성 window/차단이 모두 끝난 것을 DB에서 확인한 뒤 교체합니다.
+자동 키 회전·초기화 API는 제공하지 않습니다. 로컬 SMTP 테스트 통과는 운영 수신함 도달률 검증과 다릅니다.
+
 
 `.env.example`을 `.env`로 복사하고 로컬 값만 수정합니다. `.env`와 `.env.*`는
 Git에서 제외되며 `.env.example`만 커밋됩니다.
@@ -697,7 +739,7 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | 서블릿 필터 | order | 배치 이유 |
 | --- | --- | --- |
 | [ApiResponseHeadersFilter](../src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java) | `H` | 뒤 단계의 성공·실패 응답에 서버 생성 요청 ID와 `no-store`를 적용합니다. |
-| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증·실패 보상과 보호자 응답 재검사를 수행합니다. |
+| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증·실패 보상과 보호자·이메일 발급 응답 재검사를 수행합니다. |
 | [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
@@ -714,6 +756,7 @@ Spring Session native 저장
 → SessionCookieRenewalFilter의 저장 상태 재조회·쿠키 갱신
 → AuthStateErrorFilter의 로그인 최종 검증(로그인 요청일 때)
 → AuthStateErrorFilter의 보호자 권한 재조회(검사 성공 표식이 있는 400 미만 응답)
+→ AuthStateErrorFilter의 이메일 발급 상태·PIN 문맥 재조회(발급 표식이 있는 400 미만 응답)
 → 실제 HTTP 응답 전송
 ```
 
@@ -757,7 +800,8 @@ Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상
 `SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
-검사 대상은 `POST /api/v1/auth/logout`와 `POST /api/v1/children`입니다. 두 경로 모두
+검사 대상은 `POST /api/v1/auth/logout`, `POST /api/v1/children`,
+`POST /api/v1/auth/email-verifications`입니다. 세 경로 모두
 실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
 Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
 UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
@@ -782,10 +826,28 @@ Part 1 경로와 resume/end·음성 등 다른 Part 2 경로는 이 필터의 �
 관련 검사 순서는 다음과 같습니다.
 
 ```text
-CORS → Part 2 Content-Type → Part 1 전송 크기·Content-Type → CSRF → 업무 세션 인증 → 본문·업무 검증
+CORS → 전역 API_IP 예약 → Part 2 Content-Type → Part 1 전송 크기·Content-Type → CSRF → 조건부 업무 세션 인증 → 본문·업무 검증
 ```
 
 CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
+
+[GlobalApiRateLimitFilter](../src/main/java/com/dodamdodam/backend/global/web/GlobalApiRateLimitFilter.java)는
+Security 내부에서 Part 2 전송 필터 바로 앞에 한 번 등록합니다. `/api/v1/**`, `/oauth2/**`,
+`/login/oauth2/**`의 조회·polling·재시도도 같은 IP 예산300회/60초에 포함하며 초과 시429를
+전송 검사보다 먼저 반환합니다. health/static은 제외합니다. 정상 preflight는 CORS에서 종료됩니다.
+서블릿 request wrapper를 벗긴 연결 주소를 사용하므로 임의의 `Forwarded`/`X-Forwarded-For`로
+예산을 새로 만들지 않습니다. 프록시 뒤에서는 프록시 연결 IP의 예산을 공유하며 신뢰 프록시 구성·부하와
+실제 운영값은 D17 검증 대상입니다. `server.forward-headers-strategy=framework` 기준입니다.
+
+이메일 발급은 전역 예산을 다시 예약하지 않습니다. 구조 검증 뒤 발급 subject/IP/cooldown을 별도
+Tx로 함께 예약하고, 업무 Tx에서 실제 최신 created_at+60초를 다시 검사합니다. SMTP는 업무 커밋 뒤
+호출합니다. 성공 결과는 id와 고정6자리 소수부의 KST 만료 시각뿐이며 정상·decoy의 응답 구조·길이를
+같게 유지합니다. 공개 목적은 같은 발송 경로, PIN 목적은 검증한 계정 이메일을 사용합니다.
+
+발급 marker는 HttpSession이 아닌 request에만 둡니다. 발송 뒤와 실제 전송 직전 DB를 새로 읽고
+PIN 이메일·문맥/generation/현재 PIN 버전이 바뀌었으면 해당 발급만 폐기한 뒤401/목적별403으로
+거부합니다. 확인 장애는503입니다. 기존 native 세션 검증·지속 쿠키·guardian 응답 검사도 유지합니다.
+민감 성공 본문·Location·JSESSIONID 갱신 쿠키를 보내기 전에 비우며 이미 전송한 bytes를 회수하지는 못합니다.
 [LoginSessionAuthenticationStrategy](../src/main/java/com/dodamdodam/backend/auth/session/LoginSessionAuthenticationStrategy.java)는
 인증 성공 시 호출되는 전략이며, 실행 절차는 10.5절의 공유 로그인 계약을 따릅니다.
 
@@ -820,7 +882,7 @@ flowchart TB
     CLIENT["브라우저 / API 클라이언트"]
     subgraph SERVLET["서블릿 필터: 요청 진입"]
         HEADERS["ApiResponseHeadersFilter · H<br/>요청 ID · no-store"]
-        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상 · guardian 재검사"]
+        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상 · guardian/이메일 재검사"]
         COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
         SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
         PROXY["springSecurityFilterChain · -100"]
@@ -830,19 +892,22 @@ flowchart TB
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
         INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
         CORS["5 CorsFilter"]
-        PART2["6 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
-        GUARD["7 Part1JsonRequestGuardFilter<br/>로그아웃·자녀 등록 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
-        CSRF["8 CsrfFilter<br/>실패 403 CSRF_INVALID"]
-        OAUTH["9 OAuth2AuthorizationRequestRedirectFilter<br/>10 OAuth2LoginAuthenticationFilter"]
-        INTERMEDIATE["11 SecurityContextHolderAwareRequestFilter<br/>12 AnonymousAuthenticationFilter<br/>13 SessionManagementFilter<br/>14 ExceptionTranslationFilter"]
-        AUTHZ["15 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
-        INITIAL --> CORS --> PART2 --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
+        RATE["6 GlobalApiRateLimitFilter<br/>API/OAuth IP 예산 별도 커밋 · 429/503"]
+        PART2["7 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
+        GUARD["8 Part1JsonRequestGuardFilter<br/>로그아웃·자녀·이메일 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
+        CSRF["9 CsrfFilter<br/>실패 403 CSRF_INVALID"]
+        OAUTH["10 OAuth2AuthorizationRequestRedirectFilter<br/>11 OAuth2LoginAuthenticationFilter"]
+        INTERMEDIATE["12 SecurityContextHolderAwareRequestFilter<br/>13 AnonymousAuthenticationFilter<br/>14 SessionManagementFilter<br/>15 ExceptionTranslationFilter"]
+        AUTHZ["16 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
+        INITIAL --> CORS --> RATE --> PART2 --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
     end
     CLIENT --> HEADERS
     PROXY --> INITIAL
     AUTHZ -->|허용| START_RESPONSE
     START_RESPONSE --> MVC["DispatcherServlet → Controller"]
     MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
+    MVC -->|POST /api/v1/auth/email-verifications| EMAIL["EmailVerificationController<br/>조건부 인증 → 닫힌 입력 → 제한 예약<br/>목적별 snapshot/발급 커밋 → SMTP/실패 보상"]
+    EMAIL --> SAVE
 
     subgraph LOGIN["SessionConfig: 공유 로그인 연결"]
         STRATEGY["LoginSessionAuthenticationStrategy<br/>업무 문맥 교체 → native ID 교체<br/>인증 UUID 저장 · CSRF 교체"]
@@ -864,15 +929,26 @@ flowchart TB
         BUSINESS["SessionSecurityRepository<br/>계정 → 문맥 → PIN 잠금<br/>업무 자격 원자적 폐기"]
         NATIVE["JdbcIndexedSessionRepository<br/>일반 인증 timeout -1 · 익명 30분<br/>즉시 저장 · 명시적 ID 삭제"]
         GUARDIAN["GuardianAccessService · GuardianAccessRepository<br/>요청의 계정·문맥으로 guardian 기한·PIN 버전 재검사"]
-        BIZDB[("accounts · session_security · guardian_pins<br/>email_verifications · Flyway V2–V3, V5")]
+        RATE_REPO["AuthRateLimitService · AuthRateLimitRepository<br/>별도 예산 Tx · 정렬 잠금 · DB 시각"]
+        EMAIL_SERVICE["EmailVerificationIssuanceService<br/>목적 판정 · snapshot · 발급/응답 재검사"]
+        DELIVERY["EmailVerificationDeliveryService<br/>커밋 뒤 SMTP · 실패 id 단위 폐기"]
+        BIZDB[("accounts · session_security · guardian_pins<br/>email_verifications · auth_rate_limits<br/>Flyway V2–V3, V5, V7")]
         SESSIONDB[("SPRING_SESSION<br/>SPRING_SESSION_ATTRIBUTES · Flyway V1")]
         AUTH -. 현재 문맥 확인 .-> BUSINESS
         BUSINESS --> BIZDB
         GUARDIAN --> BIZDB
+        RATE_REPO --> BIZDB
+        EMAIL_SERVICE --> BIZDB
+        EMAIL_SERVICE --> DELIVERY
+        DELIVERY -. 실패 보상 .-> BIZDB
         NATIVE --> SESSIONDB
     end
     AUTHZ -. 보호 경로 검사 .-> AUTH
     LOGOUT -. 인증 검사 .-> AUTH
+    RATE -. 단독 전역 예약 .-> RATE_REPO
+    EMAIL -. PIN 목적 인증 .-> AUTH
+    EMAIL -. 발급 .-> EMAIL_SERVICE
+    EMAIL_SERVICE -. 발급 예산 예약 .-> RATE_REPO
     LOGOUT -. 현재 문맥·guardian·PIN 폐기 .-> BUSINESS
     LIFE -. 생성·실패 보상 .-> BUSINESS
     LIFE -. 실제 저장 재조회·실패 삭제 .-> NATIVE
@@ -884,7 +960,7 @@ flowchart TB
     subgraph RESPONSE["응답: 안쪽에서 바깥쪽, 실제 전송 전"]
         SAVE["1 Spring Session native 저장·쿠키 기록"]
         RENEW["2 SessionCookieRenewalFilter<br/>저장 상태 재검사 → 유효한 인증 쿠키 365일 갱신<br/>로그아웃 Max-Age=0 우선"]
-        VERIFY["3 AuthStateErrorFilter<br/>로그인 최종 검증 · guardian 응답 재검사"]
+        VERIFY["3 AuthStateErrorFilter<br/>로그인 최종 검증 · guardian/이메일 응답 재검사"]
         WIRE["4 HTTP 응답 전송"]
         SAVE --> RENEW --> VERIFY --> WIRE
     end
@@ -892,6 +968,7 @@ flowchart TB
     RENEW -. 재검증 .-> AUTH
     VERIFY -. 로그인일 때 .-> LIFE
     VERIFY -. guardian 표식이 있는 성공 응답 .-> GUARDIAN
+    VERIFY -. 이메일 표식이 있는 성공 응답 .-> EMAIL_SERVICE
     COOKIECONFIG["Boot CookieSerializer<br/>JSESSIONID · HttpOnly · Path=/ · SameSite · Secure"] -. 동일 설정 사용 .-> RENEW
     COOKIECONFIG -. 동일 설정 사용 .-> SESSION
     ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>성공 본문·길이·Location·인증 쿠키 제거, 공통 헤더 보존<br/>인증 무효 401 / guardian 확인 필요 403 / 확인 장애 503"]
@@ -1045,13 +1122,13 @@ DB log와 lifecycle을 명시적으로 관리하고 싶을 때 사용합니다.
 `app` service는 기본 개발 흐름과 충돌하지 않도록 `full` profile에 있습니다.
 
 ```bash
-docker compose --profile full up --build
+./scripts/compose-local.sh up --build
 ```
 
 종료:
 
 ```bash
-docker compose --profile full down
+./scripts/compose-local.sh down
 ```
 
 Dockerfile은 Java 25로 빌드하고 Spring Boot layered jar를 분리한 뒤, JRE image에서
