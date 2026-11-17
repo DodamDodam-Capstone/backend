@@ -29,6 +29,8 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
             .matcher(HttpMethod.POST, "/api/v1/auth/logout");
     private static final RequestMatcher CHILDREN = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.POST, "/api/v1/children");
+    private static final RequestMatcher EMAIL = PathPatternRequestMatcher.withDefaults()
+            .matcher(HttpMethod.POST, "/api/v1/auth/email-verifications");
     private final JsonMapper jsonMapper;
 
     /** 공통 오류 응답에 사용할 JSON 직렬화기를 받는다. */
@@ -36,10 +38,10 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
         this.jsonMapper = jsonMapper;
     }
 
-    /** 로그아웃과 자녀 등록 POST에만 전송 크기·형식 검사를 적용한다. */
+    /** 로그아웃·자녀 등록·이메일 발급 POST에 전송 크기·형식 검사를 적용한다. */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !LOGOUT.matches(request) && !CHILDREN.matches(request);
+        return !LOGOUT.matches(request) && !CHILDREN.matches(request) && !EMAIL.matches(request);
     }
 
     /** CSRF 전에 전송 규칙을 검사하고, 후속 MVC가 읽을 수 있도록 본문을 보관한다. */
@@ -58,7 +60,7 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
                     "UNSUPPORTED_MEDIA_TYPE", "지원하지 않는 Content-Type입니다.");
             return;
         }
-        // 로그아웃의 0바이트 판정과 자녀 JSON 구조 검증은 CSRF·로그인 검사 이후에 수행한다.
+        // 빈 로그아웃과 자녀·이메일 JSON 구조 검증은 CSRF·조건부 로그인 검사 이후에 수행한다.
         request.setAttribute(EMPTY_BODY, body.length == 0);
         filterChain.doFilter(new CachedBodyRequest(request, body), response);
     }

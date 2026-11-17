@@ -1,5 +1,9 @@
 package com.dodamdodam.backend.global.config;
 
+import com.dodamdodam.backend.auth.application.AuthRateLimitService;
+import com.dodamdodam.backend.auth.infrastructure.EmailVerificationKeys;
+import com.dodamdodam.backend.global.web.GlobalApiRateLimitFilter;
+
 import com.dodamdodam.backend.auth.session.AuthStateErrorHandler;
 import com.dodamdodam.backend.auth.session.AuthenticatedSessionService;
 import com.dodamdodam.backend.auth.session.LoginSessionAuthenticationStrategy;
@@ -54,7 +58,9 @@ public class SecurityConfig {
             LoginSessionAuthenticationStrategy loginSessionAuthenticationStrategy,
             SecurityContextRepository securityContextRepository,
             CsrfTokenRequestHandler csrfRequestHandler,
-            JsonMapper jsonMapper
+            JsonMapper jsonMapper,
+            AuthRateLimitService rateLimits,
+            EmailVerificationKeys verificationKeys
     ) throws Exception {
         var accessDeniedHandlers = new LinkedHashMap<Class<? extends AccessDeniedException>, AccessDeniedHandler>();
         accessDeniedHandlers.put(CsrfException.class, csrfAccessDeniedHandler);
@@ -94,6 +100,7 @@ public class SecurityConfig {
                 // 전송 크기·형식만 CSRF보다 먼저 검사하고 JSON 구조 검증은 MVC에 남긴다.
                 .addFilterBefore(new Part1JsonRequestGuardFilter(jsonMapper), CsrfFilter.class)
                 .addFilterBefore(new Part2JsonRequestGuardFilter(jsonMapper), Part1JsonRequestGuardFilter.class)
+                .addFilterBefore(new GlobalApiRateLimitFilter(rateLimits, verificationKeys, jsonMapper), Part2JsonRequestGuardFilter.class)
                 .requestCache(cache -> cache.disable())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authStateErrorHandler)

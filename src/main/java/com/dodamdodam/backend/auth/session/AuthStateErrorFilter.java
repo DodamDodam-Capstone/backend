@@ -1,5 +1,8 @@
 package com.dodamdodam.backend.auth.session;
 
+import com.dodamdodam.backend.auth.application.EmailVerificationIssuanceService;
+import com.dodamdodam.backend.auth.exception.EmailVerificationException;
+
 import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import com.dodamdodam.backend.guardian.application.GuardianAccessService;
 import com.dodamdodam.backend.guardian.exception.GuardianAccessException;
@@ -29,14 +32,16 @@ public class AuthStateErrorFilter extends OncePerRequestFilter {
     private final SessionLifecycleService lifecycle;
     private final GuardianAccessService guardian;
     private final JsonMapper jsonMapper;
+    private final EmailVerificationIssuanceService email;
 
-    /** 로그인 보상과 응답 직전 보호자 검증·공통 오류 출력 경로를 구성한다. */
+    /** 로그인 보상과 보호자·이메일 발급의 응답 재검사·공통 오류 경로를 구성한다. */
     public AuthStateErrorFilter(AuthStateErrorHandler errorHandler, SessionLifecycleService lifecycle,
-                                GuardianAccessService guardian, JsonMapper jsonMapper) {
+                                GuardianAccessService guardian, JsonMapper jsonMapper, EmailVerificationIssuanceService email) {
         this.errorHandler = errorHandler;
         this.lifecycle = lifecycle;
         this.guardian = guardian;
         this.jsonMapper = jsonMapper;
+        this.email = email;
     }
 
     /** 실제 전송 전과 미커밋 종료 시 권한을 확인하고 실패한 성공 응답을 비운다. */
@@ -70,7 +75,10 @@ public class AuthStateErrorFilter extends OncePerRequestFilter {
                 throw exception;
             }
             resetForError(response);
-            if (!loginFailure && failure instanceof GuardianAccessException access) {
+            if (!loginFailure && failure instanceof EmailVerificationException access) {
+                ApiErrorResponses.write(jsonMapper, response, access.status(), access.code(), access.getMessage());
+            }
+            else if (!loginFailure && failure instanceof GuardianAccessException access) {
                 ApiErrorResponses.write(jsonMapper, response, access.status(), access.code(), access.getMessage());
             }
             else if (!loginFailure && failure instanceof SessionCookieRenewalFilter.InvalidSessionException) {
@@ -82,12 +90,13 @@ public class AuthStateErrorFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 로그인 최종 검증을 유지하고 아직 성공 상태인 보호자 응답만 DB에서 재검사한다. */
+    /** 로그인 최종 검증을 유지하고 성공 상태인 보호자·이메일 발급 응답을 DB에서 재검사한다. */
     private void verifyResponseAccess(HttpServletRequest request, HttpServletResponse response) {
         lifecycle.verifyLogin(request);
         // 업무 오류 응답을 guardian 오류로 덮어쓰거나 오류 직렬화 중 재검사를 반복하지 않는다.
         if (response.getStatus() < 400) {
             guardian.verifyResponseAccess(request);
+            email.verifyResponseAccess(request);
         }
     }
 
@@ -98,6 +107,7 @@ public class AuthStateErrorFilter extends OncePerRequestFilter {
                 && !(failure instanceof TransactionException) && !(failure instanceof ConversionException)
                 && !(failure instanceof AuthStateUnavailableException)
                 && !(failure instanceof GuardianAccessException)
+                && !(failure instanceof EmailVerificationException)
                 && !(failure instanceof SessionCookieRenewalFilter.InvalidSessionException)) {
             failure = failure.getCause();
         }

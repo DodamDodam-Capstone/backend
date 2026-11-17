@@ -70,5 +70,17 @@ app:
       client-id: ${KAKAO_CLIENT_ID:local-kakao-client-id}
       client-secret: ${KAKAO_CLIENT_SECRET:local-kakao-client-secret}
   security:
+    rate-limit-key-file: ${AUTH_RATE_LIMIT_KEY_FILE:}
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
     login-success-url: ${APP_LOGIN_SUCCESS_URL:http://localhost:5173/oauth/callback}
+  email:
+    code-key-file: ${EMAIL_CODE_KEY_FILE:}
+    smtp:
+      host: ${SMTP_HOST:}
+      port: ${SMTP_PORT:587}
+      from: ${SMTP_FROM:}
+      username: ${SMTP_USERNAME:}
+      password-file: ${SMTP_PASSWORD_FILE:}
+      timeout-ms: ${SMTP_TIMEOUT_MS:5000}
+      starttls: ${SMTP_STARTTLS:true}
+      ssl: ${SMTP_SSL:false}

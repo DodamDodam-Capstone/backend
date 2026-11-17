@@ -1,0 +1,129 @@
+{
+  "nodes": [
+    {
+      "id": "heading",
+      "type": "text",
+      "x": 40,
+      "y": 20,
+      "width": 920,
+      "height": 100,
+      "text": "# 보호자 권한 확인\n\n인증·아이 소유권 검사를 마친 내부 호출자"
+    },
+    {
+      "id": "step-1",
+      "type": "text",
+      "x": 40,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 01  보호자 권한 요구\n\n호출자가 인증·소유권 선행\n\n현재 계정과 문맥 전달\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#requireGuardianAccess mae5bd54dbbf05b63|requireGuardianAccess()]]"
+    },
+    {
+      "id": "step-2",
+      "type": "text",
+      "x": 520,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 02  현재 상태 함께 조회\n\n문맥·계정·PIN 버전 조회\n\nDB 시각을 기준으로 검사\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository#findState mb1e4bd2e6cd4fcaf|findState()]]"
+    },
+    {
+      "id": "step-3",
+      "type": "text",
+      "x": 520,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 03  로그인 문맥 검사\n\n세션 버전·폐기·만료 확인\n\n무효면 인증 필요 오류\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#isSessionCurrent m51366fdd7d44c0f0|isSessionCurrent()]]"
+    },
+    {
+      "id": "step-4",
+      "type": "text",
+      "x": 40,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 04  보호자 확인 검사\n\nguardianUntil과 PIN 버전\n\n현재 권한인지 함께 확인\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#isGuardianCurrent m9b272566953e54cb|isGuardianCurrent()]]"
+    },
+    {
+      "id": "step-5",
+      "type": "text",
+      "x": 40,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 05  재검사 대상 기록\n\n성공한 계정·문맥만 보관\n\n권한 기한 자체는 연장 안 함\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#requireGuardianAccess mae5bd54dbbf05b63|requireGuardianAccess()]]"
+    },
+    {
+      "id": "step-6",
+      "type": "text",
+      "x": 520,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 06  응답 전 다시 조회\n\nAuthStateErrorFilter에서 호출\n\n현재 DB 권한으로 재확인\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#verifyResponseAccess m08ab0b3e274d6cb9|verifyResponseAccess()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorFilter#verifyResponseAccess m1098528f38d3ff11|verifyResponseAccess()]]"
+    },
+    {
+      "id": "legend",
+      "type": "text",
+      "x": 40,
+      "y": 1050,
+      "width": 920,
+      "height": 55,
+      "text": "번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인"
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow-0",
+      "fromNode": "step-1",
+      "fromSide": "right",
+      "toNode": "step-2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-1",
+      "fromNode": "step-2",
+      "fromSide": "bottom",
+      "toNode": "step-3",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-2",
+      "fromNode": "step-3",
+      "fromSide": "left",
+      "toNode": "step-4",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-3",
+      "fromNode": "step-4",
+      "fromSide": "bottom",
+      "toNode": "step-5",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-4",
+      "fromNode": "step-5",
+      "fromSide": "right",
+      "toNode": "step-6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    }
+  ]
+}

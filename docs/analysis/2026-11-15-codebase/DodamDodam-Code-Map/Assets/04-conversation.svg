@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1120" viewBox="0 0 1000 1120" role="img" aria-labelledby="title desc">
+<title id="title">대화 시작과 재전송</title><desc id="desc">POST /api/v1/children/{childId}/conversations</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8a99ad"/></marker></defs>
+<rect width="1000" height="1120" rx="20" fill="#f6f8fc"/>
+<g font-family="Apple SD Gothic Neo, Noto Sans CJK KR, Arial, sans-serif" fill="#17253b">
+<text x="40" y="58" font-size="32" fill="#17253b" font-weight="700">대화 시작과 재전송</text>
+<text x="40" y="96" font-size="19" fill="#53647b" font-weight="400">POST /api/v1/children/{childId}/conversations</text>
+<path d="M480 277.5 L520 277.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M740.0 405 L740.0 450" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M520 577.5 L480 577.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M260.0 705 L260.0 750" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M480 877.5 L520 877.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.api.ConversationController.md%23prepareStart+m1cac5f319ccf317a&amp;paneType=tab">
+<rect x="40" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="190" font-size="22" fill="#2555a6" font-weight="700">01  인증 · 입력 · 소유권</text>
+<text x="62" y="227" font-size="20" fill="#17253b" font-weight="400">로그인 → UUID / JSON 검사</text>
+<text x="62" y="255" font-size="20" fill="#17253b" font-weight="400">해당 아이의 소유권 확인</text>
+<text x="62" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.application.ConversationService.md%23create+mf9ff06c04e6d7fad&amp;paneType=tab">
+<rect x="520" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="190" font-size="22" fill="#2555a6" font-weight="700">02  상위 데이터 잠금</text>
+<text x="542" y="227" font-size="20" fill="#17253b" font-weight="400">계정 → 문맥 → 아이 → 대화</text>
+<text x="542" y="255" font-size="20" fill="#17253b" font-weight="400">대기 후 DB 시각 재확인</text>
+<text x="542" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.application.ConversationService.md%23decideStart+m074dea56e9276dfa&amp;paneType=tab">
+<rect x="520" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="490" font-size="22" fill="#2555a6" font-weight="700">03  이전 대화 · 시간 판단</text>
+<text x="542" y="527" font-size="20" fill="#17253b" font-weight="400">필요하면 기존 종료 상태 정리</text>
+<text x="542" y="555" font-size="20" fill="#17253b" font-weight="400">이용시간과 시작 키를 판단</text>
+<text x="542" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.infrastructure.ConversationRepository.md%23insertActive+mff8e74c752863f8c&amp;paneType=tab">
+<rect x="40" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="490" font-size="22" fill="#2555a6" font-weight="700">04  신규 또는 재전송</text>
+<text x="62" y="527" font-size="20" fill="#17253b" font-weight="400">신규: 대화와 세션 연결 저장</text>
+<text x="62" y="555" font-size="20" fill="#17253b" font-weight="400">같은 키: 기존 연결 재검사</text>
+<text x="62" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.api.ConversationController.md%23start+m255287826e69c022&amp;paneType=tab">
+<rect x="40" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="790" font-size="22" fill="#2555a6" font-weight="700">05  응답 대상 기록</text>
+<text x="62" y="827" font-size="20" fill="#17253b" font-weight="400">검증한 대화 ID를 요청에 기록</text>
+<text x="62" y="855" font-size="20" fill="#17253b" font-weight="400">신규 / 재전송 응답 구분</text>
+<text x="62" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fconversation.api.ConversationStartResponseFilter.md%23verify+mbaf83885c918b297&amp;paneType=tab">
+<rect x="520" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="790" font-size="22" fill="#2555a6" font-weight="700">06  현재 상태 다시 확인</text>
+<text x="542" y="827" font-size="20" fill="#17253b" font-weight="400">응답 직전 권한·시간·상태 확인</text>
+<text x="542" y="855" font-size="20" fill="#17253b" font-weight="400">실패하면 성공 응답을 비움</text>
+<text x="542" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<text x="40" y="1080" font-size="17" fill="#53647b" font-weight="400">번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인</text>
+</g></svg>

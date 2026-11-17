@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="980" viewBox="0 0 1000 980" role="img" aria-labelledby="title desc">
+<title id="title">DodamDodam  |  한눈에 보는 구현 구조</title><desc id="desc">HTTP → 공통 검사 → Controller → Service → DB / 외부 연결</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8a99ad"/></marker></defs>
+<rect width="1000" height="980" rx="20" fill="#f6f8fc"/>
+<g font-family="Apple SD Gothic Neo, Noto Sans CJK KR, Arial, sans-serif" fill="#17253b">
+<text x="40" y="58" font-size="32" fill="#17253b" font-weight="700">DodamDodam  |  한눈에 보는 구현 구조</text>
+<text x="40" y="96" font-size="19" fill="#53647b" font-weight="400">HTTP → 공통 검사 → Controller → Service → DB / 외부 연결</text>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fglobal.md&amp;paneType=tab">
+<rect x="40" y="140" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="140" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="180" font-size="22" fill="#2555a6" font-weight="700">01  공통 요청 · 오류</text>
+<text x="62" y="217" font-size="20" fill="#17253b" font-weight="400">CORS · CSRF · 요청 제한</text>
+<text x="62" y="245" font-size="20" fill="#17253b" font-weight="400">JSON 형식 · 크기 · 오류 응답</text>
+<text x="62" y="273" font-size="20" fill="#17253b" font-weight="400">구현됨 · 공통 진입 경계</text>
+<text x="62" y="344" font-size="17" fill="#2555a6" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fauth.md&amp;paneType=tab">
+<rect x="520" y="140" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="140" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="180" font-size="22" fill="#2555a6" font-weight="700">02  인증 · 이메일</text>
+<text x="542" y="217" font-size="20" fill="#17253b" font-weight="400">로그인 문맥 · 로그아웃</text>
+<text x="542" y="245" font-size="20" fill="#17253b" font-weight="400">인증번호 발급 · SMTP 전송</text>
+<text x="542" y="273" font-size="20" fill="#17253b" font-weight="400">부분 구현 · 가입 / OAuth 연동 후속</text>
+<text x="542" y="344" font-size="17" fill="#2555a6" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fchild.md&amp;paneType=tab">
+<rect x="40" y="395" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="395" width="440" height="5" rx="2" fill="#855400"/>
+<text x="62" y="435" font-size="22" fill="#855400" font-weight="700">03  아이 등록 · 소유권</text>
+<text x="62" y="472" font-size="20" fill="#17253b" font-weight="400">아이 등록 · 입력 검증</text>
+<text x="62" y="500" font-size="20" fill="#17253b" font-weight="400">다른 계정의 아이 접근 차단</text>
+<text x="62" y="528" font-size="20" fill="#17253b" font-weight="400">선행 조건 · 실제 캐릭터 목록 미정</text>
+<text x="62" y="599" font-size="17" fill="#855400" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fconversation.md&amp;paneType=tab">
+<rect x="520" y="395" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="395" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="435" font-size="22" fill="#2555a6" font-weight="700">04  대화 시작 · 상태</text>
+<text x="542" y="472" font-size="20" fill="#17253b" font-weight="400">신규 시작 · 재전송 구분</text>
+<text x="542" y="500" font-size="20" fill="#17253b" font-weight="400">ACTIVE → CLOSING → ENDED</text>
+<text x="542" y="528" font-size="20" fill="#17253b" font-weight="400">부분 구현 · 음성 / 종료 API 후속</text>
+<text x="542" y="599" font-size="17" fill="#2555a6" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fguardian.md&amp;paneType=tab">
+<rect x="40" y="650" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="650" width="440" height="5" rx="2" fill="#146244"/>
+<text x="62" y="690" font-size="22" fill="#146244" font-weight="700">05  보호자 권한</text>
+<text x="62" y="727" font-size="20" fill="#17253b" font-weight="400">PIN 버전 · 보호자 확인 기한</text>
+<text x="62" y="755" font-size="20" fill="#17253b" font-weight="400">응답 직전 권한 재검사</text>
+<text x="62" y="783" font-size="20" fill="#17253b" font-weight="400">기반 구현 · PIN / 기록 API 후속</text>
+<text x="62" y="854" font-size="17" fill="#146244" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FFeatures%2Fapp.md&amp;paneType=tab">
+<rect x="520" y="650" width="440" height="225" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="650" width="440" height="5" rx="2" fill="#855400"/>
+<text x="542" y="690" font-size="22" fill="#855400" font-weight="700">06  실행 · 저장 · 외부 연결</text>
+<text x="542" y="727" font-size="20" fill="#17253b" font-weight="400">PostgreSQL · Flyway · SMTP</text>
+<text x="542" y="755" font-size="20" fill="#17253b" font-weight="400">STT / TTS 연결은 후속 구현</text>
+<text x="542" y="783" font-size="20" fill="#17253b" font-weight="400">현재 연결과 후속 연결을 구분</text>
+<text x="542" y="854" font-size="17" fill="#855400" font-weight="400">담당 역할 · 주요 코드 보기 ↗</text>
+</a>
+<text x="40" y="940" font-size="17" fill="#53647b" font-weight="400">기능별 책임 지도 · 노트의 링크 / Canvas 카드로 탐색 · 카드 배치는 호출 순서가 아님</text>
+</g></svg>

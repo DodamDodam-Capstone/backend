@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1120" viewBox="0 0 1000 1120" role="img" aria-labelledby="title desc">
+<title id="title">로그인 문맥 검증과 로그아웃</title><desc id="desc">로그인이 필요한 요청 · POST /api/v1/auth/logout</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8a99ad"/></marker></defs>
+<rect width="1000" height="1120" rx="20" fill="#f6f8fc"/>
+<g font-family="Apple SD Gothic Neo, Noto Sans CJK KR, Arial, sans-serif" fill="#17253b">
+<text x="40" y="58" font-size="32" fill="#17253b" font-weight="700">로그인 문맥 검증과 로그아웃</text>
+<text x="40" y="96" font-size="19" fill="#53647b" font-weight="400">로그인이 필요한 요청 · POST /api/v1/auth/logout</text>
+<path d="M480 277.5 L520 277.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M740.0 405 L740.0 450" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M520 577.5 L480 577.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M260.0 705 L260.0 750" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M480 877.5 L520 877.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.AuthenticatedSessionService.md%23requireAuthenticatedSession+mad23075b25d06a28&amp;paneType=tab">
+<rect x="40" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="190" font-size="22" fill="#2555a6" font-weight="700">01  현재 인증 요청</text>
+<text x="62" y="227" font-size="20" fill="#17253b" font-weight="400">실제 요청의 세션을 확인</text>
+<text x="62" y="255" font-size="20" fill="#17253b" font-weight="400">없거나 무효면 인증 거부</text>
+<text x="62" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.AuthenticatedSessionService.md%23validate+m72fbb73c9b868baa&amp;paneType=tab">
+<rect x="520" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="190" font-size="22" fill="#2555a6" font-weight="700">02  저장된 정보 대조</text>
+<text x="542" y="227" font-size="20" fill="#17253b" font-weight="400">Authentication과 저장 세션</text>
+<text x="542" y="255" font-size="20" fill="#17253b" font-weight="400">SecurityContext 일치 검사</text>
+<text x="542" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.SessionSecurityRepository.md%23isCurrentContext+mda2203671fdb2db3&amp;paneType=tab">
+<rect x="520" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="490" font-size="22" fill="#2555a6" font-weight="700">03  업무 문맥 검증</text>
+<text x="542" y="527" font-size="20" fill="#17253b" font-weight="400">계정·세션 버전·폐기·만료</text>
+<text x="542" y="555" font-size="20" fill="#17253b" font-weight="400">DB의 현재 상태로 판단</text>
+<text x="542" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.api.AuthLogoutController.md%23logout+m43cbd6436794ba0f&amp;paneType=tab">
+<rect x="40" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="490" font-size="22" fill="#2555a6" font-weight="700">04  로그아웃 요청 검사</text>
+<text x="62" y="527" font-size="20" fill="#17253b" font-weight="400">인증 성공과 빈 본문 확인</text>
+<text x="62" y="555" font-size="20" fill="#17253b" font-weight="400">이후는 로그아웃 전용 경로</text>
+<text x="62" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.SessionSecurityRepository.md%23revokeCurrentContext+ma61a7dc8bfc5d117&amp;paneType=tab">
+<rect x="40" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="790" font-size="22" fill="#2555a6" font-weight="700">05  업무 문맥 폐기</text>
+<text x="62" y="827" font-size="20" fill="#17253b" font-weight="400">현재 문맥과 PIN 증명 정리</text>
+<text x="62" y="855" font-size="20" fill="#17253b" font-weight="400">뒤이은 요청에서 사용 불가</text>
+<text x="62" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.api.AuthLogoutController.md%23logout+m43cbd6436794ba0f&amp;paneType=tab">
+<rect x="520" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="790" font-size="22" fill="#2555a6" font-weight="700">06  세션 · CSRF 정리</text>
+<text x="542" y="827" font-size="20" fill="#17253b" font-weight="400">Spring 로그아웃 핸들러 호출</text>
+<text x="542" y="855" font-size="20" fill="#17253b" font-weight="400">완료 시 204 응답</text>
+<text x="542" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<text x="40" y="1080" font-size="17" fill="#53647b" font-weight="400">번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인</text>
+</g></svg>
