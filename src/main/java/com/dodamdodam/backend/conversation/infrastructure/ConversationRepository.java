@@ -52,6 +52,18 @@ public class ConversationRepository {
         }
     }
 
+    /** 소유 자녀 잠금 뒤 대상 대화를 잠그며 다른 자녀의 대화와 미존재를 구분하지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<StoredConversation> findForUpdate(UUID childId, UUID conversationId) {
+        try {
+            return jdbc.query("SELECT " + COLUMNS + " FROM conversations WHERE child_id = ? AND id = ? FOR UPDATE",
+                    STORED_ROW, childId, conversationId).stream().findFirst();
+        }
+        catch (DataAccessException failure) {
+            throw new ConversationException(failure);
+        }
+    }
+
     /** 같은 자녀의 미종료 행을 잠그며, 종료 조정기와의 상태 변경도 직렬화한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<StoredConversation> findUnendedForUpdate(UUID childId) {
