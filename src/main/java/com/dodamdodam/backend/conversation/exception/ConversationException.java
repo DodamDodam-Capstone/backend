@@ -52,9 +52,19 @@ public class ConversationException extends RuntimeException {
         return new ConversationException("CONVERSATION_CLOSING", "대화를 종료하고 있습니다.", List.of(), null, null);
     }
 
-    /** 종료된 시작 키의 재사용으로 새로운 행을 만들지 않는다. */
+    /** 종료된 대화는 기존 시작·발화 키로도 다시 사용할 수 없다. */
     public static ConversationException ended() {
         return new ConversationException("CONVERSATION_ENDED", "이미 종료된 대화입니다.", List.of(), null, null);
+    }
+
+    /** 같은 발화 키에 다른 원본 음성이 전달되어도 키·해시·음성을 오류에 복사하지 않는다. */
+    public static ConversationException idempotencyConflict() {
+        return new ConversationException("IDEMPOTENCY_CONFLICT", "같은 요청에 다른 음성이 전달되었습니다.", List.of(), null, null);
+    }
+
+    /** 다른 발화가 처리 중이면 새 키의 접수만 거부한다. */
+    public static ConversationException turnInProgress() {
+        return new ConversationException("TURN_IN_PROGRESS", "처리 중인 발화가 있습니다.", List.of(), null, null);
     }
 
     /** HTTP 처리 계층에서 사용할 업무 오류 코드를 반환한다. */
