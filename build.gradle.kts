@@ -5,7 +5,8 @@ plugins {
 }
 
 group = "com.dodamdodam"
-version = "0.0.1-SNAPSHOT"
+// PR·릴리스와 같은 버전을 사용하고 configuration cache가 파일 변경을 추적하게 한다.
+version = providers.fileContents(layout.projectDirectory.file("VERSION")).asText.get().trim()
 description = "DodamDodam backend service"
 
 java {
