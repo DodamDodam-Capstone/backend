@@ -362,6 +362,8 @@ DB 읽기: `email_verifications`; 쓰기: `accounts, email_verifications, auth_r
 
 DB 읽기: `accounts, children, guardian_pins`; 쓰기: `session_security, email_verifications, auth_rate_limits`. 공통 제한 예약과 프레임워크 세션 저장은 별도 공통 처리다.
 
+구현 흐름·원문 입력/해시 포맷·Postman 확인 방법은 [로그인 구현 문서](../../PASSWORD_LOGIN.md)를 참고한다.
+
 200 응답 예시 (normal):
 
 <!-- json-example: AccountViewResponse -->

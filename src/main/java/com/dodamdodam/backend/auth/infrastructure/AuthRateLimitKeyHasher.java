@@ -32,6 +32,14 @@ public final class AuthRateLimitKeyHasher {
         return hash(Action.API_IP, addressScope(clientAddress));
     }
 
+    /** 정규화 이메일과 실제 연결 IP의 로그인 예산을 세션과 독립적으로 묶는다. */
+    public List<AuthRateLimitKey> loginKeys(String normalizedEmail, InetAddress clientAddress) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            throw new AuthStateUnavailableException();
+        }
+        return List.of(hash(Action.LOGIN_EMAIL, normalizedEmail), hash(Action.LOGIN_IP, addressScope(clientAddress)));
+    }
+
     /** 정규화·권한 검사한 범위로 누적 한도와 현재 문맥의 cooldown 키를 만든다. */
     public List<AuthRateLimitKey> emailIssueKeys(String normalizedEmail, Purpose purpose, UUID accountId,
                                                UUID securityContextId, InetAddress clientAddress) {

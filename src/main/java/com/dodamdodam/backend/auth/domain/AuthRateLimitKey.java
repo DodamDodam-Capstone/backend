@@ -20,6 +20,8 @@ public record AuthRateLimitKey(Action action, byte[] keyHash) {
     /** 기존 기술 기준의 고정창 요청량이며 PIN 실제 오답 차단과 구분한다. */
     public enum Action {
         API_IP(300, 60),
+        LOGIN_EMAIL(10, 900),
+        LOGIN_IP(100, 900),
         EMAIL_SEND_SUBJECT(5, 900),
         EMAIL_SEND_IP(20, 900),
         EMAIL_RESEND(1, 60);

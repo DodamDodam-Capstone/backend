@@ -17,6 +17,7 @@ public class LoginSessionAuthenticationStrategy implements SessionAuthentication
     private final SessionFixationProtectionStrategy fixation = new SessionFixationProtectionStrategy();
     private final CsrfAuthenticationStrategy csrf;
 
+    /** 두 로그인 방식이 세션 고정 방어와 CSRF 교체를 같은 경로로 수행하게 구성한다. */
     public LoginSessionAuthenticationStrategy(SessionLifecycleService lifecycle, CookieCsrfTokenRepository csrfRepository,
                                               CsrfTokenRequestHandler csrfRequestHandler) {
         this.lifecycle = lifecycle;
@@ -25,9 +26,23 @@ public class LoginSessionAuthenticationStrategy implements SessionAuthentication
         csrf.setRequestHandler(csrfRequestHandler);
     }
 
+    /** 외부 인증 완료 결과를 기존 계정 문맥 교체로 연결한다. */
     @Override
     public void onAuthentication(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         var context = lifecycle.beginLogin(authentication, request);
+        prepareSession(authentication, context, request, response);
+    }
+
+    /** 비밀번호 자격 재검사를 통과한 문맥으로만 새 프레임워크 세션을 준비한다. */
+    public void onPasswordAuthentication(Authentication authentication, String expectedHash, long expectedVersion,
+                                          HttpServletRequest request, HttpServletResponse response) {
+        var context = lifecycle.beginPasswordLogin(authentication, expectedHash, expectedVersion, request);
+        prepareSession(authentication, context, request, response);
+    }
+
+    /** 이전 속성을 승계하지 않고 새 문맥·일반 로그인 수명·CSRF를 설정한다. */
+    private void prepareSession(Authentication authentication, AuthenticatedSession context,
+                                HttpServletRequest request, HttpServletResponse response) {
         try {
             var previous = request.getSession(false);
             if (previous != null) {

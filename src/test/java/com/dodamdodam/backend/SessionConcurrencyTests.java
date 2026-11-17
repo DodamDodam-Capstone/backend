@@ -68,10 +68,13 @@ class SessionConcurrencyTests {
             HttpResponse<Void> completed;
             try {
                 assertThat(delayed.loaded.await(10, TimeUnit.SECONDS)).as("old request loaded its native session").isTrue();
-                var path = replace ? "/api/v1/auth/login?account=" + current.account() : "/api/v1/auth/logout";
+                var path = replace ? "/api/v1/auth/login?sessionCookieProbe=true&account=" + current.account()
+                        : "/api/v1/auth/logout";
                 completed = client.send(request(path, oldCookie + "; XSRF-TOKEN=" + csrfCookie.getValue())
                                 .header("X-XSRF-TOKEN", JsonPath.read(csrf.body(), "$.token"))
-                                .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+                                .header("Content-Type", "application/json")
+                                .POST(replace ? HttpRequest.BodyPublishers.ofString("{}") : HttpRequest.BodyPublishers.noBody())
+                                .build(), HttpResponse.BodyHandlers.discarding());
                 assertThat(completed.statusCode()).isEqualTo(replace ? 200 : 204);
                 assertCredentialsRevoked(current);
             }

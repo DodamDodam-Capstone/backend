@@ -1,5 +1,6 @@
 package com.dodamdodam.backend.auth.session;
 
+import com.dodamdodam.backend.auth.exception.PasswordLoginException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.core.convert.ConversionException;
@@ -32,6 +33,21 @@ public class SessionLifecycleService {
 
     /** 이전 세션을 확인하고 새 로그인 문맥의 생성·커밋 장애를 인증 실패와 구분한다. */
     AuthenticatedSession beginLogin(Authentication authentication, HttpServletRequest request) {
+        return beginLogin(authentication, request, null, null);
+    }
+
+    /** 비밀번호 비교 결과를 계정 잠금 안에서 재검사하는 로그인만 시작한다. */
+    AuthenticatedSession beginPasswordLogin(Authentication authentication, String expectedHash, long expectedVersion,
+                                             HttpServletRequest request) {
+        if (expectedHash == null) {
+            throw PasswordLoginException.failed();
+        }
+        return beginLogin(authentication, request, expectedHash, expectedVersion);
+    }
+
+    /** 인증 principal과 이전 문맥을 확인하고 생성에 성공한 새 문맥만 보상 대상으로 기록한다. */
+    private AuthenticatedSession beginLogin(Authentication authentication, HttpServletRequest request,
+                                             String expectedHash, Long expectedVersion) {
         if (!trustResolver.isAuthenticated(authentication)) {
             throw new InsufficientAuthenticationException("로그인 계정을 확인할 수 없습니다.");
         }
@@ -53,7 +69,9 @@ public class SessionLifecycleService {
                 previous = new AuthenticatedSession(oldAccount, oldContext);
             }
             // REQUIRES_NEW의 커밋 실패도 프록시 호출이 끝나는 이 경계에서 분류한다.
-            var created = securityRepository.createLoginContext(accountId, previous);
+            var created = expectedVersion == null
+                    ? securityRepository.createLoginContext(accountId, previous)
+                    : securityRepository.createPasswordLoginContext(accountId, expectedHash, expectedVersion, previous);
             request.setAttribute(LOGIN_ATTEMPT, new PendingLogin(created));
             return created;
         }

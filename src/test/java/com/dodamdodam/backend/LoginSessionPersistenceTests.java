@@ -374,7 +374,8 @@ class LoginSessionPersistenceTests {
     private MvcResult manualLogin() throws Exception {
         var csrf = mockMvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk()).andReturn().getResponse();
         String token = JsonPath.read(csrf.getContentAsString(), "$.token");
-        return mockMvc.perform(post("/api/v1/auth/login").cookie(csrf.getCookie("XSRF-TOKEN"))
+        return mockMvc.perform(post("/api/v1/auth/login").param("sessionPersistenceProbe", "true")
+                .contentType("application/json").content("{}").cookie(csrf.getCookie("XSRF-TOKEN"))
                 .header("X-XSRF-TOKEN", token).header("Origin", "http://localhost:5173")).andReturn();
     }
 
@@ -504,7 +505,7 @@ class LoginSessionPersistenceTests {
             return Map.of("data", service.requireAuthenticatedSession(request));
         }
 
-        @PostMapping("/api/v1/auth/login")
+        @PostMapping(value = "/api/v1/auth/login", params = "sessionPersistenceProbe")
         void manualLogin(HttpServletRequest request, HttpServletResponse response) throws IOException {
             // 인증 완료 결과만 만드는 테스트 소비자다. 실제 비밀번호 확인 API는 SCRUM-78 범위다.
             var authentication = UsernamePasswordAuthenticationToken.authenticated(fault.accountName, null,
