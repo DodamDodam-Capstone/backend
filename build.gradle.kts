@@ -1,11 +1,12 @@
 plugins {
     java
-    id("org.springframework.boot") version "4.1.1"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.dodamdodam"
-version = "0.0.1-SNAPSHOT"
+// PR·릴리스와 같은 버전을 사용하고 configuration cache가 파일 변경을 추적하게 한다.
+version = providers.fileContents(layout.projectDirectory.file("VERSION")).asText.get().trim()
 description = "DodamDodam backend service"
 
 java {
@@ -23,7 +24,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-session-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.flywaydb:flyway-database-postgresql")
 

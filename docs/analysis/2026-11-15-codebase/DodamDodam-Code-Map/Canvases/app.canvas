@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "group602fdca8f0d0be94",
+      "type": "group",
+      "x": -55,
+      "y": -90,
+      "width": 4960,
+      "height": 540,
+      "label": "app · 업무 기능",
+      "color": "6"
+    },
+    {
+      "id": "group85535399b7baaa4e",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 1560,
+      "height": 350,
+      "label": "DodamDodamBackendApplication",
+      "color": "6"
+    },
+    {
+      "id": "n4511768b7ac61b27",
+      "type": "text",
+      "x": 30,
+      "y": 60,
+      "width": 480,
+      "height": 235,
+      "text": "### DodamDodamBackendApplication.main\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/DodamDodamBackendApplication#main m4511768b7ac61b27|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static void main(String[] args)`"
+    },
+    {
+      "id": "n5e5b5ef1c635c365",
+      "type": "text",
+      "x": 530,
+      "y": 60,
+      "width": 480,
+      "height": 235,
+      "text": "### DodamDodamBackendApplication.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/DodamDodamBackendApplication#생성자 m5e5b5ef1c635c365|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public DodamDodamBackendApplication()`\n\n자동 생성"
+    },
+    {
+      "id": "runtime1670ca6af6731a13",
+      "type": "text",
+      "x": 5900,
+      "y": 0,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nJVM 애플리케이션 시작",
+      "color": "5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "frameworkbd654537f4d2b650",
+      "fromNode": "runtime1670ca6af6731a13",
+      "fromSide": "right",
+      "toNode": "n4511768b7ac61b27",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    }
+  ]
+}

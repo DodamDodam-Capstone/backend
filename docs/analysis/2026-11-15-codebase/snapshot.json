@@ -1,0 +1,311 @@
+{
+  "date": "2026-11-15",
+  "branch": "feature/SCRUM-77-email-issuance",
+  "head": "40db54d5d5d54400b3f70f32795cab05da0f009b",
+  "workingTreeIncluded": true,
+  "files": [
+    {
+      "path": "src/main/java/com/dodamdodam/backend/DodamDodamBackendApplication.java",
+      "sha256": "cd7b12ebf6ed955108933bb36738e157199d7eddc5b3898b620a0313e560d83c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/api/AuthLogoutController.java",
+      "sha256": "ee5f3267c538e64855c6a49d1de578690cdede46317550112016ec00a7f89762"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/api/EmailVerificationController.java",
+      "sha256": "30eaef7901c6715774dbdd614bf803c411b59347fba663d149320852e7317c86"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/api/EmailVerificationExceptionHandler.java",
+      "sha256": "b9a6abe35518d448a8d06651a6f4a92518f245f9309a5fa2a10ff1bfb5614ca0"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/application/AuthRateLimitService.java",
+      "sha256": "b881cb12019c08038844baebd90f50a3b62b694b1dbb96710d2e878649f1f500"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/application/EmailVerificationCodeGenerator.java",
+      "sha256": "08263336ade3ca8e6ba5170148df766716e8803cb71be3b693192d2404e36ee0"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/application/EmailVerificationDeliveryService.java",
+      "sha256": "fb55edd1220b8d35191ff0dc39b99386835b8175fcc7de6005456454b3f039de"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/application/EmailVerificationIssuanceService.java",
+      "sha256": "6ceeb0e0ac8dbc90f0812267233beff6fc1f30da1129c16417b71ecd6404c43c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/domain/AuthRateLimitKey.java",
+      "sha256": "1147adad0306bdf81bb1e1c6e03c848fe1706a55825e9d42550a2ff84cd8c349"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/dto/IssueEmailVerificationRequest.java",
+      "sha256": "ec8c9c304a9d0509dbc80c3d378af0906d303f83a3ce69ed3abbdc9d3b42b51e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/dto/VerificationIssueResponse.java",
+      "sha256": "ac1219c08c616805d05a6b9943342b8d6cc00efe86ae7cc6a4006424300ec19e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/exception/AuthRateLimitException.java",
+      "sha256": "7bd1872db767e48322fd38c43b8169e49819b47b2f51e2fe2162a30819fe7d40"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/exception/EmailVerificationException.java",
+      "sha256": "071fb40fc46e03c9c3373bae1b66bb117024a2474f509d269cd3eff25d109605"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/AuthRateLimitKeyHasher.java",
+      "sha256": "b69c34644872ed31e2af72ecb39d0aec6f9498e5b616dee5ae1cf6eb37a02b4b"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/AuthRateLimitRepository.java",
+      "sha256": "445a272aff32f2bf5195915c3f3c76bad323fdc5063533eb1b8506d5659cc9a4"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/EmailVerificationAccountRepository.java",
+      "sha256": "cbec07fa7a380161756900786a1967060265aa4ba3175ee8e248c7580a6bc468"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/EmailVerificationCodeHasher.java",
+      "sha256": "acc06b15c7ef31ea653e7dc2cf8499c7f1633be049fcef4532a84b4a72cff771"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/EmailVerificationKeys.java",
+      "sha256": "edb628834e95a250c0de8a84acea196cd68b7ced3fe9bcd4759a0825f370a532"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/EmailVerificationRepository.java",
+      "sha256": "c70d85537aed90f64136d8812a972c14335deeacba4e28cc53baef812b60365a"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/infrastructure/SmtpEmailVerificationSender.java",
+      "sha256": "06dba0cf95d39057d7e9e30d208d8b3683bfc8e689f021900b1b6571810e2b2c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java",
+      "sha256": "1a65ba5b1f99a00c4ac97f98f6ae2ebb1994d774caf562811a1a8034ef28d853"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorHandler.java",
+      "sha256": "dd9c765bc2e5e807b27331e1980066b8bf28b3c222ba3c9366104f06e354c5f3"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/AuthStateUnavailableException.java",
+      "sha256": "da5d5b9776e80e0cb23bcedfbbbfd6099994914620b3bedad3368be587e8e634"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/AuthenticatedSession.java",
+      "sha256": "a5279341ffe10778e9ce333638ddd9cbe8b34b2f7a3488a52765c25b2eb22667"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/AuthenticatedSessionService.java",
+      "sha256": "3b450ec04544ffe70fdd33a5acb0a8fb8ca1ed60bd63f40c23520d2fac1f0190"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/LoginSecurityContextRepository.java",
+      "sha256": "7895bc5ced2a6d89a00c1d3b5217521e69392aabd838458a486f4aaec361c72a"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/LoginSessionAuthenticationStrategy.java",
+      "sha256": "617a34b5a91d4d325bca110cb4ce6f98ad305baad520e76764e8207816dbc0b0"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java",
+      "sha256": "6b4ec9a8154627e3820c19ee25aa9be8dfcca03f6e3ac79dbb28d891f4f069b6"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/SessionLifecycleService.java",
+      "sha256": "16a9c69a9569bbe663ccacd0994a460826db51ebf9768fddd818a00461728b34"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/auth/session/SessionSecurityRepository.java",
+      "sha256": "44537a51de07fd626093d88a248011d6899ebd7918b01606adec17c570f426da"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/api/ChildController.java",
+      "sha256": "31f773f5add869f7901d851536054501667850cce0d7a997ece554013086e19c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java",
+      "sha256": "ed9e11d8cac44e52567a306a2452f36dbca4b22b8d9eeac2177ccf0b62fef231"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/application/ChildService.java",
+      "sha256": "e15bffe1123de7d4a6273b33aa9aff06c6892c62b8c92ce3046757c986d9afdc"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/dto/ChildContext.java",
+      "sha256": "d8a3b94bc1a0faea53d06f235eaeb6cec956683d8540b6a115fac375d76d664e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/dto/ChildView.java",
+      "sha256": "a7a37c054a357d20453fbbdd7ceaff7411bbb928dfcb113d9ac76d3504a939bb"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/dto/CreateChildRequest.java",
+      "sha256": "01c6903cc96a0d9af6624d9d21264a738ab53f141a75dc33128619f29de13a3e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/exception/ChildException.java",
+      "sha256": "36db8f7a428ff4cf82d35782d590aaf32ae74af551560aaccc4a3be8e4e45104"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/child/infrastructure/ChildRepository.java",
+      "sha256": "f393eec96eac4d4fc9a87d20cf4d3fdf645245b33ba042c36e14ddd4b0ff1b1c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/api/ConversationController.java",
+      "sha256": "f48ecd83e1ca4d83c73345d7dece1ee85d954382dbf6d51b221ad5d80f7e9f28"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/api/ConversationExceptionHandler.java",
+      "sha256": "ed800bcec80c4aa9aa48f6fb01491e0832a72a59ebab4635ad582ae80c7dd1ac"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/api/ConversationMediaTypeExceptionHandler.java",
+      "sha256": "460a24a1cda012d0efb64a225fe769bed162d2691368d5c9e0f773a392006c24"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/api/ConversationStartResponseFilter.java",
+      "sha256": "890afe16c521e0ef35b46d6e90627449e39b8cebeda7bf36f32572c7dab1451d"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/application/ConversationClosureCoordinator.java",
+      "sha256": "b729fd61614b0922de6deff653974392c533c21c9f1e8a5606ffc33fc3542e16"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/application/ConversationService.java",
+      "sha256": "747ff6b0fade21c772bb075d3f4156d2360bc50cffaf2d66e136df9ebdabf688"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/domain/ConversationServiceHours.java",
+      "sha256": "ac58fa25d2864d5418ae4df779f60b1aee73e9209cc7eb8205177a4df6294c32"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/dto/ActiveConversationExistsError.java",
+      "sha256": "c412845b3ab90966d542ed9f2e8c0a8c7cc43f70eea1864b803fd099f436cf22"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/dto/StartConversationRequest.java",
+      "sha256": "d8308f36ab6b36d248825f8435edc61e12a13b8b12ece64b0f99247700a7cf5c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/dto/StartConversationResult.java",
+      "sha256": "0984e857199f5bf445acfcae2456e9b26652a3136fdca253222cbe0528905d93"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/exception/ConversationException.java",
+      "sha256": "de112dcdaed3e85a5bcfd1c802171553a0e35cfacfe04d5b7e15da3bebf438d8"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/infrastructure/ConversationClosureProperties.java",
+      "sha256": "97c577b8d5f5b3a57ecc900e47174071837b1ad077e5f5ef99a24659627d981b"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/infrastructure/ConversationClosureRepository.java",
+      "sha256": "f2009013bdca71dd2618410041e3903f7a2d1af759d1fd984de8d5d45e6fb73c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/conversation/infrastructure/ConversationRepository.java",
+      "sha256": "6e3f242c6b0139632f15939eee33a271fa26219db98627c43674bf3c30593ccd"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/auth/CsrfAccessDeniedHandler.java",
+      "sha256": "8edf3753019bb7acac528d4a36de838e1889fc0226054d40e7e9dcc98b142877"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/auth/CsrfController.java",
+      "sha256": "1af5a04e46e8cd48ee53a89bcb6dfd5741b35585f70fb9d85377352a19e2eb84"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/config/AppSecurityProperties.java",
+      "sha256": "9644ac7d938b8a9b452a2c410460100fa635902c7468c63bd0595e78e1c8cf7a"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/config/OAuth2ClientConfig.java",
+      "sha256": "509893de00893b075b0b631324a7e70fcd84a8781d8c26cb09641533d757524e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/config/OAuth2ClientProperties.java",
+      "sha256": "882daf857345584dee6f9888d6bc15f8b150639603b095d8a42c445c15d4c6ee"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java",
+      "sha256": "916b543efc50e22882f57f992aabe74dfafe9eb047136c93961881d2ae06e53a"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/config/SessionConfig.java",
+      "sha256": "85ef56a5e6fcae103e5962f4b717cdb825bdad2a970743a87e0d11b1f90c2d2c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/error/ApiErrorResponse.java",
+      "sha256": "95b3e3ea83008ab8b37ef2966fa8f7434edfc221e2f1a86182638d7d261218cd"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/error/ApiErrorResponses.java",
+      "sha256": "0b582c5645ed766d40f18af8bae02eb4a608b73b0a6c77032038412cd576ec2c"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/error/CommonApiExceptionHandler.java",
+      "sha256": "6897cf7ef862ee1c5cb6b2d86391689b4512d4cc15de3dbd877f383a55c54b68"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java",
+      "sha256": "65090c689ba51fb2923c66085c2326a1920bb195180747bb8a60cfbdc8c28e7e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/web/ClientAddressResolver.java",
+      "sha256": "1ea39ff879a49f6fcc5ff50db70fd46a1c5533f6f3390c8ca26b7b529eacc711"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/web/GlobalApiRateLimitFilter.java",
+      "sha256": "237fb28952bed03f25b8ce8cb58b145650bb4ee10d34c335460b4c29f1592ef1"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java",
+      "sha256": "4582f8b1ab17fd13dda3a02b3c7f65f385060b5b8fcb805decd9ec80799ace53"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/global/web/Part2JsonRequestGuardFilter.java",
+      "sha256": "2353378c326da497fceb331d95904ce734b91db575c257c06ca5f4e364fca399"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/guardian/api/GuardianAccessExceptionHandler.java",
+      "sha256": "1c7022f71afabe0eda58cc7ee2a9ee57ee9b654476961df8cf3515c9adabf2e8"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/guardian/application/GuardianAccessService.java",
+      "sha256": "6b935be45a0a1e3ea057332231255611b349de0a7815d7bfd700d73a60d1c945"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/guardian/exception/GuardianAccessException.java",
+      "sha256": "9e93e2db6973b2139f61147a7c5ee46ae6ad5c6b5035b793157e47cdaaf4117e"
+    },
+    {
+      "path": "src/main/java/com/dodamdodam/backend/guardian/infrastructure/GuardianAccessRepository.java",
+      "sha256": "3fb8573c18962269ed1ce896bad6c7580900a89c80c5460d137b8bb14469d37d"
+    }
+  ],
+  "methodology": "MCP graph discovery + javac semantic symbol binding (--release 25); framework dispatch manually classified",
+  "scope": "src/main/java only; includes nested/anonymous types, constructors and separately marked compiler-generated methods; excludes test helpers, dependencies and reflection/runtime dispatch expansion",
+  "stats": {
+    "files": 71,
+    "types": 106,
+    "declaredMethods": 271,
+    "generatedMethods": 295,
+    "callSites": 1798,
+    "internalCallSites": 724,
+    "internalPairs": 541,
+    "compilerErrors": 0
+  },
+  "limitations": [
+    "Calls inside lambdas are attributed to their containing source method; a reference means callback registration, not immediate execution.",
+    "Virtual dispatch is bound to the statically declared target, not all possible runtime implementations.",
+    "Java call order, branches, transaction timing and framework dispatch are not determined by the graph alone.",
+    "Generated members and source initializers have no standalone source definition.",
+    "No incoming Java edge does not imply unused code."
+  ]
+}

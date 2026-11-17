@@ -167,6 +167,9 @@ cp .env.example .env
 ./gradlew bootRun
 ```
 
+API를 호출하기 전에 §6의 이메일 발급·요청 제한 키 파일을 준비합니다. 키가 없으면 health는
+기동 확인에 사용할 수 있지만 보호 대상 API는503을 반환합니다. 실제 `.env`는 덮어쓰지 않습니다.
+
 `spring-boot-docker-compose`가 `compose.yaml`을 발견해 PostgreSQL을 시작하고,
 연결 정보를 애플리케이션에 제공합니다. 설정은 `start-only`이므로 애플리케이션을
 종료해도 PostgreSQL은 계속 실행됩니다.
@@ -291,6 +294,45 @@ cache이므로 팀 문서나 commit에 포함하지 않습니다.
 
 ## 6. 환경변수와 비밀값
 
+### 이메일 발급과 전역 요청 제한 키
+
+SCRUM-77은 `AUTH_RATE_LIMIT_KEY_FILE`, `EMAIL_CODE_KEY_FILE`의 **서로 다른 raw 32바이트 파일**을
+사용합니다. 파일은 프로세스 시작 시 읽으므로 변경 뒤 모든 인스턴스를 재시작합니다. 키가 없거나 길이가
+틀리면 해당 보안 처리를 503으로 거부하며 상수 키로 대체하지 않습니다. 제한 키 누락은 API/OAuth 진입을
+거부하지만 health/static에는 적용하지 않습니다. 번호 키·SMTP 설정만 빠진 경우 다른 API는 유지합니다.
+
+개발자가 로컬에서 직접 준비하는 예시입니다. 아래 명령은 키 내용을 출력하지 않습니다.
+
+```bash
+mkdir -p .secrets
+chmod 700 .secrets
+umask 077
+openssl rand -out .secrets/rate-limit.key 32
+openssl rand -out .secrets/email-code.key 32
+```
+
+`.secrets/`는 Git·Docker build에서 제외하며 full Compose는 `/run/secrets`에 읽기 전용으로
+마운트합니다. 로컬 macOS/Linux/WSL에서는 `./scripts/compose-local.sh up --build`를 사용합니다.
+이 스크립트는 호스트 파일 소유자와 같은 **비루트 UID/GID**로 앱을 실행하므로 디렉터리0700·파일0600을
+그대로 유지합니다. root 실행을 거부하며 비밀 파일을 다른 사용자에게 공개하거나 소유권을 바꾸지 않습니다.
+이미지·일반 Compose의 기본 사용자는 기존10001:10001이며 별도 배포에서는 이 UID/GID에만
+읽기 권한이 있는 비밀 파일 전달 방식을 준비합니다. 앱은 파일을 읽기만 하므로 다른 로컬 UID도 이미지의
+공개 jar를 읽어 실행할 수 있습니다. `.env.example`의 파일 경로는 bootRun 기준이며 Compose 내부 경로는 별도 지정됩니다.
+SMTP 인증 비밀번호는 `SMTP_PASSWORD_FILE`의 UTF-8 파일에 줄바꿈 없이 보관합니다. 파일 내용을
+대화·로그·PR에 붙이지 않습니다. 운영에서는 동일 환경의 모든 인스턴스에 같은 키를 안전하게 배포합니다.
+
+`SMTP_HOST`, `SMTP_PORT`(기본587), `SMTP_FROM`, `SMTP_USERNAME`, `SMTP_PASSWORD_FILE`을
+설정합니다. 기본은 STARTTLS 필수이며 implicit TLS는 `SMTP_SSL=true`, `SMTP_STARTTLS=false`로
+구성합니다. 서버 인증서·호스트 이름 검사를 유지합니다. 평문은 인증 없는 loopback 테스트 서버에만
+허용합니다. 연결·읽기·쓰기 timeout은 모두 `SMTP_TIMEOUT_MS`(기술 기준5000ms, 양의 int)입니다.
+설정 오류·발송 거부·timeout·결과 불명확은 해당 challenge를 별도 Tx에서 폐기한 뒤503으로 처리합니다.
+
+키 교체는 발급/검증/소비를 중단하고 진행 중 작업을 마친 유지보수 시간에 수행합니다. 번호 키를 바꾸기
+전에 기존 미소비·미폐기 challenge를 폐기하며 소비 완료 행·세션·제한 예산을 초기화하지 않습니다.
+제한 키 교체로 활성 예산이 초기화되므로 활성 window/차단이 모두 끝난 것을 DB에서 확인한 뒤 교체합니다.
+자동 키 회전·초기화 API는 제공하지 않습니다. 로컬 SMTP 테스트 통과는 운영 수신함 도달률 검증과 다릅니다.
+
+
 `.env.example`을 `.env`로 복사하고 로컬 값만 수정합니다. `.env`와 `.env.*`는
 Git에서 제외되며 `.env.example`만 커밋됩니다.
 
@@ -307,8 +349,28 @@ Git에서 제외되며 `.env.example`만 커밋됩니다.
 | `KAKAO_CLIENT_SECRET` | 발급 값 | 활성화한 Kakao client secret |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | React 개발 origin 목록 |
 | `APP_LOGIN_SUCCESS_URL` | `http://localhost:5173/oauth/callback` | 로그인 성공 후 React 이동 주소 |
-| `APP_LOGOUT_SUCCESS_URL` | `http://localhost:5173` | 로그아웃 후 이동 주소 |
 | `SESSION_COOKIE_SECURE` | `false` | 로컬 HTTP에서는 false, HTTPS 환경에서는 true |
+| `SESSION_COOKIE_SAME_SITE` | `lax` | 세션·CSRF 쿠키의 SameSite. `none`은 Secure=true 필요 |
+| `SUMMARY_PROCESSING_TIMEOUT` | 기본값 없음, 명시적 Duration 필수 | 요약 접수부터의 처리 기한. 양수·마이크로초 정밀도이며 D13/D14 수치는 별도 확정 |
+| `TURN_PROCESSING_TIMEOUT` | 기본값 없음, 명시적 Duration 필수 | 신규 발화 접수부터의 원래 처리 기한. 양수·마이크로초 정밀도이며 재전송 시 연장하지 않음 |
+
+`SUMMARY_PROCESSING_TIMEOUT`과 `TURN_PROCESSING_TIMEOUT`은 운영 기본값을 두지 않는다. `.env.example`의 빈 값을
+확정한 양의 Duration으로 채우거나 실행 환경에서 명시해야 하며, 미설정·0·음수는 기동 오류다.
+기존 개인 `.env`는 자동으로 수정하지 않는다. 테스트의 `src/test/resources/application.properties`에
+지정한 60초는 합성 fixture용 값이며 운영 정책을 확정한 값이 아니다.
+발화 기한의 Spring 설정 경로는 `app.conversation.turn.processing-timeout`이며 요약 설정 접두어와 구분한다.
+
+세션 쿠키 `JSESSIONID`는 HttpOnly이며, `XSRF-TOKEN`은 기존 FE 호환을 위해
+HttpOnly=false를 유지합니다. 두 쿠키 모두 Path=/, Domain 미설정(host-only)으로
+발급하고 Secure·SameSite 설정을 공유합니다. FE가 JSON 응답의 토큰만 사용한다면
+CSRF 쿠키의 HttpOnly=true 전환을 별도로 검토할 수 있습니다.
+
+로컬 HTTP는 `SESSION_COOKIE_SECURE=false`, `SESSION_COOKIE_SAME_SITE=lax`를
+사용합니다. HTTPS 환경은 Secure=true로 설정하고, FE/API가 같은 사이트인지에 따라
+SameSite를 결정합니다. `none`과 Secure=false의 조합은 기동 시 거부합니다.
+Google 로그인은 외부 사이트에서 GET callback으로 돌아오므로 `strict`를 권장하지
+않습니다. 실제 운영 origin·SameSite와 브라우저 쿠키 전달은 D17 확정 후 검증하며,
+테스트의 Secure=true·None 조합은 운영 설정을 확정한 것이 아닙니다.
 
 `application.yml`의 `local-...` OAuth 값은 자격 증명이 없을 때도 context가
 기동되도록 만든 비밀이 아닌 placeholder입니다. 실제 공급자 로그인에는 사용할 수
@@ -359,6 +421,85 @@ volumes:
 계획이 필요합니다.
 
 ### 7.3 마이그레이션 규칙
+
+프레임워크 세션은 Spring Session JDBC로 PostgreSQL에 저장합니다.
+`V1__create_spring_session_tables.sql`은 실제 사용 버전 4.1.1의 공식 PostgreSQL
+스키마를 적용하며, `SPRING_SESSION`과 `SPRING_SESSION_ATTRIBUTES`를 생성합니다.
+`spring.session.jdbc.initialize-schema=never`로 프레임워크의 자동 스키마 생성을
+끄고 Flyway만 스키마를 관리합니다.
+
+`spring.session.jdbc.flush-mode=immediate`는 세션 변경을 즉시 DB에 기록합니다.
+이 저장은 업무 DB 트랜잭션과 자동으로 원자적이지 않습니다. 현재 기본 timeout은
+30분이고 쿠키 이름은 `JSESSIONID`입니다. 공유 로그인 전략을 거친 일반 세션만
+inactive interval=-1과 업무 expires_at=NULL로 전환합니다.
+
+일반 인증 세션은 로그인 성공 시와 보호 API의 유효한 사용 후 `JSESSIONID`를
+`Max-Age=31536000`(365일)로 발급·갱신합니다. `SessionCookieRenewalFilter`는 Spring Session의
+native 저장 뒤 실제 응답 커밋 전에 저장된 principal·계정·문맥과 DB의 현재 유효성을
+다시 확인합니다. 기존 `CookieSerializer`를 재사용하므로 인코딩·Path·Domain·HttpOnly·
+Secure·SameSite 설정이 일치하며, 같은 응답에 세션 쿠키를 중복 발급하지 않습니다.
+응답 전 상태가 무효해지면 성공 본문을 제거하고 401, 저장소 장애는 503을 반환합니다.
+이때 요청 ID·보안·CORS 헤더는 유지합니다.
+
+익명/OAuth 임시 세션과 공개 CSRF 조회에는 지속 쿠키를 적용하지 않습니다.
+실패 응답은 갱신하지 않으며 로그아웃의 `Max-Age=0` 만료가 갱신보다 우선합니다.
+쿠키 사용은 `securityContextId`·`setup_generation`·보호자 확인 1800초·PIN 버전이나
+두 PIN 목적 proof의 만료를 변경하지 않습니다. 공개 엔드포인트가 나중에 인증 권한을
+사용한다면 동일한 공통 인증 판정을 호출해야 갱신 대상이 됩니다.
+
+현재 Spring Session JDBC 4.1.1의 기본 명시적 삭제 SQL은 음수 timeout을 제외합니다.
+`SessionConfig.explicitSessionDeletion`은 표준 `SessionRepositoryCustomizer`로
+`deleteById`를 ID 기준 삭제로 설정하여 무기한 세션도 로그아웃·교체·보상 때 삭제합니다.
+Flyway 스키마와 만료 cleanup은 표준 구현을 유지합니다. 근거는
+[4.1.1 저장소 소스의 DELETE_SESSION_QUERY](https://github.com/spring-projects/spring-session/blob/4.1.1/spring-session-jdbc/src/main/java/org/springframework/session/jdbc/JdbcIndexedSessionRepository.java)이며,
+유한·무기한 세션의 명시적 삭제와 속성 cascade를 실제 PostgreSQL 테스트로 검증합니다.
+
+업무 계정과 보안 문맥은 V2의 `accounts`·`session_security`, PIN challenge/token은
+V3의 `email_verifications`에 저장합니다. `session_security.expires_at=NULL`을
+허용하며 guardian 기한·PIN 버전은 함께 설정하거나 함께 해제해야 합니다.
+`SessionSecurityRepository.revokeCurrentContext(accountId, securityContextId)`는
+현재 문맥·guardian·미소비 두 PIN 목적을 한 업무 트랜잭션에서 폐기합니다.
+무효 문맥은 false, DB 실패는 예외로 전달합니다. 프레임워크 세션·쿠키 정리는
+이 업무 트랜잭션의 커밋을 확인한 뒤 실행하며, API 로그아웃이 이 순서를 사용합니다.
+
+보호 API는 `AuthenticatedSessionService.requireAuthenticatedSession(request)`를
+통해 프레임워크 세션·인증 principal·업무 문맥을 함께 확인합니다. principal 이름은
+계정 UUID 문자열이고, native 세션의 `accountId`·`securityContextId` 속성은 UUID입니다.
+계정/문맥 결합, 폐기, 최신 계정 버전과 DB 현재 시각 기준의 유한 만료를 매번 검사하며
+일반 세션의 NULL 기한도 다른 검사를 생략하지 않습니다. 유효하면 두 UUID를 반환합니다.
+무효/비로그인은 `401 AUTHENTICATION_REQUIRED`, 저장소 읽기·쓰기·역직렬화 실패는
+`503 AUTH_STATE_UNAVAILABLE` 공통 JSON으로 처리합니다. CSRF 실패의 403은 인증 판정보다
+먼저 처리하고, API 인증 실패에 로그인 페이지 redirect나 익명 요청 저장용 세션을 만들지 않습니다.
+Backend 컨트롤러의 명시적 인증 저장소 장애는 `503 AUTH_STATE_UNAVAILABLE`, 그 밖의
+미처리 업무 오류는 원문 없는 `500 INTERNAL_ERROR`로 변환합니다. JSON·UUID 구조 오류는
+400이며 자녀 기능의 404·409 처리가 공통 fallback보다 우선합니다. 진행 중 로그인 실패는
+외곽 필터로 전달해 보상 폐기하며, MVC 밖의 Spring Session 저장 장애도 기존 503 경로를 유지합니다.
+
+로그인 소비자는 **자격 검증 트랜잭션을 마친 뒤** 공유
+`SessionAuthenticationStrategy.onAuthentication(authentication, request, response)`를 호출하고,
+인증 결과를 `SecurityContextHolder`에 설정한 다음 동일한
+`SecurityContextRepository.saveContext(context, request, response)`로 명시적으로 저장합니다.
+principal 이름은 인증이 끝난 계정 UUID 문자열이어야 합니다. 실제 비밀번호 검증과
+provider sub→계정 UUID 매핑은 SCRUM-78·93의 책임이며, 이번 테스트의 수동 로그인 API와
+synthetic OAuth 결과는 테스트 구성에서만 제공합니다.
+
+공유 `LoginSessionAuthenticationStrategy`는 기존 계정·문맥의 자격 폐기와 새 문맥 등록을
+별도 업무 트랜잭션에서 커밋한 뒤 표준 세션 고정 방지·CSRF 교체를 각각 한 번 수행합니다.
+기존 일반 속성·guardian 값은 새 native 세션에 복사하지 않으며, 새 업무 문맥의 guardian은
+비어 있고 setup_generation은 0입니다. 계정 간 교체는 계정 UUID 정렬 순서로 잠급니다.
+이메일 소비자는 업무 DB 잠금을 유지한 상태로 이 전략을 호출하지 않아야 합니다.
+
+`LoginSecurityContextRepository`는 표준 request/native 저장소에 인증을 저장한 뒤
+native 세션을 재조회합니다. 저장된 principal·accountId·securityContextId와 음수 timeout,
+업무 문맥의 최신 계정 버전·미폐기·만료 상태를 확인합니다. 저장 호출의 정상 반환만으로
+성공으로 판단하지 않으며, `AuthStateErrorFilter`가 native 응답 저장 뒤 HTTP 응답 직전에도
+같은 판정을 수행합니다. 명시적 saveContext를 빠뜨린 소비자도 성공 응답을 낼 수 없습니다.
+
+새 문맥 커밋 후 저장 실패·누락·재판정 실패는 새 문맥을 보상 폐기하고 native 세션 삭제를
+시도한 뒤 `503 AUTH_STATE_UNAVAILABLE`로 처리합니다. 이전 폐기 문맥·guardian은 복구하지
+않으며, 응답을 커밋하기 전 새 JSESSIONID와 성공 Location을 제거합니다. 보상 DB 확인도
+실패하면 성공으로 간주하지 않고 503을 유지합니다. 이 경우 DB 정리 완료를 보장할 수 없으며
+별도 보상 큐는 두지 않습니다. 이미 전송한 응답 바이트는 재작성할 수 없습니다.
 
 새 스키마 파일은 다음 위치와 이름 규칙을 사용합니다.
 
@@ -444,6 +585,8 @@ Kakao endpoint, JWK endpoint, issuer는 공식 Discovery 문서의 값으로 코
 
 ## 10. React 연동 기준
 
+### 10.1 OAuth 진입과 cookie 전달
+
 로그인 버튼은 AJAX로 공급자 URL을 호출하기보다 브라우저 navigation을 사용합니다.
 
 ```text
@@ -460,13 +603,62 @@ await fetch("http://localhost:8080/api/v1/example", {
 });
 ```
 
-POST·PUT·PATCH·DELETE 전에 CSRF 토큰을 받습니다.
+React 개발 서버가 다른 port를 사용하면 `APP_CORS_ALLOWED_ORIGINS`와 로그인 성공
+URL을 함께 수정합니다. credential을 사용하는 CORS에서는 `*` origin을 사용하지
+않습니다. SameSite·Secure는 [환경변수와 비밀값](#6-환경변수와-비밀값)의 쿠키 설정과
+배포 구성을 함께 확인합니다.
+
+### 10.2 CSRF 획득과 재획득 시점
+
+POST·PUT·PATCH·DELETE 전에 CSRF 토큰을 확보합니다. 로그인 전 공개 인증 POST도
+`XSRF-TOKEN` 쿠키와 `X-XSRF-TOKEN` 헤더가 필요합니다. 쿠키는 브라우저가 관리하고,
+FE는 GET `/api/v1/auth/csrf`의 JSON token을 메모리에 보관해 헤더로 전달합니다.
+CSRF 응답은 `{headerName, parameterName, token}`이며 `data`로 감싸지 않습니다.
+응답의 `parameterName`은 `_csrf`로 유지하지만 query/form 파라미터로 헤더를
+대체할 수 없습니다. 토큰 누락·빈 값·불일치는 `403 CSRF_INVALID` JSON 오류로
+반환하며, `error.requestId`는 서버 생성 `X-Request-ID`와 같습니다.
+응답에는 `Cache-Control: no-store`를 적용합니다.
+
+| 시점 | FE 처리 |
+| --- | --- |
+| 최초 진입 | credentials를 포함한 GET으로 token을 받은 뒤 공개 인증 POST를 허용합니다. |
+| 로그인 성공 | 이전 메모리 token을 비우고 GET을 완료한 뒤 다음 POST를 허용합니다. OAuth는 성공 URL로 돌아온 화면에서 수행하고, 후속 이메일 로그인은 성공 응답 뒤 수행합니다. |
+| 로그아웃 성공 | 로그인 상태·이전 메모리 token을 비우고 익명 상태에서 GET을 완료합니다. 후속 API 로그아웃의 204 응답 뒤 수행합니다. |
+| 인증 실패 | 성공 시 정리를 적용하지 않습니다. 단, `CSRF_INVALID`이면 아래 복구 절차를 따릅니다. |
+| 일반 API 호출 | 현재 token을 재사용합니다. 반복 GET은 기존 쿠키의 같은 token을 반환하므로 매 POST 전에 GET을 반복하거나 강제 회전을 기대하지 않습니다. |
+
+로그인·로그아웃 성공 응답의 쿠키 만료를 적용한 뒤에는 이전 메모리 token을 보내지
+않습니다. GET이 실패하면 token을 사용 가능한 상태로 되돌리지 않고 POST를 보류합니다.
+FE의 token은 메모리에만 보관하며 token·쿠키 값·raw session ID는 로그에 기록하지
+않습니다. 현재 `CookieCsrfTokenRepository`에는 서버 측 폐기 목록이 없으므로 이전
+쿠키와 동일 헤더를 수동 재전송하는 것까지 차단한다고 해석하지 않습니다.
+
+### 10.3 호출 예시
+
+다음은 호출 순서 예시입니다. `/api/v1/example`은 설명용 경로이므로 실제 사용할 API로
+교체합니다. `refreshCsrf()`는 최초 진입과 로그인·로그아웃 성공 뒤에 호출합니다.
 
 ```javascript
-const csrf = await fetch("http://localhost:8080/api/v1/auth/csrf", {
-  credentials: "include",
-}).then((response) => response.json());
+let csrf = null;
 
+async function refreshCsrf() {
+  csrf = null;
+  const response = await fetch("http://localhost:8080/api/v1/auth/csrf", {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`CSRF 획득 실패: HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  if (payload?.headerName !== "X-XSRF-TOKEN"
+      || typeof payload.token !== "string" || payload.token.length === 0) {
+    throw new Error("CSRF 응답 형식 오류");
+  }
+  csrf = payload;
+}
+
+await refreshCsrf();
 await fetch("http://localhost:8080/api/v1/example", {
   method: "POST",
   credentials: "include",
@@ -478,9 +670,427 @@ await fetch("http://localhost:8080/api/v1/example", {
 });
 ```
 
-React 개발 서버가 다른 port를 사용하면 `APP_CORS_ALLOWED_ORIGINS`와 로그인 성공
-URL을 함께 수정합니다. credential을 사용하는 CORS에서는 `*` origin을 사용하지
-않습니다.
+### 10.4 오류 복구와 재시도
+
+- `403 CSRF_INVALID`: 메모리 token을 비우고 credentials를 포함한 GET으로 다시 받습니다.
+  403 응답도 새 CSRF 쿠키를 발급할 수 있으므로 브라우저가 해당 쿠키를 반영하도록 합니다.
+  재획득이 성공해도 실패한 업무 POST를 자동 재실행하지 않습니다. 사용자 확인과 해당
+  API의 재시도 계약에 따라 별도로 실행합니다.
+- `401 AUTHENTICATION_REQUIRED`: 로컬 로그인 상태·token을 비우고 재로그인 흐름으로
+  이동합니다. 이메일 로그인 자체의 `401 LOGIN_FAILED`는 자격 증명 실패이므로 구분합니다.
+- 네트워크 오류: 서버에서 POST가 처리됐는지 응답 없이 단정할 수 없습니다. 무조건
+  재전송하지 않고 조회로 결과를 확인하거나 해당 API의 복구 계약을 따릅니다.
+- GET 재획득 실패: 후속 POST를 보류합니다. `429`이면 `Retry-After`만큼 기다리고,
+  반복 호출로 토큰을 얻으려 하지 않습니다.
+
+공통 오류·재시도 기준은 [공통 HTTP와 세션 계약](p0/api/01-common.md#section-3)을 따릅니다.
+
+### 10.5 Backend 인증 API 연결
+
+현재 OAuth 로그인은 Spring Security 인증 필터의 공유 세션 전략과 인증 문맥 저장 처리를
+사용합니다. 로그아웃은 `POST /api/v1/auth/logout`이며 성공 시 본문 없는 204를 반환합니다.
+기본 `/logout` 매핑과 성공 redirect는 제거했습니다. `APP_LOGOUT_SUCCESS_URL` 설정은
+더 이상 사용하지 않으며, 204를 받은 FE가 화면 이동과 로컬 상태 정리를 담당합니다.
+허용된 origin의 FE는 `/api/**`의 credentialed CORS로 호출할 수 있습니다.
+이메일 로그인 자격 검증 API는 SCRUM-78에서 연결합니다.
+
+후속 **이메일 로그인**은 다음 순서를 지킵니다.
+
+1. 자격 증명과 최신 계정 상태를 검증한 뒤, 인증 필터와 같은 구성의
+   `SessionAuthenticationStrategy.onAuthentication(...)`을 실행합니다. 세션 fixation
+   방어와 현재 cookie repository를 사용하는 `CsrfAuthenticationStrategy`를 포함해야
+   하며, 사용자 정의 컨트롤러에 자동 적용된다고 가정하지 않습니다.
+2. 인증된 `SecurityContext`를 만들고 요청 처리 문맥에 설정한 뒤, 보안 필터와 같은
+   `SecurityContextRepository.saveContext(...)`로 저장합니다. `SecurityContextHolder`만
+   설정하면 다음 요청의 인증 보존을 보장하지 않습니다.
+3. 업무 보안 문맥과 실제 framework 세션 저장까지 성공한 뒤 200을 반환합니다.
+   저장 실패의 503·보조 문맥 폐기는 [이메일 로그인 계약](p0/api/02-auth.md#section-6-5)을
+   따릅니다. JDBC 세션 저장과 업무 트랜잭션이 자동으로 원자적이라고 가정하지 않습니다.
+
+**API 로그아웃**은 다음 순서로 처리합니다.
+
+1. 실제 body를 최대 16,385바이트까지 읽어 16,384바이트 초과는 413, 미지원 Content-Type은
+   415로 거부합니다. JSON은 `application/json`과 UTF-8을 사용하며, Content-Type 없는
+   0바이트 요청도 허용합니다. 이후 CSRF → 로그인 → 실제 0바이트 구조 검증을 수행합니다.
+   유효한 CSRF를 가진 비로그인은 401이며, 인증된 요청의 `{}`·`null`·공백도 400입니다.
+2. 현재 `session_security`와 보호자 확인·PIN 관련 권한의 DB 폐기를 먼저 커밋합니다.
+   DB 폐기가 실패하면 `503 AUTH_STATE_UNAVAILABLE`로 처리하고 성공 응답을 내지 않습니다.
+3. 성공한 DB 폐기 뒤 `SecurityContextLogoutHandler`로 인증 문맥·세션을 정리하고,
+   같은 cookie repository의 `CsrfLogoutHandler`로 CSRF를 정리합니다. 세션·CSRF 쿠키는
+   발급 때와 같은 Path/Domain으로 만료시키고, 모든 정리가 성공한 뒤 본문 없는 204를
+   반환합니다. JSESSIONID 만료는 세션 invalidate 뒤 표준 Spring Session 응답 처리와
+   동일 CookieSerializer가 담당합니다. 물리 세션 삭제 실패도 503이며, 이미 커밋한 DB
+   폐기를 복구하지 않습니다. 삭제가 늦어져도 이전 쿠키는 업무 문맥 검사에서 401입니다.
+
+FE는 로그아웃 요청에 `credentials: "include"`와 현재 `X-XSRF-TOKEN`을 포함하고 body를
+보내지 않습니다. 204 이후 GET `/api/v1/auth/csrf`로 토큰을 재획득합니다. 실패·네트워크
+오류 후 POST를 자동 재시도하지 않습니다. 자세한 기준은
+[로그아웃 계약](p0/api/02-auth.md#section-6-7)을 따릅니다.
+인증 쿠키의 365일 발급·갱신은 위 JDBC 세션 정책을 따릅니다. 실제 OAuth·HTTPS 브라우저
+연동은 D17 확정 후 SCRUM-129의 검증 범위입니다.
+
+Spring Security 근거: [CSRF 수명주기](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
+[인증 문맥 저장](https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html),
+[로그아웃 처리](https://docs.spring.io/spring-security/reference/servlet/authentication/logout.html).
+
+### 10.6 필터 실행 순서와 변경 기준
+
+세션·인증 계약에 관련된 필터의 상대 순서를 아래에서 관리합니다. 요청 진입은 작은
+order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_VALUE`)입니다.
+
+| 서블릿 필터 | order | 배치 이유 |
+| --- | --- | --- |
+| [ApiResponseHeadersFilter](../src/main/java/com/dodamdodam/backend/global/web/ApiResponseHeadersFilter.java) | `H` | 뒤 단계의 성공·실패 응답에 서버 생성 요청 ID와 `no-store`를 적용합니다. |
+| [AuthStateErrorFilter](../src/main/java/com/dodamdodam/backend/auth/session/AuthStateErrorFilter.java) | `H + 1` | 세션 저장·쿠키 갱신을 감싸 예외를 변환하고, 로그인 최종 검증·실패 보상과 보호자·이메일 발급 응답 재검사를 수행합니다. |
+| [SessionCookieRenewalFilter](../src/main/java/com/dodamdodam/backend/auth/session/SessionCookieRenewalFilter.java) | `H + 2` | Spring Session 저장 후, 실제 전송 전에 인증을 재검증하고 지속 쿠키를 기록합니다. |
+| Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
+| Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
+| [ConversationStartResponseFilter](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationStartResponseFilter.java) | Security 위임 필터 order + 1, 기본 `-99` | 보안 체인이 다음 서블릿 필터를 호출하는 동안 인증 문맥을 유지한 채 대화 시작 성공 응답을 전송 전에 재검사합니다. |
+
+`H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.2의 기본값을 사용합니다.
+프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
+
+앞단 필터가 응답을 감싼 뒤 다음 필터를 호출하므로, 정상 응답의 관련 처리는 안쪽부터
+진행합니다. 현재 저장·갱신 순서는 다음과 같습니다.
+
+```text
+Spring Session native 저장
+→ SessionCookieRenewalFilter의 저장 상태 재조회·쿠키 갱신
+→ AuthStateErrorFilter의 로그인 최종 검증(로그인 요청일 때)
+→ AuthStateErrorFilter의 보호자 권한 재조회(검사 성공 표식이 있는 400 미만 응답)
+→ AuthStateErrorFilter의 이메일 발급 상태·PIN 문맥 재조회(발급 표식이 있는 400 미만 응답)
+→ 실제 HTTP 응답 전송
+```
+
+대화 시작 POST에는 위 응답 흐름 앞에 Part 2 전용 전송 검사가 추가됩니다.
+`ConversationStartResponseFilter`는 `SecurityFilterProperties`의 실제 order + 1로 서블릿에 한 번 등록합니다.
+별도의 Security 체인 등록이나 Part 1 필터 변경은 없습니다. 보안 체인의 하위 서블릿 필터이므로
+callback과 미커밋 반환 검사 중에도 기존 `AuthenticatedSessionService`를 사용할 수 있습니다.
+Controller가 실제 201/200 성공 후 기록한 서버 문맥·시작 키·대화 ID만 재검사하며,
+Part 1·다른 Part 2 경로·400 이상 응답에는 적용하지 않습니다.
+
+첫 본문 전송/flush/Content-Length 충족 직전과 미커밋 반환 시 현재 로그인을 먼저 확인한 뒤,
+새 업무 Tx에서 계정 → 현재 보안 문맥 → 소유 아이 → 반환 대상 대화 → 기존 link를 잠가 다시 읽습니다.
+잠금 대기 뒤 DB `clock_timestamp()`로 start의 시간 우선순위, 당일 ACTIVE, 현재 연결을 확인합니다.
+자정/기존 CLOSING 정리가 필요하면 기존 공통 조정기를 사용하며 새 대화나 link는 만들지 않습니다.
+정상 종료 정리는 커밋한 뒤 403/409를 전달하고, 생성 Tx는 이미 커밋됐으므로 전송 거부로 되돌리지 않습니다.
+
+검사 실패는 MVC가 일반 500으로 소비하지 않고 Part 2 필터까지 전달합니다. 아직 커밋되지 않은
+성공 본문·Content-Length·Location·JSESSIONID 갱신 쿠키를 제거한 다음 기존 업무 오류 처리기로
+403/404/409/500 JSON을 만듭니다. requestId·no-store·CORS는 유지합니다.
+인증 무효/확인 장애는 기존 외곽 필터의 401/503 처리로 넘깁니다. 이미 전송한 바이트를 회수하거나
+DB 판정과 네트워크 전송을 하나의 원자적 작업으로 보장하는 기능은 아닙니다.
+현재 시작 API의 동기 MVC 응답에 적용하며, 후속 스트리밍/비동기 API는 별도 계약 검증이 필요합니다.
+
+두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
+컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
+저장·재검증이 실패하면 바깥 `AuthStateErrorFilter`가 아직 전송되지 않은 성공 본문과
+`Content-Length`·`Location`·인증 쿠키를 제거하고 401·403·503으로 처리합니다.
+서버 요청 ID·`no-store`·CORS 헤더는 유지합니다. 로그아웃 만료 쿠키의 `Max-Age=0`은
+갱신보다 우선합니다. 이미 전송된 응답은 재작성할 수 없습니다.
+
+`GuardianAccessService.requireGuardianAccess` 성공 시에만 같은 요청의 계정·문맥 표식을
+남기고, 응답 커밋 직전과 미커밋 종료 시 `verifyResponseAccess`로 현재 DB 권한을 다시
+읽습니다. 표식 자체는 현재 권한을 보증하지 않으며 최초 기한이나 HTTP 세션의 guardian
+속성을 재사용하지 않습니다. 일반 요청과 이미 오류 상태인 응답은 guardian 재검사 대상이
+아닙니다. 재검사 대상의 늦은 guardian·인증 확인 예외는 MVC handler가 소비하지 않고
+외곽 필터로 넘겨 성공 본문·헤더를 먼저 비웁니다. 명시적인 인증 확인 장애는 guardian
+표식 없이도 같은503 경로를 사용하며 native 세션 재조회 실패도 포함합니다. guardian만
+거부된 403은 일반 로그인을 폐기하지 않습니다. 이 연결은 동기 MVC 응답을 대상으로 합니다.
+
+Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상대 위치로 관리합니다.
+`SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
+`CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
+`@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
+검사 대상은 `POST /api/v1/auth/logout`, `POST /api/v1/children`,
+`POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/login`입니다. 네 경로 모두
+실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
+Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
+UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
+
+크기·형식 검사를 통과한 본문은 동기 MVC용 request wrapper에 보관해 후속 코드가 다시
+읽을 수 있습니다. 로그아웃은 기존 `EMPTY_BODY` 속성으로 실제 0바이트 여부를 확인합니다.
+자녀 JSON은 로그인 검증 이후 [ChildController](../src/main/java/com/dodamdodam/backend/child/api/ChildController.java)에서
+읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
+자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java)에서
+400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
+
+이메일 로그인은 [로그인 구현 문서](PASSWORD_LOGIN.md)의 원문 입력·해시 포맷·CSRF 교체 계약을 따릅니다.
+로그인 Controller는 엄격한 UTF-8 디코딩 후 JSON을 파싱해 잘못된 인코딩의 조용한 대체·자동 감지와 요청 인자 DEBUG 노출을 막습니다.
+기존 세션 전략과 외곽 필터를 재사용하며 필터 순서는 변경하지 않습니다.
+
+[Part2JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part2JsonRequestGuardFilter.java)는
+Part 1 필터 바로 앞에 한 번 등록하며 `POST /api/v1/children/{childId}/conversations`에만 적용합니다.
+`application/json`과 생략 또는 UTF-8인 charset만 허용하며, Content-Type 누락·미지원·문법 오류는
+CSRF·로그인보다 먼저 공통 오류 형식의 415 `UNSUPPORTED_MEDIA_TYPE`으로 반환합니다.
+본문은 소비·복사·파싱하지 않으며 미확정인 Part 2 크기 제한이나 Part 1의 16 KiB 제한을 적용하지 않습니다.
+정상 형식의 JSON 구조 검증은 CSRF·로그인 이후 기존 MVC·DTO에서 수행합니다.
+Part 1 경로와 resume/end·음성 등 다른 Part 2 경로는 이 필터의 대상이 아닙니다.
+[ConversationMediaTypeExceptionHandler](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationMediaTypeExceptionHandler.java)는
+대화 시작 컨트롤러에서 발생한 MVC 미지원 미디어 타입 예외도 415로 변환하며,
+다른 컨트롤러와 공통 예외 처리기의 동작은 변경하지 않습니다.
+관련 검사 순서는 다음과 같습니다.
+
+```text
+CORS → 전역 API_IP 예약 → Part 2 Content-Type → Part 1 전송 크기·Content-Type → CSRF → 조건부 업무 세션 인증 → 본문·업무 검증
+```
+
+CORS가 요청을 종료하거나 앞 단계가 거부하면 뒤 단계는 실행되지 않습니다.
+
+[GlobalApiRateLimitFilter](../src/main/java/com/dodamdodam/backend/global/web/GlobalApiRateLimitFilter.java)는
+Security 내부에서 Part 2 전송 필터 바로 앞에 한 번 등록합니다. `/api/v1/**`, `/oauth2/**`,
+`/login/oauth2/**`의 조회·polling·재시도도 같은 IP 예산300회/60초에 포함하며 초과 시429를
+전송 검사보다 먼저 반환합니다. health/static은 제외합니다. 정상 preflight는 CORS에서 종료됩니다.
+서블릿 request wrapper를 벗긴 연결 주소를 사용하므로 임의의 `Forwarded`/`X-Forwarded-For`로
+예산을 새로 만들지 않습니다. 프록시 뒤에서는 프록시 연결 IP의 예산을 공유하며 신뢰 프록시 구성·부하와
+실제 운영값은 D17 검증 대상입니다. `server.forward-headers-strategy=framework` 기준입니다.
+
+이메일 발급은 전역 예산을 다시 예약하지 않습니다. 구조 검증 뒤 발급 subject/IP/cooldown을 별도
+Tx로 함께 예약하고, 업무 Tx에서 실제 최신 created_at+60초를 다시 검사합니다. SMTP는 업무 커밋 뒤
+호출합니다. 성공 결과는 id와 고정6자리 소수부의 KST 만료 시각뿐이며 정상·decoy의 응답 구조·길이를
+같게 유지합니다. 공개 목적은 같은 발송 경로, PIN 목적은 검증한 계정 이메일을 사용합니다.
+
+발급 marker는 HttpSession이 아닌 request에만 둡니다. 발송 뒤와 실제 전송 직전 DB를 새로 읽고
+PIN 이메일·문맥/generation/현재 PIN 버전이 바뀌었으면 해당 발급만 폐기한 뒤401/목적별403으로
+거부합니다. 확인 장애는503입니다. 기존 native 세션 검증·지속 쿠키·guardian 응답 검사도 유지합니다.
+민감 성공 본문·Location·JSESSIONID 갱신 쿠키를 보내기 전에 비우며 이미 전송한 bytes를 회수하지는 못합니다.
+[LoginSessionAuthenticationStrategy](../src/main/java/com/dodamdodam/backend/auth/session/LoginSessionAuthenticationStrategy.java)는
+인증 성공 시 호출되는 전략이며, 실행 절차는 10.5절의 공유 로그인 계약을 따릅니다.
+
+필터를 추가·삭제·이동할 때는 같은 변경에서 이 절의 **등록 위치·현재 순서·배치 이유·영향받는
+요청/응답 흐름**을 갱신합니다. 변경 이유와 검증 결과는 해당 PR에 남깁니다.
+`SessionCookieLifecycleTests`·`LoginSessionPersistenceTests`·`LogoutContractTests`·
+`CsrfLifecycleContractTests` 등 관련 계약 테스트로 저장 후 갱신, 실패 시 성공 응답 차단,
+로그아웃 만료, 오류 우선순위를 확인하고 필요한 동작 사례를 보완합니다.
+`Part1JsonRequestGuardTests`는 크기 경계·UTF-8 재읽기·Content-Length 누락/허위와 제한 읽기를,
+`LogoutContractTests`는 기존 로그아웃 계약과 자녀 경로의 413/415 → CSRF 순서를 확인합니다.
+`global.web.Part2JsonRequestGuardFilterTests`는 형식·UTF-8·미소비·경로 격리를,
+`conversation.api.ConversationCreationContractTests`는 PostgreSQL에서 시작 요청의 415 우선순위와
+정상 201/200·입력 400·인증 401·CSRF 403·소유권 404를 확인합니다.
+`conversation.api.ConversationMediaTypeExceptionHandlerTests`는 필터 밖 MVC 예외의 415와 처리 범위를 확인합니다.
+`child.api.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
+입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
+`child.application.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
+동시 등록의 잠금 대기를 확인합니다. 같은 계정은 201/409와 한 행, 다른 계정은 같은 애칭으로도
+독립 등록을 검증하며, 테스트 전용 응답 advice와 latch로 등록 커밋 후 폐기 순서를 고정합니다.
+응답 직전 재검사에서 폐기를 확인하면 자녀 본문·Location 없이 401을 반환하고 세션 쿠키를
+갱신하지 않습니다. 이미 등록이 확정됐을 수 있으므로 POST를 자동 재실행하지 않고,
+재로그인 후 목록으로 확인하는 계약을 SCRUM-81에 인계합니다. 목록 API는 이 작업에 포함하지 않습니다.
+
+**전체 Spring 구성과 요청·응답 흐름**
+
+실선은 요청·처리 순서, 점선은 설정·의존 호출입니다. 보안 체인의 숫자는 현재 실행 순서이며,
+조건에 맞는 요청만 로그인·로그아웃 경로로 분기합니다. 인코딩·관측·forwarded header·MVC
+보조 필터는 생략하고 세션·인증 관련 서블릿 필터와 Security 내부 필터를 표시했습니다.
+
+```mermaid
+flowchart TB
+    CLIENT["브라우저 / API 클라이언트"]
+    subgraph SERVLET["서블릿 필터: 요청 진입"]
+        HEADERS["ApiResponseHeadersFilter · H<br/>요청 ID · no-store"]
+        ERROR["AuthStateErrorFilter · H + 1<br/>오류 변환 · 로그인 실패 보상 · guardian/이메일 재검사"]
+        COOKIE["SessionCookieRenewalFilter · H + 2<br/>응답 전 갱신 wrapper"]
+        SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
+        PROXY["springSecurityFilterChain · -100"]
+        START_RESPONSE["ConversationStartResponseFilter · 기본 -99<br/>대화 시작 성공 응답 전 보호"]
+        HEADERS --> ERROR --> COOKIE --> SESSION --> PROXY
+    end
+    subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
+        INITIAL["1 DisableEncodeUrlFilter<br/>2 WebAsyncManagerIntegrationFilter<br/>3 SecurityContextHolderFilter<br/>4 HeaderWriterFilter"]
+        CORS["5 CorsFilter"]
+        RATE["6 GlobalApiRateLimitFilter<br/>API/OAuth IP 예산 별도 커밋 · 429/503"]
+        PART2["7 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
+        GUARD["8 Part1JsonRequestGuardFilter<br/>로그아웃·자녀·이메일·로그인 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
+        CSRF["9 CsrfFilter<br/>실패 403 CSRF_INVALID"]
+        OAUTH["10 OAuth2AuthorizationRequestRedirectFilter<br/>11 OAuth2LoginAuthenticationFilter"]
+        INTERMEDIATE["12 SecurityContextHolderAwareRequestFilter<br/>13 AnonymousAuthenticationFilter<br/>14 SessionManagementFilter<br/>15 ExceptionTranslationFilter"]
+        AUTHZ["16 AuthorizationFilter<br/>공개 경로 허용 / 보호 경로 공통 인증 검사"]
+        INITIAL --> CORS --> RATE --> PART2 --> GUARD --> CSRF --> OAUTH --> INTERMEDIATE --> AUTHZ
+    end
+    CLIENT --> HEADERS
+    PROXY --> INITIAL
+    AUTHZ -->|허용| START_RESPONSE
+    START_RESPONSE --> MVC["DispatcherServlet → Controller"]
+    MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
+    MVC -->|POST /api/v1/auth/email-verifications| EMAIL["EmailVerificationController<br/>조건부 인증 → 닫힌 입력 → 제한 예약<br/>목적별 snapshot/발급 커밋 → SMTP/실패 보상"]
+    EMAIL --> SAVE
+
+    subgraph LOGIN["SessionConfig: 공유 로그인 연결"]
+        STRATEGY["LoginSessionAuthenticationStrategy<br/>업무 문맥 교체 → native ID 교체<br/>인증 UUID 저장 · CSRF 교체"]
+        CONTEXT["DelegatingSecurityContextRepository<br/>RequestAttribute + LoginSecurityContextRepository"]
+        LIFE["SessionLifecycleService<br/>저장 직후·응답 전 실제 저장 확인<br/>실패 시 새 업무 문맥·native 세션 폐기"]
+        STRATEGY -->|전략 완료 후 인증 문맥 저장| CONTEXT
+        STRATEGY -. 업무 문맥 생성 .-> LIFE
+        CONTEXT -. 저장 결과 확인 .-> LIFE
+    end
+    OAUTH -. 인증 성공 .-> STRATEGY
+    FUTURE["후속 이메일 로그인 · SCRUM-78<br/>자격 검증 후 전략 호출·문맥 저장"] -. 연결 계약 .-> STRATEGY
+    OAUTHCONFIG["OAuth2ClientConfig<br/>Google · Kakao ClientRegistration"] -. 공급자 설정 .-> OAUTH
+    CONTEXT -->|로그인 성공 응답| SAVE
+    MVC -->|일반 응답| SAVE
+    LOGOUT --> SAVE
+
+    subgraph DATA["검증 서비스와 PostgreSQL 저장소"]
+        AUTH["AuthenticatedSessionService<br/>native · principal · UUID 결합 검사<br/>DB 폐기·버전·만료 검사"]
+        BUSINESS["SessionSecurityRepository<br/>계정 → 문맥 → PIN 잠금<br/>업무 자격 원자적 폐기"]
+        NATIVE["JdbcIndexedSessionRepository<br/>일반 인증 timeout -1 · 익명 30분<br/>즉시 저장 · 명시적 ID 삭제"]
+        GUARDIAN["GuardianAccessService · GuardianAccessRepository<br/>요청의 계정·문맥으로 guardian 기한·PIN 버전 재검사"]
+        RATE_REPO["AuthRateLimitService · AuthRateLimitRepository<br/>별도 예산 Tx · 정렬 잠금 · DB 시각"]
+        EMAIL_SERVICE["EmailVerificationIssuanceService<br/>목적 판정 · snapshot · 발급/응답 재검사"]
+        DELIVERY["EmailVerificationDeliveryService<br/>커밋 뒤 SMTP · 실패 id 단위 폐기"]
+        BIZDB[("accounts · session_security · guardian_pins<br/>email_verifications · auth_rate_limits<br/>Flyway V2–V3, V5, V7")]
+        SESSIONDB[("SPRING_SESSION<br/>SPRING_SESSION_ATTRIBUTES · Flyway V1")]
+        AUTH -. 현재 문맥 확인 .-> BUSINESS
+        BUSINESS --> BIZDB
+        GUARDIAN --> BIZDB
+        RATE_REPO --> BIZDB
+        EMAIL_SERVICE --> BIZDB
+        EMAIL_SERVICE --> DELIVERY
+        DELIVERY -. 실패 보상 .-> BIZDB
+        NATIVE --> SESSIONDB
+    end
+    AUTHZ -. 보호 경로 검사 .-> AUTH
+    LOGOUT -. 인증 검사 .-> AUTH
+    RATE -. 단독 전역 예약 .-> RATE_REPO
+    EMAIL -. PIN 목적 인증 .-> AUTH
+    EMAIL -. 발급 .-> EMAIL_SERVICE
+    EMAIL_SERVICE -. 발급 예산 예약 .-> RATE_REPO
+    LOGOUT -. 현재 문맥·guardian·PIN 폐기 .-> BUSINESS
+    LIFE -. 생성·실패 보상 .-> BUSINESS
+    LIFE -. 실제 저장 재조회·실패 삭제 .-> NATIVE
+    LIFE -. 공통 검증 재사용 .-> AUTH
+    SESSION -. native 읽기·저장·삭제 .-> NATIVE
+    CONTEXT -. HttpSession을 통한 인증 문맥 저장 .-> NATIVE
+    INITIAL -. 인증 문맥 로드 .-> CONTEXT
+
+    subgraph RESPONSE["응답: 안쪽에서 바깥쪽, 실제 전송 전"]
+        SAVE["1 Spring Session native 저장·쿠키 기록"]
+        RENEW["2 SessionCookieRenewalFilter<br/>저장 상태 재검사 → 유효한 인증 쿠키 365일 갱신<br/>로그아웃 Max-Age=0 우선"]
+        VERIFY["3 AuthStateErrorFilter<br/>로그인 최종 검증 · guardian/이메일 응답 재검사"]
+        WIRE["4 HTTP 응답 전송"]
+        SAVE --> RENEW --> VERIFY --> WIRE
+    end
+    RENEW -. 실제 저장 재조회 .-> NATIVE
+    RENEW -. 재검증 .-> AUTH
+    VERIFY -. 로그인일 때 .-> LIFE
+    VERIFY -. guardian 표식이 있는 성공 응답 .-> GUARDIAN
+    VERIFY -. 이메일 표식이 있는 성공 응답 .-> EMAIL_SERVICE
+    COOKIECONFIG["Boot CookieSerializer<br/>JSESSIONID · HttpOnly · Path=/ · SameSite · Secure"] -. 동일 설정 사용 .-> RENEW
+    COOKIECONFIG -. 동일 설정 사용 .-> SESSION
+    ERROR -. 처리 가능한 실패 .-> FAILURE["오류 응답<br/>성공 본문·길이·Location·인증 쿠키 제거, 공통 헤더 보존<br/>인증 무효 401 / guardian 확인 필요 403 / 확인 장애 503"]
+    FAILURE --> WIRE
+    WIRE --> CLIENTOUT["클라이언트 응답 수신"]
+```
+
+OAuth callback은 인증 필터에서 응답을 끝낼 수 있어 항상 Controller까지 진행하지 않습니다.
+`SessionConfig`의 전략·문맥 저장소를 후속 로그인도 공유하며, 실제 공급자 인증 결과를 계정
+UUID principal로 연결하는 작업은 SCRUM-93 범위입니다. DB 연결·JdbcTemplate·트랜잭션·Flyway는
+Spring Boot 자동 구성을 사용합니다. 세션 저장과 업무 폐기는 서로 다른 트랜잭션이므로,
+`session_security`를 다시 확인하고 실패 시 보상하는 절차가 필요합니다.
+
+`SessionConcurrencyTests`는 실제 HTTP 요청을 latch로 정지시켜 **이전 요청의 세션 조회 →
+로그아웃/재로그인 완료 → 이전 요청의 늦은 저장** 순서를 검증합니다. 늦은 응답과 이전 쿠키는
+401이며, 폐기된 문맥·guardian·PIN 자격이 복구되지 않고 재로그인한 새 세션은 유지되어야 합니다.
+
+### 10.7 Backend 공통 권한 사용과 Part 2 인계
+
+[SCRUM-96](https://dodamdodam.atlassian.net/browse/SCRUM-96)은 기존 로그인·자녀 소유권
+서비스와 DB 기준 보호자 검사를 공통으로 제공합니다. 제품별 적용 경로·응답 DTO는
+[공통 API](p0/api/01-common.md#section-3)와 각 operation이 기준이며, 아래는 현재 코드의 사용법입니다.
+
+**호출 순서와 반환값**
+
+```java
+var authenticated = authentication.requireAuthenticatedSession(request);
+var child = children.requireChildAccess(authenticated.accountId(), childId);
+// conversation/turn 경로는 이 위치에서 아래의 리소스 관계를 검사한다. 실패는 404다.
+var until = guardian.requireGuardianAccess(request, authenticated); // 보호자 경로에만 적용
+```
+
+- `authentication`은 `auth.session.AuthenticatedSessionService`, `children`은
+  `child.application.ChildService`, `guardian`은 `guardian.application.GuardianAccessService`다.
+  `accountId`·`securityContextId`는 같은 요청에서 검증한 `AuthenticatedSession`에서만 얻는다.
+- `requireChildAccess`는 소유 `ChildView`를 반환한다. 내부 AI 입력 등에 쓰는
+  `getChildContext(childId)`도 인증·소유권 검사를 마친 뒤 호출한다.
+- `requireGuardianAccess`는 현재 문맥과 PIN이 유효하고 기한이 DB 시각보다 미래일 때만
+  `OffsetDateTime` 기한을 반환한다. 기한과 DB 시각이 같으면 403이다. 다른 문맥의 확인이나
+  오래된 HTTP 세션 속성은 사용할 수 없다. 조회로 기한·PIN·문맥을 갱신하지 않는다.
+- 반환한 기한은 요청 이후의 권한을 보증하지 않는다. 성공 시 요청 표식이 남아 §10.6의
+  응답 직전 DB 재검사가 적용된다. 소비자가 기한을 캐시하거나 직접 필터를 추가할 필요는 없다.
+
+전송 크기·형식 → CSRF → 로그인 → 구조 → 소유권·리소스 관계 → 필요한 guardian →
+업무 상태 순서로 검사한다. 현재 전송 guard의 적용 경로는 §10.6에 한정되어 있으며,
+후속 API의 형식·크기·요청량 제한은 각 구현에서 연결해야 한다.
+
+**대화·발화 소비자의 관계 검사**
+
+[SCRUM-86](https://dodamdodam.atlassian.net/browse/SCRUM-86) /
+[SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) /
+[SCRUM-111](https://dodamdodam.atlassian.net/browse/SCRUM-111) 연동에서는 검증한 자녀 아래의
+리소스임을 guardian·업무 상태 검사보다 먼저 확인해야 한다.
+
+- 대화 조회는 요청 `conversationId`와 검증된 `child.childId()`를 함께 조건으로 사용한다.
+- 발화 조회는 위 자녀·대화 조건에 `conversation_turns.conversation_id`와 요청 `turnId`까지
+  결합한다. 경로의 ID들이 각각 존재하는 것만으로 관계 검사를 마친 것으로 간주하지 않는다.
+- 미존재·미소유·잘못된 조합은 모두 `404 RESOURCE_NOT_FOUND`다. 관계 확인 전 상태·텍스트·
+  음성을 노출하지 않고, 이후 실제 업무 조회·갱신에도 같은 자녀·리소스 조건을 유지한다.
+- 응답에는 해당 operation이 허용한 DTO 필드만 매핑한다. `AuthenticatedSession`,
+  `GuardianAccessState`, 저장소 row, PIN 해시·보안 문맥·예외 원인을 그대로 직렬화하지 않는다.
+  보호자 기록과 아이 대화의 차이는 [기록 API](p0/api/05-records.md)와
+  [대화 API](p0/api/06-conversations.md)를 따른다.
+
+**공통 오류와 응답 처리**
+
+일반 오류 본문은 `error.code/message/requestId/fields`이며 `fields`는 없으면 `[]`다.
+`requestId`는 서버의 `X-Request-ID`와 같고 `Cache-Control: no-store`를 유지한다.
+원문 입력·자격·금지 텍스트·SQL을 메시지나 검증 필드에 복사하지 않는다.
+
+| 상황 | 현재 공통 처리 |
+| --- | --- |
+| 현재 로그인 문맥 없음·불일치·폐기·만료 | `401 AUTHENTICATION_REQUIRED` |
+| CSRF 누락·불일치 | `403 CSRF_INVALID` |
+| 잘못된 UUID·JSON 등 구조 오류 | `400 VALIDATION_FAILED` |
+| 자녀 미존재·미소유 | `404 RESOURCE_NOT_FOUND` |
+| 현재 guardian 없음·만료·PIN 없음·PIN 버전 불일치 | `403 GUARDIAN_UNLOCK_REQUIRED` |
+| 기존 자녀 등록 제한 | `409 CHILD_LIMIT_REACHED` |
+| 인증·guardian 상태 확인 장애 | `503 AUTH_STATE_UNAVAILABLE` |
+| 자녀 업무 DB 장애·예상하지 못한 MVC 업무 오류 | `500 INTERNAL_ERROR` |
+
+소비자의 관계 오류도 같은404를 사용한다. PIN 미설정의 guardian 검사403과 후속 PIN
+unlock/reset operation의409 `PIN_NOT_SET`은 구분한다. 추가 업무 오류·특수 응답은
+[오류 계약](p0/api/08-errors-and-validation.md#section-9)을 따른다.
+MVC는 `ApiErrorResponses.body`, 필터는 `ApiErrorResponses.write`를 재사용한다.
+§10.6의 늦은 재검사 실패는 외곽 필터로 전달해 준비된 성공 본문·길이·Location·세션 쿠키를
+제거한 뒤401/403/503을 출력한다. guardian만 거부된403은 일반 로그인과 대화 연결을 폐기하지 않는다.
+이미 전송된 bytes를 회수하거나 업무 커밋을 자동으로 롤백하는 기능은 아니다.
+
+**트랜잭션·잠금과 남은 연결 작업**
+
+권한 조회는 행 잠금을 잡지 않는다. 변경 트랜잭션에서 현재 로그인 문맥을 잠글 때는
+`SessionSecurityRepository.requireCurrentContextForUpdate(accountId, securityContextId)`를
+사용할 수 있다. 기존 트랜잭션이 필수(`MANDATORY`)이며 `accounts → session_security` 순서다.
+이 함수만으로 guardian 권한까지 잠그거나 미래의 유효성을 보증하지는 않는다.
+PIN·challenge를 변경하는 경로는 [ERD §8.1](p0/Integrated_ERD_Design.md#81-잠금커밋-원칙)의
+`accounts → session_security → guardian_pins → email_verifications → PIN_FAILURE_ACCOUNT`
+중 필요한 행을 같은 순서로 잠그고, 같은 종류의 여러 행은 ID 순으로 처리한다.
+잠금 뒤 최신 DB 시각·버전으로 재검사하며 메일·AI 외부 호출 중 업무 잠금을 유지하지 않는다.
+Part 2의 자녀→대화→발화/연결/음성 잠금 확장은 같은 절의 기술 설계로, 실제 SQL·교착·경합
+검증은 해당 소비자 작업에서 수행한다.
+
+| 후속 작업 | 이번 공통 기반 이후 구현·검증할 것 |
+| --- | --- |
+| [SCRUM-82](https://dodamdodam.atlassian.net/browse/SCRUM-82) | PIN 생성과 일회성 권한 소비. 설정 성공이 자동 unlock을 대신하지 않는다. |
+| [SCRUM-97](https://dodamdodam.atlassian.net/browse/SCRUM-97) | PIN 확인 성공 시 현재 문맥에 DB 시각 기준 최대1800초·실제 문맥 만료 이내의 기한과 최신 PIN 버전을 기록한다. |
+| [SCRUM-98](https://dodamdodam.atlassian.net/browse/SCRUM-98) | 현재 guardian 해제·generation 증가·PIN 목적 권한 폐기. 일반 로그인·대화 연결은 유지한다. |
+| [SCRUM-83](https://dodamdodam.atlassian.net/browse/SCRUM-83) | PIN 변경과 버전 증가로 기존 guardian 무효화·관련 일회성 권한 폐기. 자동 unlock 없음. |
+| SCRUM-86/88/111 등 실제 소비자 | Part 2 모델·migration·API에서 관계 검사와 허용 DTO를 적용하고 각 권한·상태·응답 경합을 연동 검증한다. |
+
+이 절의 SCRUM-96 공통 기반은 V5 `guardian_pins` 스키마와 조회·판정 함수를 제공한다.
+해당 작업의 정상 권한과 경합은 합성 DB fixture와 테스트 전용 소비자로 검증했다.
+현재 구현된 Part 2의 스키마·시작·응답 보호·종료 조정기와 후속 책임은
+[대화 공통 기반 인계서](CONVERSATION_HANDOFF.md)에서 함께 관리한다.
+PIN 발급부터 후속 Part 2 API까지의 실제 연동 인수, 캐릭터 목록 보류,
+AI wire·운영 OAuth/HTTPS 설정은 각 기존 작업 범위로 유지한다.
 
 ## 11. FastAPI·AI 팀 연동 기준
 
@@ -518,13 +1128,13 @@ DB log와 lifecycle을 명시적으로 관리하고 싶을 때 사용합니다.
 `app` service는 기본 개발 흐름과 충돌하지 않도록 `full` profile에 있습니다.
 
 ```bash
-docker compose --profile full up --build
+./scripts/compose-local.sh up --build
 ```
 
 종료:
 
 ```bash
-docker compose --profile full down
+./scripts/compose-local.sh down
 ```
 
 Dockerfile은 Java 25로 빌드하고 Spring Boot layered jar를 분리한 뒤, JRE image에서
@@ -653,7 +1263,7 @@ REST API key를 client ID에 넣었는지, client secret 기능을 활성화했�
 
 먼저 `/api/v1/auth/csrf`를 `credentials: "include"`로 호출한 뒤 응답의
 `headerName`과 `token`을 변경 요청에 넣습니다. 두 요청에서 동일한 session cookie가
-전송되는지 확인합니다.
+전송되는지 확인하고, 발급받은 `XSRF-TOKEN` 쿠키도 함께 전송합니다.
 
 ## 16. 업데이트 원칙
 

@@ -53,7 +53,7 @@ curl http://localhost:8080/actuator/health
 ./gradlew clean check
 ./gradlew bootRun
 docker compose up -d postgres
-docker compose --profile full up --build
+./scripts/compose-local.sh up --build
 docker compose stop
 ```
 
@@ -63,6 +63,7 @@ docker compose stop
 ## 문서
 
 - [P0 통합 요구사항·API·ERD·다이어그램 v3.1](docs/p0/README.md)
+- [대화 시작·종료 공통 기반 구현 계약 및 후속 Task 인계](docs/CONVERSATION_HANDOFF.md)
 
 - [개발환경 설치·실행 가이드](docs/DEVELOPMENT_SETUP.md)
 - [IntelliJ·JDK·Docker 상세 설정](docs/DEVELOPMENT_SETUP.md#5-intellij-idea-설정)

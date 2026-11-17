@@ -10,8 +10,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("app.security")
 public record AppSecurityProperties(
         @NotEmpty List<@NotBlank String> allowedOrigins,
-        @NotBlank String loginSuccessUrl,
-        @NotBlank String logoutSuccessUrl
+        @NotBlank String loginSuccessUrl
 ) {
 
     public AppSecurityProperties {

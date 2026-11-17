@@ -1,0 +1,173 @@
+package com.dodamdodam.backend.auth.session;
+
+import com.dodamdodam.backend.auth.exception.PasswordLoginException;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import org.springframework.core.convert.ConversionException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Repository
+public class SessionSecurityRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public SessionSecurityRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /** 외부 인증 완료 계정의 이전 문맥 폐기와 새 문맥 생성을 한 번에 커밋한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AuthenticatedSession createLoginContext(UUID accountId, AuthenticatedSession previous) {
+        // 계정 간 재로그인도 같은 순서로 잠가 서로 역순으로 기다리지 않게 한다.
+        var accounts = jdbcTemplate.queryForList("""
+                SELECT id, session_version FROM accounts WHERE id IN (?, ?) ORDER BY id FOR UPDATE
+                """, accountId, previous == null ? accountId : previous.accountId());
+        var version = accounts.stream().filter(row -> accountId.equals(row.get("id")))
+                .map(row -> (Long) row.get("session_version")).findFirst()
+                .orElseThrow(() -> new InsufficientAuthenticationException("로그인 계정을 확인할 수 없습니다."));
+        return createContextAfterAccountLock(accountId, version, previous);
+    }
+
+    /** 잠금 밖에서 비교한 자격을 다시 확인한 뒤에만 이전 문맥을 교체한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AuthenticatedSession createPasswordLoginContext(UUID accountId, String expectedHash, long expectedVersion,
+                                                            AuthenticatedSession previous) {
+        // 서로 다른 계정으로 교체해도 기존 인증과 같은 UUID 정렬 잠금을 유지한다.
+        var accounts = jdbcTemplate.queryForList("""
+                SELECT id, password_hash, session_version FROM accounts
+                WHERE id IN (?, ?) ORDER BY id FOR UPDATE
+                """, accountId, previous == null ? accountId : previous.accountId());
+        var current = accounts.stream().filter(row -> accountId.equals(row.get("id"))).findFirst()
+                .orElseThrow(PasswordLoginException::failed);
+        if (expectedHash == null || !expectedHash.equals(current.get("password_hash"))
+                || expectedVersion != (Long) current.get("session_version")) {
+            // reset 또는 자격 변경은 기존 로그인 문맥을 건드리기 전에 거부한다.
+            throw PasswordLoginException.failed();
+        }
+        return createContextAfterAccountLock(accountId, expectedVersion, previous);
+    }
+
+    /** 호출자가 계정 잠금을 보유한 Tx에서만 기존 폐기·새 문맥 등록을 수행한다. */
+    private AuthenticatedSession createContextAfterAccountLock(UUID accountId, long version, AuthenticatedSession previous) {
+        if (previous != null) {
+            revokeCurrentContext(previous.accountId(), previous.securityContextId());
+        }
+        var contextId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO session_security (id, account_id, session_version, expires_at) VALUES (?, ?, ?, NULL)
+                """, contextId, accountId, version);
+        return new AuthenticatedSession(accountId, contextId);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void discardLoginContext(AuthenticatedSession context) {
+        if (revokeCurrentContext(context.accountId(), context.securityContextId())) {
+            return;
+        }
+        // 저장 중 버전이 바뀐 문맥도 보상 폐기한다. 이미 기록된 폐기 시각은 유지한다.
+        var revokedAt = jdbcTemplate.queryForObject("SELECT clock_timestamp()",
+                (result, row) -> result.getObject(1, OffsetDateTime.class));
+        jdbcTemplate.update("""
+                UPDATE session_security
+                SET revoked_at = COALESCE(revoked_at, ?), guardian_unlocked_until = NULL, guardian_pin_version = NULL
+                WHERE id = ? AND account_id = ?
+                """, revokedAt, context.securityContextId(), context.accountId());
+        invalidatePinCredentials(context.accountId(), context.securityContextId(), revokedAt);
+    }
+
+    public boolean isCurrentContext(UUID accountId, UUID securityContextId) {
+        var states = jdbcTemplate.query("""
+                SELECT s.session_version, a.session_version AS account_version,
+                       s.revoked_at, s.expires_at, clock_timestamp() AS checked_at
+                FROM session_security s JOIN accounts a ON a.id = s.account_id
+                WHERE s.id = ? AND s.account_id = ?
+                """, (result, row) -> new SessionValidity(
+                result.getLong("session_version"), result.getLong("account_version"),
+                result.getObject("revoked_at", OffsetDateTime.class),
+                result.getObject("expires_at", OffsetDateTime.class),
+                result.getObject("checked_at", OffsetDateTime.class)), securityContextId, accountId);
+        return !states.isEmpty() && states.getFirst().isValid();
+    }
+
+    record SessionValidity(long sessionVersion, long accountVersion, OffsetDateTime revokedAt,
+                           OffsetDateTime expiresAt, OffsetDateTime checkedAt) {
+        boolean isValid() {
+            return sessionVersion == accountVersion && revokedAt == null
+                    && (expiresAt == null || checkedAt.isBefore(expiresAt));
+        }
+    }
+
+    /** 호출자의 트랜잭션에서 계정→문맥 순서로 잠그고 현재 유효성을 재검사한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void requireCurrentContextForUpdate(UUID accountId, UUID securityContextId) {
+        try {
+            var accounts = jdbcTemplate.queryForList("SELECT id FROM accounts WHERE id = ? FOR UPDATE", UUID.class, accountId);
+            if (accounts.isEmpty()) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
+            var contexts = jdbcTemplate.queryForList("""
+                    SELECT id FROM session_security WHERE id = ? AND account_id = ? FOR UPDATE
+                    """, UUID.class, securityContextId, accountId);
+            // 잠금 대기가 끝난 뒤 기존 규칙과 새 DB 시각으로 다시 확인한다.
+            if (contexts.isEmpty() || !isCurrentContext(accountId, securityContextId)) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
+        }
+        catch (DataAccessException | TransactionException | ConversionException failure) {
+            // 자녀 업무 트랜잭션 전체가 아니라 인증 검사 실패만 구분한다.
+            throw new AuthStateUnavailableException(failure);
+        }
+    }
+
+    @Transactional
+    public boolean revokeCurrentContext(UUID accountId, UUID securityContextId) {
+        var accountVersions = jdbcTemplate.queryForList(
+                "SELECT session_version FROM accounts WHERE id = ? FOR UPDATE", Long.class, accountId);
+        if (accountVersions.isEmpty()) {
+            return false;
+        }
+        var contexts = jdbcTemplate.queryForList("""
+                SELECT id FROM session_security WHERE id = ? AND account_id = ? FOR UPDATE
+                """, UUID.class, securityContextId, accountId);
+        if (contexts.isEmpty()) {
+            return false;
+        }
+        jdbcTemplate.queryForList("""
+                SELECT id FROM email_verifications
+                WHERE setup_account_id = ? AND setup_session_binding = ?
+                  AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                  AND token_consumed_at IS NULL AND invalidated_at IS NULL
+                ORDER BY id FOR UPDATE
+                """, UUID.class, accountId, securityContextId);
+
+        // 잠금을 기다린 시간을 반영하도록 모든 잠금 뒤 DB 시각을 읽는다.
+        var revokedAt = jdbcTemplate.queryForObject("SELECT clock_timestamp()",
+                (result, row) -> result.getObject(1, OffsetDateTime.class));
+        int updated = jdbcTemplate.update("""
+                UPDATE session_security
+                SET revoked_at = ?, guardian_unlocked_until = NULL, guardian_pin_version = NULL
+                WHERE id = ? AND account_id = ? AND session_version = ? AND revoked_at IS NULL
+                  AND (expires_at IS NULL OR expires_at > ?)
+                """, revokedAt, securityContextId, accountId, accountVersions.getFirst(), revokedAt);
+        if (updated == 0) {
+            return false;
+        }
+        invalidatePinCredentials(accountId, securityContextId, revokedAt);
+        return true;
+    }
+
+    private void invalidatePinCredentials(UUID accountId, UUID securityContextId, OffsetDateTime revokedAt) {
+        jdbcTemplate.update("""
+                UPDATE email_verifications SET invalidated_at = ?
+                WHERE setup_account_id = ? AND setup_session_binding = ?
+                  AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                  AND token_consumed_at IS NULL AND invalidated_at IS NULL
+                """, revokedAt, accountId, securityContextId);
+    }
+}

@@ -362,6 +362,8 @@ DB 읽기: `email_verifications`; 쓰기: `accounts, email_verifications, auth_r
 
 DB 읽기: `accounts, children, guardian_pins`; 쓰기: `session_security, email_verifications, auth_rate_limits`. 공통 제한 예약과 프레임워크 세션 저장은 별도 공통 처리다.
 
+구현 흐름·원문 입력/해시 포맷·Postman 확인 방법은 [로그인 구현 문서](../../PASSWORD_LOGIN.md)를 참고한다.
+
 200 응답 예시 (normal):
 
 <!-- json-example: AccountViewResponse -->
@@ -415,7 +417,8 @@ DB 읽기: `accounts, children, guardian_pins, session_security`; 쓰기: ``. �
 }
 ```
 
-나머지 4개 상태 예시는 OpenAPI의 이 operation에 함께 제공한다.
+아이 등록·PIN 설정·보호자 확인 전후의 5개 상태와 구현 검증 방법은
+[현재 계정 조회 구현 문서](../../CURRENT_ACCOUNT.md#상태별-성공-예시)에서 확인한다.
 
 <a id="section-6-7"></a>
 <a id="operation-logout"></a>

@@ -1,0 +1,25 @@
+digraph Proposal {
+  graph [rankdir=TB, bgcolor="white", pad=.35, nodesep=.5, ranksep=.6, fontname="Arial", label="Supabase 적용 제안 — 현재 구현 아님\n실선: 우선 구성안 · 점선: 선택 / 후속",labelloc=t];
+  node [shape=box,style=rounded,fontname="Arial",fontsize=13,margin=".2,.15"];
+  edge [fontname="Arial",fontsize=11,arrowsize=.7];
+  client [label="React / 앱"];
+  spring [label="유지: Spring 업무 API\n세션 · CSRF · PIN · 아이 소유권\nidempotency · 대화 종료 · 응답 권한 재검사"];
+  db [shape=cylinder,label="연결 변경: Supabase PostgreSQL\n기존 JDBC / Flyway / 업무 schema 유지\n업무 Data API 비공개 · 최소 권한"];
+  files [label="후속: Supabase private Storage\n오디오 객체 · 삭제 재시도\n업무 메타데이터와 물리 파일 분리"];
+  ai [label="유지할 책임 경계: 별도 FastAPI / AI worker\n합의된 API / 작업 기한 / 허용 결과\n공급자 선택 또는 GPU 실행은 AI 팀"];
+  vendor [label="STT / LLM / TTS\nOpenAI · Google · Azure · AWS\nCLOVA · ElevenLabs · Deepgram · 자체 모델"];
+  auth [style="rounded,dashed",label="선택: Supabase Auth\n검증된 subject → 로컬 accountId mapping\n기존 Spring Google 유지도 가능"];
+  read [label="후속: 인증된 음성 GET\n세션 → 소유권 → 연결 → 상태/시간 → 음성 허용/TTL\n검증 뒤 객체 중계 · no-store"];
+  client -> spring;
+  spring -> db [label="TLS / direct 또는 session 연결 PoC"];
+  spring -> files [label="서버에서만 접근"];
+  spring -> ai [label="업무 DB는 공유하지 않음"];
+  ai -> vendor;
+  ai -> spring [label="결과 저장 권한은 backend"];
+  client -> auth [style=dashed,label="선택: PKCE"];
+  auth -> spring [style=dashed,label="세션 bridge / 실패 보상"];
+  client -> read;
+  read -> spring [label="현재 업무 권한"];
+  read -> files [label="private 객체 읽기"];
+  read -> client [label="직접 signed URL 대신 현재 권한 검증 경로"];
+}

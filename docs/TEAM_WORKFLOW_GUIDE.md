@@ -28,6 +28,9 @@ Epic 아래에 `[FE]`, `[AI]`, `[INT]` Task를 별도로 만듭니다.
 이미 있는 Jira Task와 GitHub Issue Form을 함께 사용하면 Jira Task가 중복 생성될
 수 있습니다. 한 업무에는 한 가지 시작 경로만 사용합니다.
 
+Story/Task의 포인트를 입력하기 전에 [Jira Story Point 입력 기준 공유안](STORY_POINTS.md)을 확인합니다.
+점수별 설명, 프로젝트 예시와 중복 집계·완료량 기준은 이 문서에서 관리합니다.
+
 ## 3. Jira-first: Jira Task가 이미 있는 경우
 
 예시 계획:
@@ -144,7 +147,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 
 ## 6. PR 검증과 병합 규칙
 
-- branch와 PR 제목에는 같은 `SCRUM-번호`를 정확히 하나 넣습니다.
+- 일반 작업 branch와 PR 제목에는 같은 `SCRUM-번호`를 정확히 하나 넣습니다.
 - `development` 대상 PR 제목에는 `[BE]`만 정확히 하나 넣습니다.
 - Gitmoji는 의미에 맞게 자유롭게 선택하고 `feat`, `fix`, `docs`, `test` 등의
   Conventional Commit type을 사용합니다.
@@ -159,6 +162,9 @@ database credential, 개인정보는 첨부하지 않습니다.
 - PR 제목 형식은 `<gitmoji> <type>(optional-scope): <description>`입니다.
 - `main` 대상 PR은 `development`에서만 만들며 긴급 수정도 같은 승격 경로를
   사용합니다.
+- `main` 승격 제목은 `🚀 chore(release): [BE] v0.1.0 스프린트 릴리스`처럼
+  VERSION과 같은 버전을 사용합니다. Jira 키는 필수가 아니며 Epic 완료와 무관합니다.
+  생성물·보호 설정·재실행은 [Backend 릴리스 가이드](RELEASE_GUIDE.md)를 따릅니다.
 - `main` 승격 PR에는 `Resolves #번호`, `Closes #번호`, `Fixes #번호`를
   적지 않습니다. GitHub는 기본 브랜치 병합 시 이 키워드로 Issue를 닫습니다.
 
@@ -173,7 +179,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 
 ## 8. 문제 발생 시
 
-- `jira-issue-key` 실패: branch와 PR의 Jira 키, `[BE]`, target branch를 확인합니다.
+- `jira-issue-key` 실패: 작업 PR은 Jira 키와 `[BE]`, main 승격은 같은 저장소의 development·제목 버전·VERSION 일치를 확인합니다.
 - Jira 자동 생성이 건너뛰어짐: `task` 또는 `bug`를 확인한 뒤 `jira-sync` 레이블을
   추가합니다.
 - Jira 자동 생성 실패: `jira-sync`를 제거 후 다시 추가하거나 `GitHub Issue to

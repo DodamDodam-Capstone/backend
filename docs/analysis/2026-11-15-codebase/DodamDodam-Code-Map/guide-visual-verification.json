@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-16 Asia/Seoul",
+  "idempotentGeneration": true,
+  "renderedSvgCount": 8,
+  "previewWidth": 700,
+  "visuallyInspected": [
+    "00-Overview",
+    "02-email"
+  ],
+  "applicationUiVerified": false,
+  "scope": "문서·그림·생성/검증 스크립트만 수정. Java 테스트는 이 작업에서 재실행하지 않음."
+}
