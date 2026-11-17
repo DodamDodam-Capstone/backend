@@ -12,6 +12,7 @@ out/
 bin/
 
 .env
+.secrets/
 .env.*
 !.env.example
 CLAUDE.local.md

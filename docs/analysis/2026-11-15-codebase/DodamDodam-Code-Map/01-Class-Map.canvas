@@ -1,0 +1,3007 @@
+{
+  "nodes": [
+    {
+      "id": "featurea172cedcae47474b",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 3400,
+      "height": 490,
+      "label": "app",
+      "color": "6"
+    },
+    {
+      "id": "n85535399b7baaa4e",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/DodamDodamBackendApplication.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 65,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "feature8001c27439650c5c",
+      "type": "group",
+      "x": 0,
+      "y": 720,
+      "width": 3400,
+      "height": 2050,
+      "label": "global",
+      "color": "5"
+    },
+    {
+      "id": "ne8c22db77405b1a5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.auth.CsrfAccessDeniedHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 785,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n34ae5264da0f69c5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.auth.CsrfController.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 785,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n75af25a1e96c3fdc",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.auth.CsrfController.CsrfTokenResponse.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 785,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nfddf4f3e0ef8e8d1",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.AppSecurityProperties.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 785,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nfd9878542d647dd3",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.OAuth2ClientConfig.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 785,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n78164cea4ce9b681",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.OAuth2ClientProperties.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 1175,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc786288bae6c38b3",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.OAuth2ClientProperties.Credentials.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 1175,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n569c46dda082e83a",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.SecurityConfig.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 1175,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n3caabaa1ff0dc7af",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.SecurityConfig_anonymous_120.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 1175,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc70bc623bc705dd7",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.config.SessionConfig.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 1175,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0f937e4a24415be8",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponse.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 1565,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n99ec18f1d0ea868d",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponse.ErrorDetail.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 1565,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc28f0fde87fb9ae9",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponse.FieldError.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 1565,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "naaec64b639b43860",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponses.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 1565,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n05337afc166489f4",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.CommonApiExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 1565,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nf76e7be30bac6362",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.ApiResponseHeadersFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 1955,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n71fd94e3db388d6c",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.ClientAddressResolver.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 1955,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n1b5f755775e32750",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.GlobalApiRateLimitFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 1955,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0bd44b97ab1055e4",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.Part1JsonRequestGuardFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 1955,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "ne040af2a895c6fdb",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.Part1JsonRequestGuardFilter.CachedBodyRequest.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 1955,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "naa85f965e7e633ad",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.Part1JsonRequestGuardFilter.CachedBodyRequest_anonymous_97.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 2345,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nd8bae413525190f5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.web.Part2JsonRequestGuardFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 2345,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "featurebdf49c3c3882102f",
+      "type": "group",
+      "x": 0,
+      "y": 3000,
+      "width": 3400,
+      "height": 3610,
+      "label": "auth",
+      "color": "2"
+    },
+    {
+      "id": "n18f7e9625b9b3a2f",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.api.AuthLogoutController.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 3065,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nb0aadde727bf7fba",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.api.EmailVerificationController.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 3065,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n1d7ba573e062d31a",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.api.EmailVerificationExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 3065,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nb40cfd1ecbf6897d",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.application.AuthRateLimitService.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 3065,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n376858713f6d6de6",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.application.EmailVerificationCodeGenerator.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 3065,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n94283ce18fa0d3b2",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.application.EmailVerificationDeliveryService.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 3455,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc35a52d17e397ae8",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.application.EmailVerificationIssuanceService.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 3455,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n98bc83b3f56ffaba",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.application.EmailVerificationIssuanceService.Prepared.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 3455,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nee59f5f9bd845b4e",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.domain.AuthRateLimitKey.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 3455,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n6da5253362c64888",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.domain.AuthRateLimitKey.Action.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 3455,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nbcfa9f8292823131",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.dto.IssueEmailVerificationRequest.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 3845,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n504ed5ee1045f9a4",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.dto.IssueEmailVerificationRequest.Purpose.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 3845,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nabc9db1db372a68e",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.dto.VerificationIssueResponse.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 3845,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nd8eee7b06ad20401",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.exception.AuthRateLimitException.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 3845,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n9a29e06153fb14e7",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.exception.EmailVerificationException.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 3845,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n22067441d409f58d",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.AuthRateLimitKeyHasher.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 4235,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n966612d7d24e01aa",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.AuthRateLimitRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 4235,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n3a7bf4bbe1b7d556",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.AuthRateLimitRepository.RateLimitState.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 4235,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nbf67703b05f14c0c",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationAccountRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 4235,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0992fa069aa31648",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationAccountRepository.AccountState.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 4235,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n7b19e968f1e6330e",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationAccountRepository.PinState.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 4625,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n5b327cfc6f7652da",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationCodeHasher.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 4625,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n8b445bc35d40bedc",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationKeys.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 4625,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n40e403ce2b673401",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 4625,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nfaef871718a7700f",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationRepository.NewChallenge.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 4625,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "ne442cc9e74cc8416",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.EmailVerificationRepository.IssuedChallenge.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 5015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nae7e9e421d4baecc",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.infrastructure.SmtpEmailVerificationSender.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 5015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n3d88b5ac4e7de0d2",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 5015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc6386e16d9b6b125",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorFilter_anonymous_52.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 5015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n593ffdc18f6f84ae",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 5015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n9d9e3d399eb3060d",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateUnavailableException.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 5405,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "ne1dad7905526edee",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSession.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 5405,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nb0a4ab63fd929df6",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSessionService.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 5405,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc64f30f574a6e04e",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSessionService.CookieRenewal.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 5405,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n290f076da2ebaeb5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.LoginSecurityContextRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 5405,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n053e9f0eafb0c123",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.LoginSessionAuthenticationStrategy.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 5795,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nb8cefaf2267fe1a2",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionCookieRenewalFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 5795,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n1cfc0de516a157de",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionCookieRenewalFilter_anonymous_41.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 5795,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0b9c5a0019f42217",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionCookieRenewalFilter.InvalidSessionException.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 5795,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n5a7ff80e922445e0",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionLifecycleService.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 5795,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n85f3d64106eeb3bd",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionLifecycleService.PendingLogin.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 6185,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nf4cca37503468982",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionSecurityRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 6185,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "na4baeb64a19c4a4b",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionSecurityRepository.SessionValidity.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 6185,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "featureddc9e669194254ce",
+      "type": "group",
+      "x": 0,
+      "y": 6840,
+      "width": 3400,
+      "height": 880,
+      "label": "child",
+      "color": "4"
+    },
+    {
+      "id": "n7164be60912e2d14",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 6905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n1c7a5361d65ec2b1",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 6905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n368081dcd7b6b7bd",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 6905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nb36c8501a000bba0",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 6905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n4c7bec0d3bec1f29",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 6905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "na7b83245176f5048",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.Gender.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 7295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nfaa007b1773af3c5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 7295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n089791d2c47fee92",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 7295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nf24e55a415caba9c",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 7295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "featuredde6e8974b46a1ed",
+      "type": "group",
+      "x": 0,
+      "y": 7950,
+      "width": 3400,
+      "height": 490,
+      "label": "guardian",
+      "color": "3"
+    },
+    {
+      "id": "n93a6a1b38eac0f69",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.api.GuardianAccessExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 8015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nfa79772d9363a56b",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 8015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n6b59d15f728433fd",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 8015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0f8f245c4fc212b5",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 8015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n7fd9a3d4d4e4d1ba",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 8015,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "feature8b34dbc2c05eb4d7",
+      "type": "group",
+      "x": 0,
+      "y": 8670,
+      "width": 3400,
+      "height": 2440,
+      "label": "conversation",
+      "color": "6"
+    },
+    {
+      "id": "n12c50f835765367f",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationController.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 8735,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n611cbacfb87ea153",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationController.PreparedStart.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 8735,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n1e937c5c3a056958",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 8735,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nc80ec037a3154974",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationMediaTypeExceptionHandler.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 8735,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n5dd0e2f558e7cb6c",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 8735,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "neadb49a60ef2b13c",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter_anonymous_86.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 9125,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n65bccc80bf874267",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter.ResponseAccess.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 9125,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nd138c2cd6f2a1826",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter.ResponseRejected.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 9125,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "ndc982c3f154b647b",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 9125,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n765bf7106077aacf",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator.Trigger.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 9125,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n2b72e7a52ba91197",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator.ClosureResult.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 9515,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nad7ba0745bfdeaca",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 9515,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n5af0bccbc60357cd",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService.StartOutcome.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 9515,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n0336a26a2ade582f",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService.StartDecision.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 9515,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n4ab5613f9e346ccf",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.domain.ConversationServiceHours.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 9515,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nf10564ccd54a924b",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.domain.ConversationServiceHours.ServiceWindow.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 9905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n2a8dd9646984c9d4",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.dto.ActiveConversationExistsError.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 9905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "ncb7331dbc9ddc1d3",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.dto.ActiveConversationExistsError.ErrorDetail.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 9905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n8aa55e9a5d1426a1",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.dto.StartConversationRequest.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 9905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n6d2f0429cb2ca4e8",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.dto.StartConversationResult.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 9905,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "nd72388b7ecd4ed18",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.exception.ConversationException.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 10295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n4e255e56550ed824",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationClosureProperties.md",
+      "subpath": "#메서드 목록",
+      "x": 700,
+      "y": 10295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n8169f880b0f773e6",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationClosureRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 1370,
+      "y": 10295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n208219f2361cde40",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationClosureRepository.ClosureState.md",
+      "subpath": "#메서드 목록",
+      "x": 2040,
+      "y": 10295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n85dbe63a8b92ba63",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationRepository.md",
+      "subpath": "#메서드 목록",
+      "x": 2710,
+      "y": 10295,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "n64058c4fa931bf5d",
+      "type": "file",
+      "file": "analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationRepository.StoredConversation.md",
+      "subpath": "#메서드 목록",
+      "x": 30,
+      "y": 10685,
+      "width": 640,
+      "height": 360
+    }
+  ],
+  "edges": [
+    {
+      "id": "classedgeaeac46f637e74eba",
+      "fromNode": "n18f7e9625b9b3a2f",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgecfda7139921dcdfa",
+      "fromNode": "n18f7e9625b9b3a2f",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee551a8b8a5ff911e",
+      "fromNode": "n18f7e9625b9b3a2f",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge61552c683d19adb2",
+      "fromNode": "n18f7e9625b9b3a2f",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge54c562e81360f19c",
+      "fromNode": "n18f7e9625b9b3a2f",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7aaca639e0f35c13",
+      "fromNode": "nb0aadde727bf7fba",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6504a8dcd12807b3",
+      "fromNode": "nb0aadde727bf7fba",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec3ffc7787645cbd3",
+      "fromNode": "nb0aadde727bf7fba",
+      "fromSide": "right",
+      "toNode": "nbcfa9f8292823131",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged248bcc266858043",
+      "fromNode": "nb0aadde727bf7fba",
+      "fromSide": "right",
+      "toNode": "nc35a52d17e397ae8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge860a03286ab87fec",
+      "fromNode": "nb0aadde727bf7fba",
+      "fromSide": "right",
+      "toNode": "n71fd94e3db388d6c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeabfa9ff0541f48e3",
+      "fromNode": "n1d7ba573e062d31a",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9e029c76878671eb",
+      "fromNode": "n1d7ba573e062d31a",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge492b71730d0cf31e",
+      "fromNode": "n1d7ba573e062d31a",
+      "fromSide": "right",
+      "toNode": "nd8eee7b06ad20401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge4457ed7646fcb71b",
+      "fromNode": "nb40cfd1ecbf6897d",
+      "fromSide": "right",
+      "toNode": "n966612d7d24e01aa",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgefd89a09a179217c0",
+      "fromNode": "nb40cfd1ecbf6897d",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge908d9bede8e792fa",
+      "fromNode": "nb40cfd1ecbf6897d",
+      "fromSide": "right",
+      "toNode": "nd8eee7b06ad20401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge97d3bddd0d34c28d",
+      "fromNode": "n94283ce18fa0d3b2",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7dcc2961ccded3dc",
+      "fromNode": "n94283ce18fa0d3b2",
+      "fromSide": "right",
+      "toNode": "nae7e9e421d4baecc",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge46553dde8832b923",
+      "fromNode": "n94283ce18fa0d3b2",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5f9e80c5c61f7856",
+      "fromNode": "n94283ce18fa0d3b2",
+      "fromSide": "right",
+      "toNode": "n40e403ce2b673401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge39287e1266030a27",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n376858713f6d6de6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee73d20c6e5cd6ac8",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nbcfa9f8292823131",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "9개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgefffe1f9430acc345",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nb40cfd1ecbf6897d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef11ee10bc0554295",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n22067441d409f58d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeea44988ce9820443",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n8b445bc35d40bedc",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee5458c5c3a78877e",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgea919f53f505feb76",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n5b327cfc6f7652da",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeeacaf780230a0b26",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge71500794aef1251c",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n94283ce18fa0d3b2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedd6bf6972c1d1716",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "ne442cc9e74cc8416",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge75163186f205a73a",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n98bc83b3f56ffaba",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "5개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge97bee7e37731a489",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nfaef871718a7700f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "11개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge559f683a02120353",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nabc9db1db372a68e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedb7f0efdc5dd10ad",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n40e403ce2b673401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "7개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec6dff0c961751583",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nbf67703b05f14c0c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5dfd4dca9b013784",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n0992fa069aa31648",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge391e2eadef22875a",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec8bdc5c75d914c62",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "7개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8bb892c3f107daa6",
+      "fromNode": "nc35a52d17e397ae8",
+      "fromSide": "right",
+      "toNode": "n7b19e968f1e6330e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "8개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7564bfc774d55d97",
+      "fromNode": "nbcfa9f8292823131",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1dfaa76d17e0b563",
+      "fromNode": "nbcfa9f8292823131",
+      "fromSide": "right",
+      "toNode": "n504ed5ee1045f9a4",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1806b5d8c00a9136",
+      "fromNode": "n9a29e06153fb14e7",
+      "fromSide": "right",
+      "toNode": "nc28f0fde87fb9ae9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge301462ab4e7f7bbf",
+      "fromNode": "n22067441d409f58d",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge74b7702246b79eaf",
+      "fromNode": "n22067441d409f58d",
+      "fromSide": "right",
+      "toNode": "nee59f5f9bd845b4e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef769ce3a3e9f1101",
+      "fromNode": "n966612d7d24e01aa",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgebe953c1ab7f4035c",
+      "fromNode": "n966612d7d24e01aa",
+      "fromSide": "right",
+      "toNode": "nee59f5f9bd845b4e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgecd6038eaaee4b69e",
+      "fromNode": "n966612d7d24e01aa",
+      "fromSide": "right",
+      "toNode": "n3a7bf4bbe1b7d556",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge91ed1045a5433b74",
+      "fromNode": "n966612d7d24e01aa",
+      "fromSide": "right",
+      "toNode": "n6da5253362c64888",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgebd7ad5fbe85a35d3",
+      "fromNode": "n3a7bf4bbe1b7d556",
+      "fromSide": "right",
+      "toNode": "n6da5253362c64888",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged985ac10e9c1a291",
+      "fromNode": "nbf67703b05f14c0c",
+      "fromSide": "right",
+      "toNode": "n0992fa069aa31648",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge41e82f0da81a68f5",
+      "fromNode": "nbf67703b05f14c0c",
+      "fromSide": "right",
+      "toNode": "n7b19e968f1e6330e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8d0179425e5470c6",
+      "fromNode": "n5b327cfc6f7652da",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge363c9bd41385ab25",
+      "fromNode": "n8b445bc35d40bedc",
+      "fromSide": "right",
+      "toNode": "n22067441d409f58d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge4dd46e2713e0bcb6",
+      "fromNode": "n8b445bc35d40bedc",
+      "fromSide": "right",
+      "toNode": "n5b327cfc6f7652da",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge2de6f1db23fd5113",
+      "fromNode": "n8b445bc35d40bedc",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9a1a0ae6bbcd7362",
+      "fromNode": "n40e403ce2b673401",
+      "fromSide": "right",
+      "toNode": "nfaef871718a7700f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "11개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged58ed5aabb318c68",
+      "fromNode": "n40e403ce2b673401",
+      "fromSide": "right",
+      "toNode": "ne442cc9e74cc8416",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedf997bc036c866d9",
+      "fromNode": "n40e403ce2b673401",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged68cb18c3f28f5ed",
+      "fromNode": "n40e403ce2b673401",
+      "fromSide": "right",
+      "toNode": "nd8eee7b06ad20401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged9bb954a213d0bad",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "nc6386e16d9b6b125",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9d23eb14bb58420e",
+      "fromNode": "nc6386e16d9b6b125",
+      "fromSide": "right",
+      "toNode": "n3d88b5ac4e7de0d2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge709da86128cbe99c",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "n5a7ff80e922445e0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9fc7ecf79609318c",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge497496f17e54bbff",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "n9a29e06153fb14e7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedc0a91f721e2a4fc",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "n6b59d15f728433fd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgecd0ff5613b51ffed",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "n593ffdc18f6f84ae",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge77bc2c47edb65e14",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "nfa79772d9363a56b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3e07d338546bbda8",
+      "fromNode": "n3d88b5ac4e7de0d2",
+      "fromSide": "right",
+      "toNode": "nc35a52d17e397ae8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge30dd85eac06f6587",
+      "fromNode": "n593ffdc18f6f84ae",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge502b7eed4fe18114",
+      "fromNode": "nb0a4ab63fd929df6",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge707b388daec8d5eb",
+      "fromNode": "nb0a4ab63fd929df6",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee30bdaa586191d42",
+      "fromNode": "nb0a4ab63fd929df6",
+      "fromSide": "right",
+      "toNode": "nc64f30f574a6e04e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeab1b59bee7230690",
+      "fromNode": "nb0a4ab63fd929df6",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7d424587d115aad6",
+      "fromNode": "n290f076da2ebaeb5",
+      "fromSide": "right",
+      "toNode": "n5a7ff80e922445e0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge29e2bc98b7090d4f",
+      "fromNode": "n053e9f0eafb0c123",
+      "fromSide": "right",
+      "toNode": "n5a7ff80e922445e0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9f563fac611eba47",
+      "fromNode": "n053e9f0eafb0c123",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee37d4629c85382d1",
+      "fromNode": "nb8cefaf2267fe1a2",
+      "fromSide": "right",
+      "toNode": "n1cfc0de516a157de",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9902420f2e3d6d31",
+      "fromNode": "n1cfc0de516a157de",
+      "fromSide": "right",
+      "toNode": "nb8cefaf2267fe1a2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6d9140e0ac09fb0e",
+      "fromNode": "nb8cefaf2267fe1a2",
+      "fromSide": "right",
+      "toNode": "nc64f30f574a6e04e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgebc7a35593766c3a4",
+      "fromNode": "nb8cefaf2267fe1a2",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged20ac9e56472afb5",
+      "fromNode": "nb8cefaf2267fe1a2",
+      "fromSide": "right",
+      "toNode": "n0b9c5a0019f42217",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge236e62e332001305",
+      "fromNode": "nb8cefaf2267fe1a2",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeb06bed38f26763ad",
+      "fromNode": "n5a7ff80e922445e0",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3b94bdd929beee40",
+      "fromNode": "n5a7ff80e922445e0",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgea1cc1d475530cd23",
+      "fromNode": "n5a7ff80e922445e0",
+      "fromSide": "right",
+      "toNode": "n85f3d64106eeb3bd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge398603b77bba8642",
+      "fromNode": "n5a7ff80e922445e0",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8003c36c605ab3b2",
+      "fromNode": "n5a7ff80e922445e0",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge2253bc40e0e0bbbd",
+      "fromNode": "nf4cca37503468982",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "5개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeb5bd7f9cf93d09d4",
+      "fromNode": "nf4cca37503468982",
+      "fromSide": "right",
+      "toNode": "na4baeb64a19c4a4b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge25d923ebe01e6a80",
+      "fromNode": "nf4cca37503468982",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge99be02e10a75e7b8",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge02a894447ca5c969",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "n368081dcd7b6b7bd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge132642c5e2a4b8bd",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "nfaa007b1773af3c5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge40bbdf161e6bcd7b",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "n4c7bec0d3bec1f29",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge910b25a5ee11f018",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge74f52db3c1df6e84",
+      "fromNode": "n7164be60912e2d14",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6231dbe7b50247c1",
+      "fromNode": "n1c7a5361d65ec2b1",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeab374b613832f1cd",
+      "fromNode": "n1c7a5361d65ec2b1",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge37af94302811ff77",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "nfaa007b1773af3c5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgea37c8567a9a65703",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec268b935d8b4d3af",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge0b33e107df6fc3e1",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "nf24e55a415caba9c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef66b24ec72aa1a07",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge06fb8c9425d87921",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "nb36c8501a000bba0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1ac0731f13ca5ca3",
+      "fromNode": "n368081dcd7b6b7bd",
+      "fromSide": "right",
+      "toNode": "n4c7bec0d3bec1f29",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "7개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9280e6690c7a6004",
+      "fromNode": "nfaa007b1773af3c5",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef3556103dd016260",
+      "fromNode": "nfaa007b1773af3c5",
+      "fromSide": "right",
+      "toNode": "na7b83245176f5048",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge87e864e6277c326b",
+      "fromNode": "n089791d2c47fee92",
+      "fromSide": "right",
+      "toNode": "nc28f0fde87fb9ae9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5966366d331ef164",
+      "fromNode": "nf24e55a415caba9c",
+      "fromSide": "right",
+      "toNode": "n4c7bec0d3bec1f29",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgefe85abc0597e78fc",
+      "fromNode": "nf24e55a415caba9c",
+      "fromSide": "right",
+      "toNode": "na7b83245176f5048",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge23fdbb846c0797dc",
+      "fromNode": "nf24e55a415caba9c",
+      "fromSide": "right",
+      "toNode": "nfaa007b1773af3c5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "6개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgebb7e16f79e46795c",
+      "fromNode": "nf24e55a415caba9c",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge99c5fd6def94f54f",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "nad7ba0745bfdeaca",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5064eade1cf75292",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n611cbacfb87ea153",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge774f7b1c47293b33",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n5dd0e2f558e7cb6c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged78e4e973f01b79c",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n8aa55e9a5d1426a1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeaf8d0051de2bd970",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n6d2f0429cb2ca4e8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge12e8a11385d46fb5",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n5af0bccbc60357cd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5d28a1f3ad0fa923",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5c1c632b002b11ba",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n368081dcd7b6b7bd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec93612094f62b099",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge88b8a80e769ad3b8",
+      "fromNode": "n12c50f835765367f",
+      "fromSide": "right",
+      "toNode": "n4c7bec0d3bec1f29",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9651d62601a59a3a",
+      "fromNode": "n1e937c5c3a056958",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8a3c065a2c30c6c1",
+      "fromNode": "n1e937c5c3a056958",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee92d38b96c27d53c",
+      "fromNode": "n1e937c5c3a056958",
+      "fromSide": "right",
+      "toNode": "n2a8dd9646984c9d4",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge666601f56c8a0e55",
+      "fromNode": "nc80ec037a3154974",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3ee19b4a3281160b",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "n65bccc80bf874267",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "5개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged3862c64ded19180",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "neadb49a60ef2b13c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6e7b3e551cd752f0",
+      "fromNode": "neadb49a60ef2b13c",
+      "fromSide": "right",
+      "toNode": "n5dd0e2f558e7cb6c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee675b592a9648e7f",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "n0b9c5a0019f42217",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9653b8c2e634aa59",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "n1c7a5361d65ec2b1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee431ace7ff151405",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "n1e937c5c3a056958",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9314945594e6e1ef",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge5d828f5d2f2e68c7",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged04e89774a25e316",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3aa052149bf6a1e7",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "nad7ba0745bfdeaca",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge822f4bfaab2aa0f2",
+      "fromNode": "n5dd0e2f558e7cb6c",
+      "fromSide": "right",
+      "toNode": "nd138c2cd6f2a1826",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7c01f2561ae512ce",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n8169f880b0f773e6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "10개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9e7554e8b906d5f8",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3c4230ab6aefacfa",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n368081dcd7b6b7bd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge0ee6accb20bdd450",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n85dbe63a8b92ba63",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7a89bfbc7590558b",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n208219f2361cde40",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged064ab64bccc3dba",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n2b72e7a52ba91197",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeccfbafa8e9ad6023",
+      "fromNode": "ndc982c3f154b647b",
+      "fromSide": "right",
+      "toNode": "n4e255e56550ed824",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge28783dd109b0f12a",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n0336a26a2ade582f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge19199013baf22a19",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "nf4cca37503468982",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6f012c5d8c4eb221",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "6개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9c33fcaa57cb20c8",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n368081dcd7b6b7bd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge69b75b140631f86b",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n85dbe63a8b92ba63",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "9개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgee08cdbeff269958d",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n64058c4fa931bf5d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "12개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge087c1962ccda5a8b",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n089791d2c47fee92",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef81386e958fe7b1e",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "ndc982c3f154b647b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1a2ee0451b0e19ce",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n4ab5613f9e346ccf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "5개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge28131179ea650ba1",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "9개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3ca95b50104be53f",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n8aa55e9a5d1426a1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8f6ae513a6ed841a",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n6d2f0429cb2ca4e8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge85fe827f8a75eaf0",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "nf10564ccd54a924b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge4d28d51b41d8d3f3",
+      "fromNode": "nad7ba0745bfdeaca",
+      "fromSide": "right",
+      "toNode": "n5af0bccbc60357cd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged5f867a0b7961760",
+      "fromNode": "n4ab5613f9e346ccf",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef5b16ea55fb3507c",
+      "fromNode": "n4ab5613f9e346ccf",
+      "fromSide": "right",
+      "toNode": "nf10564ccd54a924b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge152b289484758ef8",
+      "fromNode": "n2a8dd9646984c9d4",
+      "fromSide": "right",
+      "toNode": "n0f937e4a24415be8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef2ad3b14a7ec08f9",
+      "fromNode": "n2a8dd9646984c9d4",
+      "fromSide": "right",
+      "toNode": "ncb7331dbc9ddc1d3",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef8f218946b8d4bd5",
+      "fromNode": "n2a8dd9646984c9d4",
+      "fromSide": "right",
+      "toNode": "n99ec18f1d0ea868d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6d097b3364c2cc52",
+      "fromNode": "n8aa55e9a5d1426a1",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6dd57a41b652a0ad",
+      "fromNode": "nd72388b7ecd4ed18",
+      "fromSide": "right",
+      "toNode": "nc28f0fde87fb9ae9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1961e7d5ded23f0f",
+      "fromNode": "n8169f880b0f773e6",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "11개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec5d1dc0176b7ca44",
+      "fromNode": "n8169f880b0f773e6",
+      "fromSide": "right",
+      "toNode": "n208219f2361cde40",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgecfae8522400e362c",
+      "fromNode": "n85dbe63a8b92ba63",
+      "fromSide": "right",
+      "toNode": "n64058c4fa931bf5d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge7a162fca6c98c063",
+      "fromNode": "n85dbe63a8b92ba63",
+      "fromSide": "right",
+      "toNode": "nd72388b7ecd4ed18",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "6개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedeb5b002a41f4237",
+      "fromNode": "n85dbe63a8b92ba63",
+      "fromSide": "right",
+      "toNode": "n6d2f0429cb2ca4e8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge41d090c029bd0c80",
+      "fromNode": "n85dbe63a8b92ba63",
+      "fromSide": "right",
+      "toNode": "nf10564ccd54a924b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge0cbbbe63d14ad4b6",
+      "fromNode": "n64058c4fa931bf5d",
+      "fromSide": "right",
+      "toNode": "n6d2f0429cb2ca4e8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeb2d502e8ea8c20ee",
+      "fromNode": "ne8c22db77405b1a5",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge239e47f3e4a4f5f8",
+      "fromNode": "n34ae5264da0f69c5",
+      "fromSide": "right",
+      "toNode": "n75af25a1e96c3fdc",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec136d19230de979b",
+      "fromNode": "nfd9878542d647dd3",
+      "fromSide": "right",
+      "toNode": "n78164cea4ce9b681",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge9e626ffa073306e0",
+      "fromNode": "nfd9878542d647dd3",
+      "fromSide": "right",
+      "toNode": "nc786288bae6c38b3",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "4개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge76965c27f9007223",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "nb0a4ab63fd929df6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge515834118d24ab6c",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "n0bd44b97ab1055e4",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1123b8a088f0518e",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "nd8bae413525190f5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge630b75d698fd62dc",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "n1b5f755775e32750",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged0cbff9a196faafa",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "nfddf4f3e0ef8e8d1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgeaf90d772f8b9c171",
+      "fromNode": "n569c46dda082e83a",
+      "fromSide": "right",
+      "toNode": "n3caabaa1ff0dc7af",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge64c848db2c213c6d",
+      "fromNode": "nc70bc623bc705dd7",
+      "fromSide": "right",
+      "toNode": "n053e9f0eafb0c123",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec2320519f07bf602",
+      "fromNode": "nc70bc623bc705dd7",
+      "fromSide": "right",
+      "toNode": "n290f076da2ebaeb5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge8977d02c405cb5d6",
+      "fromNode": "naaec64b639b43860",
+      "fromSide": "right",
+      "toNode": "n0f937e4a24415be8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgefc39e1b733a9468e",
+      "fromNode": "naaec64b639b43860",
+      "fromSide": "right",
+      "toNode": "n99ec18f1d0ea868d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge60fd52bc4fa5241d",
+      "fromNode": "n05337afc166489f4",
+      "fromSide": "right",
+      "toNode": "n5a7ff80e922445e0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged0ae3f10e06dc418",
+      "fromNode": "n05337afc166489f4",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge452380e7886c429d",
+      "fromNode": "n05337afc166489f4",
+      "fromSide": "right",
+      "toNode": "nc28f0fde87fb9ae9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgedf963c5be71032ab",
+      "fromNode": "n71fd94e3db388d6c",
+      "fromSide": "right",
+      "toNode": "n9d9e3d399eb3060d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6e8679e76a229981",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "nb40cfd1ecbf6897d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedged724460860b532da",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "n22067441d409f58d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge3bd381e399943a96",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "n8b445bc35d40bedc",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge1443bbc60e158c7f",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "n71fd94e3db388d6c",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgebf3a4c55b2566bda",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "nd8eee7b06ad20401",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6a02eac77bb53c04",
+      "fromNode": "n1b5f755775e32750",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgec77b85db13d99fbf",
+      "fromNode": "n0bd44b97ab1055e4",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge90adf615b3957500",
+      "fromNode": "n0bd44b97ab1055e4",
+      "fromSide": "right",
+      "toNode": "ne040af2a895c6fdb",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgef5310837e6ed7321",
+      "fromNode": "ne040af2a895c6fdb",
+      "fromSide": "right",
+      "toNode": "naa85f965e7e633ad",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge939c439029bc9b25",
+      "fromNode": "nd8bae413525190f5",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge2ca7754e8ea36284",
+      "fromNode": "n93a6a1b38eac0f69",
+      "fromSide": "right",
+      "toNode": "nfa79772d9363a56b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge12b48092c92b40cf",
+      "fromNode": "n93a6a1b38eac0f69",
+      "fromSide": "right",
+      "toNode": "n6b59d15f728433fd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedgea4f823b7ed05f165",
+      "fromNode": "n93a6a1b38eac0f69",
+      "fromSide": "right",
+      "toNode": "naaec64b639b43860",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge6d0ace1fc21cd2f2",
+      "fromNode": "nfa79772d9363a56b",
+      "fromSide": "right",
+      "toNode": "n0f8f245c4fc212b5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge779ab008b44a3089",
+      "fromNode": "nfa79772d9363a56b",
+      "fromSide": "right",
+      "toNode": "ne1dad7905526edee",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge96d354719f6169e5",
+      "fromNode": "nfa79772d9363a56b",
+      "fromSide": "right",
+      "toNode": "n6b59d15f728433fd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "2개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge26c1f093cae142a6",
+      "fromNode": "nfa79772d9363a56b",
+      "fromSide": "right",
+      "toNode": "n7fd9a3d4d4e4d1ba",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "3개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge115dff7a6959bbc3",
+      "fromNode": "n0f8f245c4fc212b5",
+      "fromSide": "right",
+      "toNode": "n7fd9a3d4d4e4d1ba",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    },
+    {
+      "id": "classedge31f387c5392c54fa",
+      "fromNode": "n0f8f245c4fc212b5",
+      "fromSide": "right",
+      "toNode": "n6b59d15f728433fd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "1개 메서드 호출 쌍"
+    }
+  ]
+}

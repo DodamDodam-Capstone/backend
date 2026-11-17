@@ -1,0 +1,1621 @@
+{
+  "nodes": [
+    {
+      "id": "groupd23c66bc6110225f",
+      "type": "group",
+      "x": -55,
+      "y": 4250,
+      "width": 4960,
+      "height": 1010,
+      "label": "conversation · 직접 연결된 경계",
+      "color": "6"
+    },
+    {
+      "id": "group430a7caffa6ab039",
+      "type": "group",
+      "x": -55,
+      "y": 1310,
+      "width": 4960,
+      "height": 2780,
+      "label": "child · 업무 기능",
+      "color": "4"
+    },
+    {
+      "id": "group948e07c998b638fe",
+      "type": "group",
+      "x": -55,
+      "y": 610,
+      "width": 4960,
+      "height": 540,
+      "label": "auth · 직접 연결된 경계",
+      "color": "2"
+    },
+    {
+      "id": "groupe5b53b0bfad17237",
+      "type": "group",
+      "x": -55,
+      "y": -90,
+      "width": 4960,
+      "height": 540,
+      "label": "global · 직접 연결된 경계",
+      "color": "5"
+    },
+    {
+      "id": "groupc28f0fde87fb9ae9",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 1560,
+      "height": 350,
+      "label": "global.error.ApiErrorResponse.FieldError [경계]",
+      "color": "5"
+    },
+    {
+      "id": "nf0e62423c0dec9de",
+      "type": "text",
+      "x": 30,
+      "y": 60,
+      "width": 480,
+      "height": 235,
+      "text": "### FieldError.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponse.FieldError#생성자 mf0e62423c0dec9de|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public FieldError(String field, String reason)`\n\n자동 생성"
+    },
+    {
+      "id": "groupaaec64b639b43860",
+      "type": "group",
+      "x": 1640,
+      "y": 0,
+      "width": 1560,
+      "height": 350,
+      "label": "global.error.ApiErrorResponses [경계]",
+      "color": "5"
+    },
+    {
+      "id": "ne905a471c60d2a7e",
+      "type": "text",
+      "x": 1670,
+      "y": 60,
+      "width": 480,
+      "height": 235,
+      "text": "### ApiErrorResponses.body\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponses#body me905a471c60d2a7e|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ApiErrorResponse body(HttpServletResponse response, String code, String message, List<ApiErrorResponse.FieldError> fields)`"
+    },
+    {
+      "id": "groupe1dad7905526edee",
+      "type": "group",
+      "x": 0,
+      "y": 700,
+      "width": 1560,
+      "height": 350,
+      "label": "auth.session.AuthenticatedSession [경계]",
+      "color": "2"
+    },
+    {
+      "id": "n23b42fff4f806999",
+      "type": "text",
+      "x": 30,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthenticatedSession.accountId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSession#accountId m23b42fff4f806999|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID accountId()`\n\n자동 생성"
+    },
+    {
+      "id": "ne6d8be795777e536",
+      "type": "text",
+      "x": 530,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthenticatedSession.securityContextId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSession#securityContextId me6d8be795777e536|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID securityContextId()`\n\n자동 생성"
+    },
+    {
+      "id": "groupb0a4ab63fd929df6",
+      "type": "group",
+      "x": 1640,
+      "y": 700,
+      "width": 1560,
+      "height": 350,
+      "label": "auth.session.AuthenticatedSessionService [경계]",
+      "color": "2"
+    },
+    {
+      "id": "nad23075b25d06a28",
+      "type": "text",
+      "x": 1670,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthenticatedSessionService.requireAuthenticatedSession\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSessionService#requireAuthenticatedSession mad23075b25d06a28|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public AuthenticatedSession requireAuthenticatedSession(HttpServletRequest request)`"
+    },
+    {
+      "id": "groupf4cca37503468982",
+      "type": "group",
+      "x": 3280,
+      "y": 700,
+      "width": 1560,
+      "height": 350,
+      "label": "auth.session.SessionSecurityRepository [경계]",
+      "color": "2"
+    },
+    {
+      "id": "n950184451aa631db",
+      "type": "text",
+      "x": 3310,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### SessionSecurityRepository.requireCurrentContextForUpdate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionSecurityRepository#requireCurrentContextForUpdate m950184451aa631db|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public void requireCurrentContextForUpdate(UUID accountId, UUID securityContextId)`"
+    },
+    {
+      "id": "group7164be60912e2d14",
+      "type": "group",
+      "x": 0,
+      "y": 1400,
+      "width": 1560,
+      "height": 350,
+      "label": "child.api.ChildController",
+      "color": "4"
+    },
+    {
+      "id": "n4127e44b19ab6078",
+      "type": "text",
+      "x": 30,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildController.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController#생성자 m4127e44b19ab6078|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildController(AuthenticatedSessionService authentication, ChildService children)`"
+    },
+    {
+      "id": "n85a3864c9b94be48",
+      "type": "text",
+      "x": 530,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildController.create\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController#create m85a3864c9b94be48|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ResponseEntity<Map<String,ChildView>> create(HttpServletRequest request, JsonNode body)`"
+    },
+    {
+      "id": "n85e9a4840a5175ad",
+      "type": "text",
+      "x": 1030,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildController.invalidJson\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController#invalidJson m85e9a4840a5175ad|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ResponseEntity<ApiErrorResponse> invalidJson(HttpServletResponse response)`"
+    },
+    {
+      "id": "group1c7a5361d65ec2b1",
+      "type": "group",
+      "x": 1640,
+      "y": 1400,
+      "width": 1560,
+      "height": 350,
+      "label": "child.api.ChildExceptionHandler",
+      "color": "4"
+    },
+    {
+      "id": "na451743715a09223",
+      "type": "text",
+      "x": 1670,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildExceptionHandler.handle\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildExceptionHandler#handle ma451743715a09223|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ResponseEntity<ApiErrorResponse> handle(ChildException exception, HttpServletResponse response)`"
+    },
+    {
+      "id": "n05592ff2e913c1cf",
+      "type": "text",
+      "x": 2170,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildExceptionHandler.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildExceptionHandler#생성자 m05592ff2e913c1cf|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildExceptionHandler()`\n\n자동 생성"
+    },
+    {
+      "id": "group368081dcd7b6b7bd",
+      "type": "group",
+      "x": 3280,
+      "y": 1400,
+      "width": 1560,
+      "height": 610,
+      "label": "child.application.ChildService",
+      "color": "4"
+    },
+    {
+      "id": "n525dcc919ca9a630",
+      "type": "text",
+      "x": 3310,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#생성자 m525dcc919ca9a630|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildService(ChildRepository repository, SessionSecurityRepository securityRepository)`"
+    },
+    {
+      "id": "na9397c45f753bcb9",
+      "type": "text",
+      "x": 3810,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#생성자 ma9397c45f753bcb9|정의 · 소스 · 호출자 · 호출 대상]]\n\n`ChildService(ChildRepository repository, SessionSecurityRepository securityRepository, Clock clock, Set<String> supportedCharacterIds)`"
+    },
+    {
+      "id": "n022c1fb522a0efea",
+      "type": "text",
+      "x": 4310,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.create\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#create m022c1fb522a0efea|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView create(AuthenticatedSession session, CreateChildRequest request)`"
+    },
+    {
+      "id": "nbb6af419b1ceab47",
+      "type": "text",
+      "x": 3310,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.requireChildAccess\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#requireChildAccess mbb6af419b1ceab47|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView requireChildAccess(UUID accountId, UUID childId)`"
+    },
+    {
+      "id": "n10ec0868c9e8ded5",
+      "type": "text",
+      "x": 3810,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.requireChildAccessForUpdate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#requireChildAccessForUpdate m10ec0868c9e8ded5|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView requireChildAccessForUpdate(UUID accountId, UUID childId)`"
+    },
+    {
+      "id": "n6caa8e347baa2700",
+      "type": "text",
+      "x": 4310,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildService.getChildContext\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#getChildContext m6caa8e347baa2700|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildContext getChildContext(UUID childId)`"
+    },
+    {
+      "id": "groupb36c8501a000bba0",
+      "type": "group",
+      "x": 0,
+      "y": 1870,
+      "width": 1560,
+      "height": 1130,
+      "label": "child.dto.ChildContext",
+      "color": "4"
+    },
+    {
+      "id": "n536e5b98466722f0",
+      "type": "text",
+      "x": 30,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#생성자 m536e5b98466722f0|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildContext(UUID childId, String name, String nickname, LocalDate birthDate, List<String> interests, String characterId, OffsetDateTime createdAt)`\n\n자동 생성"
+    },
+    {
+      "id": "nd80d782a7e004ec7",
+      "type": "text",
+      "x": 530,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.birthDate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#birthDate md80d782a7e004ec7|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public LocalDate birthDate()`\n\n자동 생성"
+    },
+    {
+      "id": "n1a056d29c8472cfe",
+      "type": "text",
+      "x": 1030,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.characterId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#characterId m1a056d29c8472cfe|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String characterId()`\n\n자동 생성"
+    },
+    {
+      "id": "nd03b81babf8d1064",
+      "type": "text",
+      "x": 30,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.childId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#childId md03b81babf8d1064|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID childId()`\n\n자동 생성"
+    },
+    {
+      "id": "n709ae446c7a01e53",
+      "type": "text",
+      "x": 530,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.createdAt\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#createdAt m709ae446c7a01e53|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime createdAt()`\n\n자동 생성"
+    },
+    {
+      "id": "n62bf96e608dee2f4",
+      "type": "text",
+      "x": 1030,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.equals\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#equals m62bf96e608dee2f4|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final boolean equals(Object o)`\n\n자동 생성"
+    },
+    {
+      "id": "n294944f0205e4f5f",
+      "type": "text",
+      "x": 30,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.hashCode\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#hashCode m294944f0205e4f5f|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final int hashCode()`\n\n자동 생성"
+    },
+    {
+      "id": "ne6442a16271d51ba",
+      "type": "text",
+      "x": 530,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.interests\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#interests me6442a16271d51ba|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public List<String> interests()`\n\n자동 생성"
+    },
+    {
+      "id": "nfbb7f9eecd6b2a08",
+      "type": "text",
+      "x": 1030,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.name\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#name mfbb7f9eecd6b2a08|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String name()`\n\n자동 생성"
+    },
+    {
+      "id": "n5ac1757dee10cab7",
+      "type": "text",
+      "x": 30,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.nickname\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#nickname m5ac1757dee10cab7|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String nickname()`\n\n자동 생성"
+    },
+    {
+      "id": "nb1f50d4f8e93d20a",
+      "type": "text",
+      "x": 530,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildContext.toString\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildContext#toString mb1f50d4f8e93d20a|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final String toString()`\n\n자동 생성"
+    },
+    {
+      "id": "group4c7bec0d3bec1f29",
+      "type": "group",
+      "x": 1640,
+      "y": 1870,
+      "width": 1560,
+      "height": 1130,
+      "label": "child.dto.ChildView",
+      "color": "4"
+    },
+    {
+      "id": "n7920af371985807d",
+      "type": "text",
+      "x": 1670,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#생성자 m7920af371985807d|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView(UUID childId, String name, String nickname, LocalDate birthDate, ChildView.Gender gender, List<String> interests, String characterId, OffsetDateTime createdAt)`\n\n자동 생성"
+    },
+    {
+      "id": "nd248aad07954f7cd",
+      "type": "text",
+      "x": 2170,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.birthDate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#birthDate md248aad07954f7cd|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public LocalDate birthDate()`\n\n자동 생성"
+    },
+    {
+      "id": "nab784e0a7962babf",
+      "type": "text",
+      "x": 2670,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.characterId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#characterId mab784e0a7962babf|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String characterId()`\n\n자동 생성"
+    },
+    {
+      "id": "n7990d88dbffa4abf",
+      "type": "text",
+      "x": 1670,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.childId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#childId m7990d88dbffa4abf|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID childId()`\n\n자동 생성"
+    },
+    {
+      "id": "n659786102a254ae8",
+      "type": "text",
+      "x": 2170,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.createdAt\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#createdAt m659786102a254ae8|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime createdAt()`\n\n자동 생성"
+    },
+    {
+      "id": "ne7f9b6d7e73c4930",
+      "type": "text",
+      "x": 2670,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.equals\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#equals me7f9b6d7e73c4930|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final boolean equals(Object o)`\n\n자동 생성"
+    },
+    {
+      "id": "nf0df961456b30e95",
+      "type": "text",
+      "x": 1670,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.gender\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#gender mf0df961456b30e95|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView.Gender gender()`\n\n자동 생성"
+    },
+    {
+      "id": "n43c759216ee7545f",
+      "type": "text",
+      "x": 2170,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.hashCode\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#hashCode m43c759216ee7545f|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final int hashCode()`\n\n자동 생성"
+    },
+    {
+      "id": "n5a91f7785027eed8",
+      "type": "text",
+      "x": 2670,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.interests\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#interests m5a91f7785027eed8|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public List<String> interests()`\n\n자동 생성"
+    },
+    {
+      "id": "nac1fa6635c552e74",
+      "type": "text",
+      "x": 1670,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.name\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#name mac1fa6635c552e74|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String name()`\n\n자동 생성"
+    },
+    {
+      "id": "nfe2268021c8e5b2b",
+      "type": "text",
+      "x": 2170,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.nickname\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#nickname mfe2268021c8e5b2b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String nickname()`\n\n자동 생성"
+    },
+    {
+      "id": "naeddd37313c40abf",
+      "type": "text",
+      "x": 2670,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildView.toString\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView#toString maeddd37313c40abf|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final String toString()`\n\n자동 생성"
+    },
+    {
+      "id": "groupa7b83245176f5048",
+      "type": "group",
+      "x": 3280,
+      "y": 2130,
+      "width": 1560,
+      "height": 350,
+      "label": "child.dto.ChildView.Gender",
+      "color": "4"
+    },
+    {
+      "id": "ne28961aaaab896a5",
+      "type": "text",
+      "x": 3310,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### Gender.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.Gender#생성자 me28961aaaab896a5|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private Gender()`\n\n자동 생성"
+    },
+    {
+      "id": "nae04a68330eefb58",
+      "type": "text",
+      "x": 3810,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### Gender.valueOf\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.Gender#valueOf mae04a68330eefb58|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ChildView.Gender valueOf(String name)`\n\n자동 생성"
+    },
+    {
+      "id": "ndb3726c097096c43",
+      "type": "text",
+      "x": 4310,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### Gender.values\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.Gender#values mdb3726c097096c43|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ChildView.Gender[] values()`\n\n자동 생성"
+    },
+    {
+      "id": "groupfaa007b1773af3c5",
+      "type": "group",
+      "x": 3280,
+      "y": 2600,
+      "width": 1560,
+      "height": 1390,
+      "label": "child.dto.CreateChildRequest",
+      "color": "4"
+    },
+    {
+      "id": "nf8c618d868acf95b",
+      "type": "text",
+      "x": 3310,
+      "y": 2660,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.fromJson\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#fromJson mf8c618d868acf95b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static CreateChildRequest fromJson(JsonNode body)`"
+    },
+    {
+      "id": "nf6b45ea2162d93f1",
+      "type": "text",
+      "x": 3810,
+      "y": 2660,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.normalized\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#normalized mf6b45ea2162d93f1|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public CreateChildRequest normalized(Clock clock, Set<String> supportedCharacterIds)`"
+    },
+    {
+      "id": "n56d642f98e92dbce",
+      "type": "text",
+      "x": 4310,
+      "y": 2660,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.requiredString\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#requiredString m56d642f98e92dbce|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private static String requiredString(JsonNode node, String field)`"
+    },
+    {
+      "id": "n1fe5e0b24f99439b",
+      "type": "text",
+      "x": 3310,
+      "y": 2920,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.normalizedText\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#normalizedText m1fe5e0b24f99439b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private static String normalizedText(String value, int maximum, String field)`"
+    },
+    {
+      "id": "nb94f8bd69ff019a8",
+      "type": "text",
+      "x": 3810,
+      "y": 2920,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.isSpace\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#isSpace mb94f8bd69ff019a8|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private static boolean isSpace(int codePoint)`"
+    },
+    {
+      "id": "nc86d1916589ca833",
+      "type": "text",
+      "x": 4310,
+      "y": 2920,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#생성자 mc86d1916589ca833|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public CreateChildRequest(String name, String nickname, LocalDate birthDate, ChildView.Gender gender, List<String> interests, String characterId)`\n\n자동 생성"
+    },
+    {
+      "id": "n521a841c1b562159",
+      "type": "text",
+      "x": 3310,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.birthDate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#birthDate m521a841c1b562159|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public LocalDate birthDate()`\n\n자동 생성"
+    },
+    {
+      "id": "n947b336024310718",
+      "type": "text",
+      "x": 3810,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.characterId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#characterId m947b336024310718|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String characterId()`\n\n자동 생성"
+    },
+    {
+      "id": "n06e35e4c9eb02043",
+      "type": "text",
+      "x": 4310,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.equals\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#equals m06e35e4c9eb02043|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final boolean equals(Object o)`\n\n자동 생성"
+    },
+    {
+      "id": "n0bb25172a292801f",
+      "type": "text",
+      "x": 3310,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.gender\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#gender m0bb25172a292801f|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildView.Gender gender()`\n\n자동 생성"
+    },
+    {
+      "id": "nf67e9c5c70288691",
+      "type": "text",
+      "x": 3810,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.hashCode\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#hashCode mf67e9c5c70288691|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final int hashCode()`\n\n자동 생성"
+    },
+    {
+      "id": "n3ec099adee591128",
+      "type": "text",
+      "x": 4310,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.interests\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#interests m3ec099adee591128|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public List<String> interests()`\n\n자동 생성"
+    },
+    {
+      "id": "nea66a08e5a7112b1",
+      "type": "text",
+      "x": 3310,
+      "y": 3700,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.name\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#name mea66a08e5a7112b1|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String name()`\n\n자동 생성"
+    },
+    {
+      "id": "ne107b28c9a6d3bad",
+      "type": "text",
+      "x": 3810,
+      "y": 3700,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.nickname\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#nickname me107b28c9a6d3bad|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String nickname()`\n\n자동 생성"
+    },
+    {
+      "id": "n65bd911d24098d6b",
+      "type": "text",
+      "x": 4310,
+      "y": 3700,
+      "width": 480,
+      "height": 235,
+      "text": "### CreateChildRequest.toString\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#toString m65bd911d24098d6b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final String toString()`\n\n자동 생성"
+    },
+    {
+      "id": "group089791d2c47fee92",
+      "type": "group",
+      "x": 0,
+      "y": 3120,
+      "width": 1560,
+      "height": 870,
+      "label": "child.exception.ChildException",
+      "color": "4"
+    },
+    {
+      "id": "n1309e1738b206625",
+      "type": "text",
+      "x": 30,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#생성자 m1309e1738b206625|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildException(Throwable cause)`"
+    },
+    {
+      "id": "n09180f2bb9ab53c7",
+      "type": "text",
+      "x": 530,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#생성자 m09180f2bb9ab53c7|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private ChildException(String code, String message, List<ApiErrorResponse.FieldError> fields, Throwable cause)`"
+    },
+    {
+      "id": "nda3f586558efa3e2",
+      "type": "text",
+      "x": 1030,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.notFound\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#notFound mda3f586558efa3e2|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ChildException notFound()`"
+    },
+    {
+      "id": "n04bce91b4a5ea457",
+      "type": "text",
+      "x": 30,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.validation\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#validation m04bce91b4a5ea457|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ChildException validation(String field)`"
+    },
+    {
+      "id": "ne8321a7d6a24ae8e",
+      "type": "text",
+      "x": 530,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.limitReached\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#limitReached me8321a7d6a24ae8e|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ChildException limitReached()`"
+    },
+    {
+      "id": "n9503281b2a5259d9",
+      "type": "text",
+      "x": 1030,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.code\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#code m9503281b2a5259d9|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String code()`"
+    },
+    {
+      "id": "n5ca1eb5c4e2bd206",
+      "type": "text",
+      "x": 30,
+      "y": 3700,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildException.fields\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.exception.ChildException#fields m5ca1eb5c4e2bd206|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public List<ApiErrorResponse.FieldError> fields()`"
+    },
+    {
+      "id": "groupf24e55a415caba9c",
+      "type": "group",
+      "x": 1640,
+      "y": 3120,
+      "width": 1560,
+      "height": 610,
+      "label": "child.infrastructure.ChildRepository",
+      "color": "4"
+    },
+    {
+      "id": "n41ae0dedcce4349b",
+      "type": "text",
+      "x": 1670,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildRepository.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#생성자 m41ae0dedcce4349b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ChildRepository(JdbcTemplate jdbc)`"
+    },
+    {
+      "id": "ncdb7b197a0d8c26e",
+      "type": "text",
+      "x": 2170,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildRepository.insert\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#insert mcdb7b197a0d8c26e|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Optional<ChildView> insert(UUID accountId, CreateChildRequest normalized)`"
+    },
+    {
+      "id": "n0c455eef6c80ad12",
+      "type": "text",
+      "x": 2670,
+      "y": 3180,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildRepository.findOwned\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#findOwned m0c455eef6c80ad12|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Optional<ChildView> findOwned(UUID accountId, UUID childId)`"
+    },
+    {
+      "id": "naf36c957db0ad4a1",
+      "type": "text",
+      "x": 1670,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildRepository.findOwnedForUpdate\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#findOwnedForUpdate maf36c957db0ad4a1|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Optional<ChildView> findOwnedForUpdate(UUID accountId, UUID childId)`"
+    },
+    {
+      "id": "ndfeacb26eaf99e57",
+      "type": "text",
+      "x": 2170,
+      "y": 3440,
+      "width": 480,
+      "height": 235,
+      "text": "### ChildRepository.findById\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#findById mdfeacb26eaf99e57|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Optional<ChildView> findById(UUID childId)`"
+    },
+    {
+      "id": "group12c50f835765367f",
+      "type": "group",
+      "x": 0,
+      "y": 4340,
+      "width": 1560,
+      "height": 350,
+      "label": "conversation.api.ConversationController [경계]",
+      "color": "6"
+    },
+    {
+      "id": "n1cac5f319ccf317a",
+      "type": "text",
+      "x": 30,
+      "y": 4400,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationController.prepareStart\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationController#prepareStart m1cac5f319ccf317a|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ConversationController.PreparedStart prepareStart(HttpServletRequest request, String childId, JsonNode body)`"
+    },
+    {
+      "id": "group5dd0e2f558e7cb6c",
+      "type": "group",
+      "x": 1640,
+      "y": 4340,
+      "width": 1560,
+      "height": 350,
+      "label": "conversation.api.ConversationStartResponseFilter [경계]",
+      "color": "6"
+    },
+    {
+      "id": "n2e5a11b062f28145",
+      "type": "text",
+      "x": 1670,
+      "y": 4400,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationStartResponseFilter.doFilterInternal\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter#doFilterInternal m2e5a11b062f28145|정의 · 소스 · 호출자 · 호출 대상]]\n\n`protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)`"
+    },
+    {
+      "id": "groupdc982c3f154b647b",
+      "type": "group",
+      "x": 3280,
+      "y": 4340,
+      "width": 1560,
+      "height": 350,
+      "label": "conversation.application.ConversationClosureCoordinator [경계]",
+      "color": "6"
+    },
+    {
+      "id": "n5c7d3b9b2dd0cb88",
+      "type": "text",
+      "x": 3310,
+      "y": 4400,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationClosureCoordinator.reconcile\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator#reconcile m5c7d3b9b2dd0cb88|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ConversationClosureCoordinator.ClosureResult reconcile(UUID accountId, UUID childId, UUID conversationId, ConversationClosureCoordinator.Trigger trigger)`"
+    },
+    {
+      "id": "nbbd5c374803feeec",
+      "type": "text",
+      "x": 3810,
+      "y": 4400,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationClosureCoordinator.requireState\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator#requireState mbbd5c374803feeec|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private ConversationClosureRepository.ClosureState requireState(UUID childId, UUID conversationId)`"
+    },
+    {
+      "id": "groupad7ba0745bfdeaca",
+      "type": "group",
+      "x": 0,
+      "y": 4810,
+      "width": 1560,
+      "height": 350,
+      "label": "conversation.application.ConversationService [경계]",
+      "color": "6"
+    },
+    {
+      "id": "nacdb3aca10ad50df",
+      "type": "text",
+      "x": 30,
+      "y": 4870,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationService.verifyStartResponse\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#verifyStartResponse macdb3aca10ad50df|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public void verifyStartResponse(AuthenticatedSession session, UUID childId, UUID clientRequestId, UUID conversationId)`"
+    },
+    {
+      "id": "n074dea56e9276dfa",
+      "type": "text",
+      "x": 530,
+      "y": 4870,
+      "width": 480,
+      "height": 235,
+      "text": "### ConversationService.decideStart\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#decideStart m074dea56e9276dfa|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private ConversationService.StartDecision decideStart(AuthenticatedSession session, UUID childId, StartConversationRequest request)`"
+    },
+    {
+      "id": "n4769fdaf7f1e2eb5",
+      "type": "text",
+      "x": 5300,
+      "y": 0,
+      "width": 480,
+      "height": 200,
+      "text": "### 필드 / 정적 초기화\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.ChildView.Gender|Gender]]",
+      "color": "5"
+    },
+    {
+      "id": "n343f5699243eec47",
+      "type": "text",
+      "x": 5300,
+      "y": 240,
+      "width": 480,
+      "height": 200,
+      "text": "### 필드 / 정적 초기화\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository|ChildRepository]]",
+      "color": "5"
+    },
+    {
+      "id": "runtime539232206706e9f6",
+      "type": "text",
+      "x": 5900,
+      "y": 0,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nPOST /api/v1/children",
+      "color": "5"
+    },
+    {
+      "id": "runtimef08f467630725312",
+      "type": "text",
+      "x": 5900,
+      "y": 240,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nServlet / Spring 필터 실행",
+      "color": "5"
+    },
+    {
+      "id": "runtime43584945420c46a6",
+      "type": "text",
+      "x": 5900,
+      "y": 480,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nSpring MVC 예외 처리",
+      "color": "5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edgee110fdb51c0f0b7d",
+      "fromNode": "n85a3864c9b94be48",
+      "fromSide": "right",
+      "toNode": "nad23075b25d06a28",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge840a81efb5ebc820",
+      "fromNode": "n85a3864c9b94be48",
+      "fromSide": "right",
+      "toNode": "n022c1fb522a0efea",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeeaaf4c8d51c6b147",
+      "fromNode": "n85a3864c9b94be48",
+      "fromSide": "right",
+      "toNode": "nf8c618d868acf95b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge72d92c804884dc45",
+      "fromNode": "n85a3864c9b94be48",
+      "fromSide": "right",
+      "toNode": "n7990d88dbffa4abf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeaf6743a704dddb75",
+      "fromNode": "n85e9a4840a5175ad",
+      "fromSide": "right",
+      "toNode": "n04bce91b4a5ea457",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge32e33f309251a78f",
+      "fromNode": "n85e9a4840a5175ad",
+      "fromSide": "right",
+      "toNode": "ne905a471c60d2a7e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge555f6a8a684e6227",
+      "fromNode": "n85e9a4840a5175ad",
+      "fromSide": "right",
+      "toNode": "n9503281b2a5259d9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgee103e0fa299dcc78",
+      "fromNode": "n85e9a4840a5175ad",
+      "fromSide": "right",
+      "toNode": "n5ca1eb5c4e2bd206",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge8715628181f42749",
+      "fromNode": "na451743715a09223",
+      "fromSide": "right",
+      "toNode": "n9503281b2a5259d9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgef86bd4e6007759d2",
+      "fromNode": "na451743715a09223",
+      "fromSide": "right",
+      "toNode": "ne905a471c60d2a7e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeee2d5b40653430e2",
+      "fromNode": "na451743715a09223",
+      "fromSide": "right",
+      "toNode": "n5ca1eb5c4e2bd206",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge18e79f7c92c27ddf",
+      "fromNode": "n525dcc919ca9a630",
+      "fromSide": "right",
+      "toNode": "na9397c45f753bcb9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeecc07578566b2836",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "nf6b45ea2162d93f1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge2edbaa846a12f426",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "n950184451aa631db",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge868086fd46d64b98",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "n23b42fff4f806999",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeb31426f9284028b6",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "ne6d8be795777e536",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeabc802fabec8fa42",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "ncdb7b197a0d8c26e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge8f9c7a235cdb9583",
+      "fromNode": "n022c1fb522a0efea",
+      "fromSide": "right",
+      "toNode": "ne8321a7d6a24ae8e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edge4ed20025a79a7b79",
+      "fromNode": "nbb6af419b1ceab47",
+      "fromSide": "right",
+      "toNode": "n0c455eef6c80ad12",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge8f978c71d878d8ac",
+      "fromNode": "nbb6af419b1ceab47",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edgee1f342cce9468915",
+      "fromNode": "n10ec0868c9e8ded5",
+      "fromSide": "right",
+      "toNode": "naf36c957db0ad4a1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge9ca986036d8dde8b",
+      "fromNode": "n10ec0868c9e8ded5",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edged0fa1929017519a3",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "ndfeacb26eaf99e57",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgee5d60ed926a8960c",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edge2adead9c5cbf87c7",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "n536e5b98466722f0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge6c2069506644a6a7",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "n7990d88dbffa4abf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgec2a37c40865d9664",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "nac1fa6635c552e74",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgef3fed70491431e8a",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "nfe2268021c8e5b2b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeefc378f7a7c9d445",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "nd248aad07954f7cd",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge8b77ebb3166e5ff7",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "n5a91f7785027eed8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge2065ffc0342ce964",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "nab784e0a7962babf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgedfa1100b11d7766d",
+      "fromNode": "n6caa8e347baa2700",
+      "fromSide": "right",
+      "toNode": "n659786102a254ae8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgea358d2c90ac8559f",
+      "fromNode": "n4769fdaf7f1e2eb5",
+      "fromSide": "right",
+      "toNode": "ne28961aaaab896a5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge09b8915d0cde187c",
+      "fromNode": "nf8c618d868acf95b",
+      "fromSide": "right",
+      "toNode": "n04bce91b4a5ea457",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgefa886aee1f2d1b1f",
+      "fromNode": "nf8c618d868acf95b",
+      "fromSide": "right",
+      "toNode": "n56d642f98e92dbce",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge25aafdb7766d8772",
+      "fromNode": "nf8c618d868acf95b",
+      "fromSide": "right",
+      "toNode": "nae04a68330eefb58",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgee090b52808696b67",
+      "fromNode": "nf8c618d868acf95b",
+      "fromSide": "right",
+      "toNode": "nc86d1916589ca833",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeed153cec64d94e93",
+      "fromNode": "nf6b45ea2162d93f1",
+      "fromSide": "right",
+      "toNode": "n1fe5e0b24f99439b",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge71af9f6ade8e61e5",
+      "fromNode": "nf6b45ea2162d93f1",
+      "fromSide": "right",
+      "toNode": "n04bce91b4a5ea457",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge513e3dfc73dee171",
+      "fromNode": "nf6b45ea2162d93f1",
+      "fromSide": "right",
+      "toNode": "nc86d1916589ca833",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge526e54c6140d7694",
+      "fromNode": "n56d642f98e92dbce",
+      "fromSide": "right",
+      "toNode": "n04bce91b4a5ea457",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge381c91bef6aff097",
+      "fromNode": "n1fe5e0b24f99439b",
+      "fromSide": "right",
+      "toNode": "n04bce91b4a5ea457",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge3e74b7b14435bb3f",
+      "fromNode": "n1fe5e0b24f99439b",
+      "fromSide": "right",
+      "toNode": "nb94f8bd69ff019a8",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgee2338e5196e0d187",
+      "fromNode": "n1309e1738b206625",
+      "fromSide": "right",
+      "toNode": "n09180f2bb9ab53c7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge08c69a20b68a651d",
+      "fromNode": "nda3f586558efa3e2",
+      "fromSide": "right",
+      "toNode": "n09180f2bb9ab53c7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgec67262f414e2a78c",
+      "fromNode": "n04bce91b4a5ea457",
+      "fromSide": "right",
+      "toNode": "n09180f2bb9ab53c7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge2a836d1057eef191",
+      "fromNode": "n04bce91b4a5ea457",
+      "fromSide": "right",
+      "toNode": "nf0e62423c0dec9de",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge5a5d0c38c9dc02ab",
+      "fromNode": "ne8321a7d6a24ae8e",
+      "fromSide": "right",
+      "toNode": "n09180f2bb9ab53c7",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgefce9ebd5064001ba",
+      "fromNode": "n343f5699243eec47",
+      "fromSide": "right",
+      "toNode": "n7920af371985807d",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge645390f140742e69",
+      "fromNode": "n343f5699243eec47",
+      "fromSide": "right",
+      "toNode": "nae04a68330eefb58",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge03addf9136e1cd78",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "nea66a08e5a7112b1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edged6e158bd5ecec348",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "ne107b28c9a6d3bad",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge9e4569dcc8b96fe0",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "n521a841c1b562159",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge77d692805dba8049",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "n0bb25172a292801f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge2a05e49c51cfcaab",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "n3ec099adee591128",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge3f9ca466a4d56884",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "n947b336024310718",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgebea3754476c0062f",
+      "fromNode": "ncdb7b197a0d8c26e",
+      "fromSide": "right",
+      "toNode": "n1309e1738b206625",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge2f4b31c527182394",
+      "fromNode": "n0c455eef6c80ad12",
+      "fromSide": "right",
+      "toNode": "n1309e1738b206625",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge529e2ce9a942b5a5",
+      "fromNode": "naf36c957db0ad4a1",
+      "fromSide": "right",
+      "toNode": "n1309e1738b206625",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge0c97aa61e90e83b4",
+      "fromNode": "ndfeacb26eaf99e57",
+      "fromSide": "right",
+      "toNode": "n1309e1738b206625",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge1d0f71f7292e4e45",
+      "fromNode": "n1cac5f319ccf317a",
+      "fromSide": "right",
+      "toNode": "nbb6af419b1ceab47",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeb4f7992debc35a09",
+      "fromNode": "n1cac5f319ccf317a",
+      "fromSide": "right",
+      "toNode": "n7990d88dbffa4abf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgebefa6c9b00fe887f",
+      "fromNode": "n2e5a11b062f28145",
+      "fromSide": "right",
+      "toNode": "na451743715a09223",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge91d9cb84894e3617",
+      "fromNode": "n5c7d3b9b2dd0cb88",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgef017706f831f0ded",
+      "fromNode": "n5c7d3b9b2dd0cb88",
+      "fromSide": "right",
+      "toNode": "n10ec0868c9e8ded5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge798204ec4472e713",
+      "fromNode": "nbbd5c374803feeec",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edgef59314a09bc8e9a6",
+      "fromNode": "nacdb3aca10ad50df",
+      "fromSide": "right",
+      "toNode": "n10ec0868c9e8ded5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge41db1e8f91d3db3c",
+      "fromNode": "nacdb3aca10ad50df",
+      "fromSide": "right",
+      "toNode": "nda3f586558efa3e2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "참조"
+    },
+    {
+      "id": "edge38564c83822d43b9",
+      "fromNode": "n074dea56e9276dfa",
+      "fromSide": "right",
+      "toNode": "n10ec0868c9e8ded5",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "frameworka84101b0b933d69e",
+      "fromNode": "runtime539232206706e9f6",
+      "fromSide": "right",
+      "toNode": "n85a3864c9b94be48",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    },
+    {
+      "id": "framework851007bc9e1f4102",
+      "fromNode": "runtime43584945420c46a6",
+      "fromSide": "right",
+      "toNode": "n85e9a4840a5175ad",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    },
+    {
+      "id": "framework631c3841da1b774b",
+      "fromNode": "runtime43584945420c46a6",
+      "fromSide": "right",
+      "toNode": "na451743715a09223",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    },
+    {
+      "id": "frameworkb055ce6e86dcf13e",
+      "fromNode": "runtimef08f467630725312",
+      "fromSide": "right",
+      "toNode": "n2e5a11b062f28145",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    }
+  ]
+}

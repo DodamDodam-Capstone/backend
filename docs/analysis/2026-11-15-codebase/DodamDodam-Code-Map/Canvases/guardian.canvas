@@ -1,0 +1,669 @@
+{
+  "nodes": [
+    {
+      "id": "grouped63da1b8448a4ce",
+      "type": "group",
+      "x": -55,
+      "y": 1310,
+      "width": 4960,
+      "height": 2310,
+      "label": "guardian · 업무 기능",
+      "color": "3"
+    },
+    {
+      "id": "group948e07c998b638fe",
+      "type": "group",
+      "x": -55,
+      "y": 610,
+      "width": 4960,
+      "height": 540,
+      "label": "auth · 직접 연결된 경계",
+      "color": "2"
+    },
+    {
+      "id": "groupe5b53b0bfad17237",
+      "type": "group",
+      "x": -55,
+      "y": -90,
+      "width": 4960,
+      "height": 540,
+      "label": "global · 직접 연결된 경계",
+      "color": "5"
+    },
+    {
+      "id": "groupaaec64b639b43860",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 1560,
+      "height": 350,
+      "label": "global.error.ApiErrorResponses [경계]",
+      "color": "5"
+    },
+    {
+      "id": "ne905a471c60d2a7e",
+      "type": "text",
+      "x": 30,
+      "y": 60,
+      "width": 480,
+      "height": 235,
+      "text": "### ApiErrorResponses.body\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/global.error.ApiErrorResponses#body me905a471c60d2a7e|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static ApiErrorResponse body(HttpServletResponse response, String code, String message, List<ApiErrorResponse.FieldError> fields)`"
+    },
+    {
+      "id": "group3d88b5ac4e7de0d2",
+      "type": "group",
+      "x": 0,
+      "y": 700,
+      "width": 1560,
+      "height": 350,
+      "label": "auth.session.AuthStateErrorFilter [경계]",
+      "color": "2"
+    },
+    {
+      "id": "n039987860b5cf49f",
+      "type": "text",
+      "x": 30,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthStateErrorFilter.doFilterInternal\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorFilter#doFilterInternal m039987860b5cf49f|정의 · 소스 · 호출자 · 호출 대상]]\n\n`protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)`"
+    },
+    {
+      "id": "n1098528f38d3ff11",
+      "type": "text",
+      "x": 530,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthStateErrorFilter.verifyResponseAccess\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthStateErrorFilter#verifyResponseAccess m1098528f38d3ff11|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private void verifyResponseAccess(HttpServletRequest request, HttpServletResponse response)`"
+    },
+    {
+      "id": "groupe1dad7905526edee",
+      "type": "group",
+      "x": 1640,
+      "y": 700,
+      "width": 1560,
+      "height": 350,
+      "label": "auth.session.AuthenticatedSession [경계]",
+      "color": "2"
+    },
+    {
+      "id": "n23b42fff4f806999",
+      "type": "text",
+      "x": 1670,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthenticatedSession.accountId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSession#accountId m23b42fff4f806999|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID accountId()`\n\n자동 생성"
+    },
+    {
+      "id": "ne6d8be795777e536",
+      "type": "text",
+      "x": 2170,
+      "y": 760,
+      "width": 480,
+      "height": 235,
+      "text": "### AuthenticatedSession.securityContextId\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSession#securityContextId me6d8be795777e536|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public UUID securityContextId()`\n\n자동 생성"
+    },
+    {
+      "id": "group93a6a1b38eac0f69",
+      "type": "group",
+      "x": 0,
+      "y": 1400,
+      "width": 1560,
+      "height": 350,
+      "label": "guardian.api.GuardianAccessExceptionHandler",
+      "color": "3"
+    },
+    {
+      "id": "nc83c0587f4b275ce",
+      "type": "text",
+      "x": 30,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessExceptionHandler.handle\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.api.GuardianAccessExceptionHandler#handle mc83c0587f4b275ce|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public ResponseEntity<ApiErrorResponse> handle(GuardianAccessException exception, HttpServletRequest request, HttpServletResponse response)`"
+    },
+    {
+      "id": "nc1968c2ca688becc",
+      "type": "text",
+      "x": 530,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessExceptionHandler.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.api.GuardianAccessExceptionHandler#생성자 mc1968c2ca688becc|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public GuardianAccessExceptionHandler()`\n\n자동 생성"
+    },
+    {
+      "id": "groupfa79772d9363a56b",
+      "type": "group",
+      "x": 1640,
+      "y": 1400,
+      "width": 1560,
+      "height": 610,
+      "label": "guardian.application.GuardianAccessService",
+      "color": "3"
+    },
+    {
+      "id": "n64c6cf8d92037a4d",
+      "type": "text",
+      "x": 1670,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessService.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#생성자 m64c6cf8d92037a4d|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public GuardianAccessService(GuardianAccessRepository repository)`"
+    },
+    {
+      "id": "nae5bd54dbbf05b63",
+      "type": "text",
+      "x": 2170,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessService.requireGuardianAccess\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#requireGuardianAccess mae5bd54dbbf05b63|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime requireGuardianAccess(HttpServletRequest request, AuthenticatedSession authenticated)`"
+    },
+    {
+      "id": "n41add87d49066ff2",
+      "type": "text",
+      "x": 2670,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessService.requiresResponseVerification\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#requiresResponseVerification m41add87d49066ff2|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static boolean requiresResponseVerification(HttpServletRequest request)`"
+    },
+    {
+      "id": "n08ab0b3e274d6cb9",
+      "type": "text",
+      "x": 1670,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessService.verifyResponseAccess\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#verifyResponseAccess m08ab0b3e274d6cb9|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public void verifyResponseAccess(HttpServletRequest request)`"
+    },
+    {
+      "id": "nef6c2129fa7e5585",
+      "type": "text",
+      "x": 2170,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessService.requireCurrentAccess\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.application.GuardianAccessService#requireCurrentAccess mef6c2129fa7e5585|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private OffsetDateTime requireCurrentAccess(AuthenticatedSession authenticated)`"
+    },
+    {
+      "id": "group6b59d15f728433fd",
+      "type": "group",
+      "x": 3280,
+      "y": 1400,
+      "width": 1560,
+      "height": 610,
+      "label": "guardian.exception.GuardianAccessException",
+      "color": "3"
+    },
+    {
+      "id": "n4e6fce2d05e4a8d9",
+      "type": "text",
+      "x": 3310,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#생성자 m4e6fce2d05e4a8d9|정의 · 소스 · 호출자 · 호출 대상]]\n\n`private GuardianAccessException(int status, String code, String message, Throwable cause)`"
+    },
+    {
+      "id": "n71e62d186a76be15",
+      "type": "text",
+      "x": 3810,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.authenticationRequired\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#authenticationRequired m71e62d186a76be15|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static GuardianAccessException authenticationRequired()`"
+    },
+    {
+      "id": "nd7ff80a32bab27b1",
+      "type": "text",
+      "x": 4310,
+      "y": 1460,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.unlockRequired\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#unlockRequired md7ff80a32bab27b1|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static GuardianAccessException unlockRequired()`"
+    },
+    {
+      "id": "n0cb219e13da52ebb",
+      "type": "text",
+      "x": 3310,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.unavailable\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#unavailable m0cb219e13da52ebb|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public static GuardianAccessException unavailable(Throwable cause)`"
+    },
+    {
+      "id": "nd61668cf15a2751a",
+      "type": "text",
+      "x": 3810,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.status\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#status md61668cf15a2751a|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public int status()`"
+    },
+    {
+      "id": "n7dd5b7198c3b7a07",
+      "type": "text",
+      "x": 4310,
+      "y": 1720,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessException.code\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.exception.GuardianAccessException#code m7dd5b7198c3b7a07|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public String code()`"
+    },
+    {
+      "id": "group0f8f245c4fc212b5",
+      "type": "group",
+      "x": 0,
+      "y": 1870,
+      "width": 1560,
+      "height": 350,
+      "label": "guardian.infrastructure.GuardianAccessRepository",
+      "color": "3"
+    },
+    {
+      "id": "nb0f0cf87359de769",
+      "type": "text",
+      "x": 30,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessRepository.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository#생성자 mb0f0cf87359de769|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public GuardianAccessRepository(JdbcTemplate jdbc)`"
+    },
+    {
+      "id": "nb1e4bd2e6cd4fcaf",
+      "type": "text",
+      "x": 530,
+      "y": 1930,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessRepository.findState\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository#findState mb1e4bd2e6cd4fcaf|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Optional<GuardianAccessRepository.GuardianAccessState> findState(UUID accountId, UUID securityContextId)`"
+    },
+    {
+      "id": "group7fd9a3d4d4e4d1ba",
+      "type": "group",
+      "x": 1640,
+      "y": 2130,
+      "width": 1560,
+      "height": 1390,
+      "label": "guardian.infrastructure.GuardianAccessRepository.GuardianAccessState",
+      "color": "3"
+    },
+    {
+      "id": "n51366fdd7d44c0f0",
+      "type": "text",
+      "x": 1670,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.isSessionCurrent\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#isSessionCurrent m51366fdd7d44c0f0|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public boolean isSessionCurrent()`"
+    },
+    {
+      "id": "n9b272566953e54cb",
+      "type": "text",
+      "x": 2170,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.isGuardianCurrent\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#isGuardianCurrent m9b272566953e54cb|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public boolean isGuardianCurrent()`"
+    },
+    {
+      "id": "n565381b90003821f",
+      "type": "text",
+      "x": 2670,
+      "y": 2190,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.생성자\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#생성자 m565381b90003821f|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public GuardianAccessState(long contextSessionVersion, long accountSessionVersion, OffsetDateTime revokedAt, OffsetDateTime expiresAt, OffsetDateTime guardianUntil, Long guardianPinVersion, Long currentPinVersion, OffsetDateTime checkedAt)`\n\n자동 생성"
+    },
+    {
+      "id": "n7b139bd642255366",
+      "type": "text",
+      "x": 1670,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.accountSessionVersion\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#accountSessionVersion m7b139bd642255366|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public long accountSessionVersion()`\n\n자동 생성"
+    },
+    {
+      "id": "n31c5c9db13e82358",
+      "type": "text",
+      "x": 2170,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.checkedAt\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#checkedAt m31c5c9db13e82358|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime checkedAt()`\n\n자동 생성"
+    },
+    {
+      "id": "n709858159b646843",
+      "type": "text",
+      "x": 2670,
+      "y": 2450,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.contextSessionVersion\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#contextSessionVersion m709858159b646843|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public long contextSessionVersion()`\n\n자동 생성"
+    },
+    {
+      "id": "nad9d4875edcf0f53",
+      "type": "text",
+      "x": 1670,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.currentPinVersion\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#currentPinVersion mad9d4875edcf0f53|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Long currentPinVersion()`\n\n자동 생성"
+    },
+    {
+      "id": "n299e688b69e52e37",
+      "type": "text",
+      "x": 2170,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.equals\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#equals m299e688b69e52e37|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final boolean equals(Object o)`\n\n자동 생성"
+    },
+    {
+      "id": "n0d1dfdfbf48c7157",
+      "type": "text",
+      "x": 2670,
+      "y": 2710,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.expiresAt\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#expiresAt m0d1dfdfbf48c7157|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime expiresAt()`\n\n자동 생성"
+    },
+    {
+      "id": "n56df23790d154cdb",
+      "type": "text",
+      "x": 1670,
+      "y": 2970,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.guardianPinVersion\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#guardianPinVersion m56df23790d154cdb|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public Long guardianPinVersion()`\n\n자동 생성"
+    },
+    {
+      "id": "n91cf4fd36a77eee4",
+      "type": "text",
+      "x": 2170,
+      "y": 2970,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.guardianUntil\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#guardianUntil m91cf4fd36a77eee4|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime guardianUntil()`\n\n자동 생성"
+    },
+    {
+      "id": "n7feff43c89452c6b",
+      "type": "text",
+      "x": 2670,
+      "y": 2970,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.hashCode\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#hashCode m7feff43c89452c6b|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final int hashCode()`\n\n자동 생성"
+    },
+    {
+      "id": "n081ab43ab4fb881a",
+      "type": "text",
+      "x": 1670,
+      "y": 3230,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.revokedAt\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#revokedAt m081ab43ab4fb881a|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public OffsetDateTime revokedAt()`\n\n자동 생성"
+    },
+    {
+      "id": "n1a9c4e19b90dc934",
+      "type": "text",
+      "x": 2170,
+      "y": 3230,
+      "width": 480,
+      "height": 235,
+      "text": "### GuardianAccessState.toString\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/guardian.infrastructure.GuardianAccessRepository.GuardianAccessState#toString m1a9c4e19b90dc934|정의 · 소스 · 호출자 · 호출 대상]]\n\n`public final String toString()`\n\n자동 생성"
+    },
+    {
+      "id": "runtimef08f467630725312",
+      "type": "text",
+      "x": 5900,
+      "y": 0,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nServlet / Spring 필터 실행",
+      "color": "5"
+    },
+    {
+      "id": "runtime43584945420c46a6",
+      "type": "text",
+      "x": 5900,
+      "y": 240,
+      "width": 480,
+      "height": 200,
+      "text": "### 프레임워크 진입\n\nSpring MVC 예외 처리",
+      "color": "5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge35e363538432bbae",
+      "fromNode": "n039987860b5cf49f",
+      "fromSide": "right",
+      "toNode": "nd61668cf15a2751a",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edged04c76538925042b",
+      "fromNode": "n039987860b5cf49f",
+      "fromSide": "right",
+      "toNode": "n7dd5b7198c3b7a07",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgec2fdaea822253239",
+      "fromNode": "n1098528f38d3ff11",
+      "fromSide": "right",
+      "toNode": "n08ab0b3e274d6cb9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edged8bb42845768eca3",
+      "fromNode": "nc83c0587f4b275ce",
+      "fromSide": "right",
+      "toNode": "n41add87d49066ff2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgea1915de4209e4787",
+      "fromNode": "nc83c0587f4b275ce",
+      "fromSide": "right",
+      "toNode": "nd61668cf15a2751a",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge27c5ebdefc885c59",
+      "fromNode": "nc83c0587f4b275ce",
+      "fromSide": "right",
+      "toNode": "ne905a471c60d2a7e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeb6e3d80021688e23",
+      "fromNode": "nc83c0587f4b275ce",
+      "fromSide": "right",
+      "toNode": "n7dd5b7198c3b7a07",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgeeec06a9e60f0703b",
+      "fromNode": "nae5bd54dbbf05b63",
+      "fromSide": "right",
+      "toNode": "nef6c2129fa7e5585",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge3e8b69ba71804447",
+      "fromNode": "n08ab0b3e274d6cb9",
+      "fromSide": "right",
+      "toNode": "nef6c2129fa7e5585",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge29afcfb43085932b",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "nb1e4bd2e6cd4fcaf",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgea982946363278538",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "n23b42fff4f806999",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgebc4486a24c1eacdd",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "ne6d8be795777e536",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge84d1b0394e7b0f4a",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "n71e62d186a76be15",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge0f32f98ed5f4088a",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "n51366fdd7d44c0f0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge89961cad46cf183d",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "n9b272566953e54cb",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgea634dfd8e513ca0d",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "nd7ff80a32bab27b1",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge6506d8e07699587b",
+      "fromNode": "nef6c2129fa7e5585",
+      "fromSide": "right",
+      "toNode": "n91cf4fd36a77eee4",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge58fd4b2f82606a52",
+      "fromNode": "n71e62d186a76be15",
+      "fromSide": "right",
+      "toNode": "n4e6fce2d05e4a8d9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge32096de0be86e017",
+      "fromNode": "nd7ff80a32bab27b1",
+      "fromSide": "right",
+      "toNode": "n4e6fce2d05e4a8d9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgece42babb8c783e67",
+      "fromNode": "n0cb219e13da52ebb",
+      "fromSide": "right",
+      "toNode": "n4e6fce2d05e4a8d9",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edge29649656851acd03",
+      "fromNode": "nb1e4bd2e6cd4fcaf",
+      "fromSide": "right",
+      "toNode": "n565381b90003821f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edged280428e20063022",
+      "fromNode": "nb1e4bd2e6cd4fcaf",
+      "fromSide": "right",
+      "toNode": "n0cb219e13da52ebb",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "edgebefc5d4fb8f686b1",
+      "fromNode": "n9b272566953e54cb",
+      "fromSide": "right",
+      "toNode": "n51366fdd7d44c0f0",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "호출/생성"
+    },
+    {
+      "id": "frameworkeaf14efe70bf7084",
+      "fromNode": "runtimef08f467630725312",
+      "fromSide": "right",
+      "toNode": "n039987860b5cf49f",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    },
+    {
+      "id": "framework765911d668baf55c",
+      "fromNode": "runtime43584945420c46a6",
+      "fromSide": "right",
+      "toNode": "nc83c0587f4b275ce",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "프레임워크",
+      "color": "5"
+    }
+  ]
+}

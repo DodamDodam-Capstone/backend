@@ -1,0 +1,35 @@
+{
+  "verifiedOn": "2026-11-16 Asia/Seoul",
+  "sourceSnapshotDate": "2026-11-15",
+  "compilerErrors": 0,
+  "stats": {
+    "files": 71,
+    "types": 106,
+    "declaredMethods": 271,
+    "generatedMethods": 295,
+    "callSites": 1798,
+    "internalCallSites": 724,
+    "internalPairs": 541,
+    "compilerErrors": 0
+  },
+  "sourceHashes": "all 71 unchanged",
+  "catalogLinksAndAnchors": "pass",
+  "svgXml": "pass; both diagrams visually inspected",
+  "fragmentBytes": 615463,
+  "browser": {
+    "search": "pass",
+    "emptySearch": "pass",
+    "callTargetNavigation": "pass",
+    "initialSelection": "ChildService.create",
+    "viewports": [
+      1024,
+      736,
+      320
+    ],
+    "horizontalOverflow": false
+  },
+  "notRun": [
+    "No live Supabase, cloud migration, real OAuth, or AI provider benchmark",
+    "Application full test suite not rerun for documentation; previous SCRUM-77 result 1131 tests passed"
+  ]
+}

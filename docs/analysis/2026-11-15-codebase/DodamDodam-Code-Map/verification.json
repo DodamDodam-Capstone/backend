@@ -1,0 +1,89 @@
+{
+  "checkedOn": "2026-11-17 Asia/Seoul",
+  "sourceHashes": "71 unchanged",
+  "classNotes": 106,
+  "methodDefinitions": 566,
+  "sourceCodeCopies": 271,
+  "internalCallPairs": 541,
+  "frameworkEdges": 42,
+  "wikilinksChecked": 4722,
+  "svgDeepLinks": 672,
+  "canvasFiles": {
+    "00-Overview.canvas": {
+      "nodes": 8,
+      "edges": 0
+    },
+    "01-Class-Map.canvas": {
+      "nodes": 112,
+      "edges": 209
+    },
+    "02-All-Methods.canvas": {
+      "nodes": 699,
+      "edges": 583
+    },
+    "app.canvas": {
+      "nodes": 5,
+      "edges": 1
+    },
+    "auth.canvas": {
+      "nodes": 311,
+      "edges": 294
+    },
+    "child.canvas": {
+      "nodes": 103,
+      "edges": 73
+    },
+    "conversation.canvas": {
+      "nodes": 227,
+      "edges": 184
+    },
+    "global.canvas": {
+      "nodes": 179,
+      "edges": 89
+    },
+    "guardian.canvas": {
+      "nodes": 47,
+      "edges": 25
+    },
+    "01-request.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "02-email.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "03-child.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "04-conversation.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "05-session.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "06-guardian.canvas": {
+      "nodes": 8,
+      "edges": 5
+    },
+    "07-closure.canvas": {
+      "nodes": 8,
+      "edges": 5
+    }
+  },
+  "cardOverlap": false,
+  "vaultRoot": "backend/docs",
+  "onboardingGuide": {
+    "featureCards": 6,
+    "requestFlows": 7,
+    "stepsPerFlow": 6,
+    "sourceMethodsReferenced": 61,
+    "svgDeepLinks": 48,
+    "svgWidth": 1000,
+    "tableAliasesEscaped": true
+  },
+  "applicationUiVerified": false
+}
