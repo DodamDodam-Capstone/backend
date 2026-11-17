@@ -14,6 +14,28 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CiContractTests(unittest.TestCase):
+    def test_release_requires_quality_and_main_push_before_notification(self):
+        # 품질 실패·PR 실행에서 외부 쓰기가 시작되지 않도록 workflow 연결을 고정한다.
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertIn("  push:\n    branches: [main]", workflow)
+        self.assertIn("run: python3 .github/scripts/test_release.py", workflow)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
+        self.assertIn("github.event.pull_request.number || github.sha", workflow)
+        release = workflow.split("\n  release:\n")[1].split("\n  notify-integration:\n")[0]
+        self.assertIn("    needs: quality", release)
+        self.assertIn("if: github.event_name == 'push' && github.ref == 'refs/heads/main'", release)
+        self.assertIn("      contents: write", release)
+        self.assertIn("          ref: ${{ github.sha }}", release)
+        self.assertNotIn("always()", release)
+        notification = workflow.split("\n  notify-integration:\n")[1]
+        self.assertIn("    needs: release", notification)
+        self.assertIn("    uses: ./.github/workflows/notify-integration.yml", notification)
+        self.assertNotIn("always()", notification)
+        reusable = (ROOT / ".github/workflows/notify-integration.yml").read_text()
+        self.assertIn("  workflow_call:", reusable)
+        self.assertNotIn("  push:", reusable)
+        self.assertNotIn("  workflow_dispatch:", reusable)
+
     def test_local_compose_runtime_uses_host_nonroot_uid(self):
         for uid, gid, succeeds in [("501", "20", True), ("0", "0", False), ("501", "0", False)]:
             with self.subTest(uid=uid, gid=gid), tempfile.TemporaryDirectory() as directory:

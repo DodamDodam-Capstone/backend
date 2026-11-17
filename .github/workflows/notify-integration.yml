@@ -1,9 +1,11 @@
 name: Component Sync
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+  # 품질 검사와 Release 생성이 성공한 CI에서만 호출한다.
+  workflow_call:
+    secrets:
+      INTEGRATION_APP_PRIVATE_KEY:
+        required: true
 
 permissions:
   contents: read
