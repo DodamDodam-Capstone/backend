@@ -1,6 +1,7 @@
 """버전·PR 계약과 외부 쓰기 없는 릴리스 회귀 검사."""
 
 import importlib
+from copy import deepcopy
 import os
 from pathlib import Path
 import subprocess
@@ -14,20 +15,21 @@ ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
 REPO = "DodamDodam-Capstone/backend"
+NOTES = "## 스프린트 작업\n\n### 테스트 스프린트\n- [SCRUM-180](https://dodamdodam.atlassian.net/browse/SCRUM-180) 릴리스 자동화\n"
 
 
 class PullRequestContractTests(unittest.TestCase):
     # 실제 CLI 경계에서 일반 작업과 승격 예외가 서로 섞이지 않는지 확인한다.
     def check_pr(self, *, title="🚀 chore(release): [BE] v0.1.0 스프린트 릴리스",
                  head="development", base="main", actor="yutakdv", version="0.1.0\n",
-                 head_repo=REPO):
+                 head_repo=REPO, body=NOTES):
         with tempfile.TemporaryDirectory() as directory:
             if version is not None:
                 (Path(directory) / "VERSION").write_text(version)
             return subprocess.run(
                 [sys.executable, str(ROOT / ".github/scripts/validate_pr_contract.py")],
                 cwd=directory, capture_output=True, text=True,
-                env={**os.environ, "PR_TITLE": title, "HEAD_REF": head, "BASE_REF": base,
+                env={**os.environ, "PR_TITLE": title, "PR_BODY": body, "HEAD_REF": head, "BASE_REF": base,
                      "ACTOR": actor, "HEAD_REPOSITORY": head_repo, "GITHUB_REPOSITORY": REPO},
             )
 
@@ -68,6 +70,11 @@ class PullRequestContractTests(unittest.TestCase):
         self.assertEqual(self.check_pr(base="development", head="dependabot/gradle/update",
                                       actor="dependabot[bot]", title="⬆️ deps: update").returncode, 0)
 
+    def test_main_pr_requires_nonempty_sprint_task_section(self):
+        for body in ("", "설명만 있음", "## 스프린트 작업\n\n## 검증\n통과"):
+            with self.subTest(body=body):
+                self.assertEqual(self.check_pr(body=body).returncode, 1)
+
 
 class FakeGitHub:
     """GitHub ref의 생성 전용 의미를 보존하는 메모리 경계. 실제 네트워크는 쓰지 않는다."""
@@ -78,6 +85,9 @@ class FakeGitHub:
         self.tags = {}
         self.writes = []
         self.fail_release_once = False
+        self.pulls = [{"number": 58, "merge_commit_sha": SHA, "merged_at": "2026-11-17T12:31:00Z",
+                       "base": {"ref": "main"}, "head": {"ref": "development", "repo": {"full_name": REPO}},
+                       "body": NOTES}]
 
     def __call__(self, endpoint, payload=None, *, paginate=False):
         path = endpoint.removeprefix(f"repos/{REPO}/")
@@ -89,6 +99,8 @@ class FakeGitHub:
                 return {"object": self.tags[path.removeprefix("git/tags/")]}
             if path == "releases?per_page=100":
                 return list(self.releases)
+            if path == f"commits/{SHA}/pulls?per_page=100":
+                return self.pulls
         elif path == "git/refs":
             if payload["ref"] in self.refs:
                 raise RuntimeError("Reference already exists")
@@ -124,6 +136,29 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(self.github.releases[0]["generate_release_notes"])
         self.assertEqual(self.release.publish(REPO, SHA, "0.1.0"), url)
         self.assertEqual(len(self.github.writes), 3)
+
+    def test_release_contains_notes_from_its_promotion_pr(self):
+        self.release.publish(REPO, SHA, "0.1.0")
+        self.assertEqual(self.github.releases[0].get("body"), NOTES)
+        self.github.pulls[0]["body"] = NOTES + "PR 편집 내용"
+        self.release.publish(REPO, SHA, "0.1.0")
+        self.assertEqual(self.github.releases[0]["body"], NOTES)
+        self.assertEqual(len(self.github.writes), 3)
+
+    def test_missing_or_wrong_promotion_pr_fails_before_ref_creation(self):
+        original = deepcopy(self.github.pulls[0])
+        variants = [[], [original, original]]
+        for field, value in (("merge_commit_sha", OTHER_SHA), ("merged_at", None), ("body", ""),
+                             ("body", "## 스프린트 작업\n\n## 검증\n통과"),
+                             ("base", {"ref": "development"}),
+                             ("head", {"ref": "development", "repo": {"full_name": "someone/backend"}})):
+            variants.append([{**original, field: value}])
+        for pulls in variants:
+            with self.subTest(pulls=pulls):
+                self.github.pulls = pulls
+                with self.assertRaises(ValueError):
+                    self.release.publish(REPO, SHA, "0.1.0")
+                self.assertEqual(self.github.writes, [])
 
     def test_conflicting_branch_or_tag_fails_before_any_write(self):
         for ref in ("refs/heads/release/v0.1.0", "refs/tags/v0.1.0"):
