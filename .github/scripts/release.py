@@ -23,6 +23,14 @@ def read_version(path=Path("VERSION")):
     return validate_version(Path(path).read_text(encoding="utf-8").strip())
 
 
+def validate_notes(body):
+    """승격 PR에서 검토할 스프린트 작업 섹션이 비어 있지 않은지 검사한다."""
+    section = re.search(r"^## 스프린트 작업[ \t]*\r?\n([\s\S]*?)(?=^##[ \t]|\Z)", body or "", re.M)
+    if section is None or not section[1].strip():
+        raise ValueError("승격 PR 본문에 비어 있지 않은 '## 스프린트 작업' 섹션이 필요합니다.")
+    return body
+
+
 def api(endpoint, payload=None, *, paginate=False):
     """인증은 기존 GH_TOKEN에 맡기고 API 실패를 '없음'으로 바꾸지 않는다."""
     command = ["gh", "api", endpoint]
@@ -55,6 +63,17 @@ def ref_commit(repo, short_ref):
     return obj["sha"]
 
 
+def promotion_notes(repo, sha):
+    """현재 main merge commit을 만든 승격 PR의 검토된 본문을 읽는다."""
+    pulls = api(f"repos/{repo}/commits/{sha}/pulls?per_page=100", paginate=True)
+    matches = [pr for pr in pulls if pr.get("merged_at") and pr.get("merge_commit_sha") == sha
+               and pr["base"]["ref"] == "main" and pr["head"]["ref"] == "development"
+               and (pr["head"].get("repo") or {}).get("full_name") == repo]
+    if len(matches) != 1:
+        raise ValueError("정확한 main 커밋에 연결된 승격 PR을 하나 찾을 수 있어야 합니다.")
+    return validate_notes(matches[0].get("body"))
+
+
 def publish(repo, sha, version):
     """충돌을 먼저 검사한 뒤 누락된 ref와 Release만 순서대로 생성한다."""
     validate_version(version)
@@ -75,6 +94,9 @@ def publish(repo, sha, version):
         if refs[f"tags/{tag}"] is None:
             raise ValueError("Existing release has no verifiable tag; inspect it before publishing.")
 
+    # Jira 조회·목록 검토는 PR 준비 때 수행한다. 재실행은 이미 발행한 본문을 덮어쓰지 않는다.
+    notes = promotion_notes(repo, sha) if existing_release is None else None
+
     # 생성 API만 사용한다. 경합·부분 실패는 중단하고 같은 SHA로 재실행한다.
     for ref, existing in refs.items():
         if existing is None:
@@ -82,7 +104,7 @@ def publish(repo, sha, version):
     if existing_release is None:
         existing_release = api(f"repos/{repo}/releases", {
             "tag_name": tag, "target_commitish": sha, "name": tag,
-            "draft": False, "prerelease": False, "generate_release_notes": True,
+            "draft": False, "prerelease": False, "generate_release_notes": True, "body": notes,
         })
     print(f"Released {tag} at {sha}: {existing_release['html_url']}")
     return existing_release["html_url"]

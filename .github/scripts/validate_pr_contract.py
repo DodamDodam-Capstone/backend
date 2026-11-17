@@ -4,7 +4,7 @@ import os
 import re
 import sys
 
-from release import VERSION_PATTERN, read_version
+from release import VERSION_PATTERN, read_version, validate_notes
 
 
 def validate():
@@ -19,6 +19,7 @@ def validate():
             raise ValueError("승격 제목은 <gitmoji> chore(release): [BE] vX.Y.Z <설명> 형식이어야 합니다.")
         if match["version"] != read_version():
             raise ValueError("승격 PR 제목의 버전과 VERSION 파일이 일치해야 합니다.")
+        validate_notes(os.environ.get("PR_BODY", ""))
         return f"Release version verified: {match['version']}"
 
     if base != "development":

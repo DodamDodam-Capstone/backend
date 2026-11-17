@@ -12,6 +12,31 @@
 - 승격 본문에는 포함 Task·관련 Epic·검증 결과를 적고 Issue 자동 종료 키워드는 쓰지 않습니다. 매번 출시용 Epic·Task를 새로 만들지 않습니다.
 - 최초 자동화 구현만 별도 Task로 등록합니다. GitHub-first 연동이 건너뛰어졌으면 기존 Issue를 검토하고 `jira-sync`를 추가합니다. 같은 Jira Task를 수동으로 다시 만들지 않습니다.
 
+## 스프린트 Task를 Release에 표시
+
+승격 PR 본문에 아래 `## 스프린트 작업` 섹션을 작성합니다. 이전 출시 이후 실제
+반영된 Task를 Jira 스프린트 소속과 대조하고, Task 제목·Jira 링크·작업 PR을 적습니다.
+이월 작업은 이력을 표시하고 스프린트 미지정 작업은 별도로 적습니다. Jira Task가
+없는 의존성 전용 출시라면 해당 섹션에 그 사실과 변경 PR을 적습니다.
+
+```markdown
+## 스프린트 작업
+
+### 실제 Jira 스프린트 이름
+- [SCRUM-180](https://dodamdodam.atlassian.net/browse/SCRUM-180) 릴리스 자동화 — 작업 PR #56
+
+## 검증
+- 실행한 검사와 결과
+```
+
+CI는 이 섹션이 비어 있으면 승격을 거부하고, 실제 main merge commit에 연결된
+승격 PR의 **전체 본문**을 GitHub Release 상단에 복사합니다. GitHub 자동 변경 내역도
+함께 생성합니다. Jira 정보는 PR 준비 시 조회·검토하며 release job에 새 Jira secret은
+추가하지 않습니다. 같은 실행을 재시도할 때 기존 Release 본문은 덮어쓰지 않습니다.
+
+스프린트 이름과 저장소 버전은 별개입니다. Jira에서 완료됐더라도 출시 커밋에
+포함되지 않은 Task를 넣지 않으며, Epic 전체 완료로 표시하지 않습니다.
+
 ## 자동 생성 순서
 
 ```text
