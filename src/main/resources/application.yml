@@ -60,6 +60,8 @@ management:
 app:
   conversation:
     summary-processing-timeout: ${SUMMARY_PROCESSING_TIMEOUT}
+    turn:
+      processing-timeout: ${TURN_PROCESSING_TIMEOUT}
   oauth2:
     google:
       client-id: ${GOOGLE_CLIENT_ID:local-google-client-id}
