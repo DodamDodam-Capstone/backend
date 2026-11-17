@@ -1,0 +1,129 @@
+{
+  "nodes": [
+    {
+      "id": "heading",
+      "type": "text",
+      "x": 40,
+      "y": 20,
+      "width": 920,
+      "height": 100,
+      "text": "# 아이 등록과 소유권\n\nPOST /api/v1/children"
+    },
+    {
+      "id": "step-1",
+      "type": "text",
+      "x": 40,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 01  로그인 계정 확인\n\naccountId는 세션에서 가져옴\n\n본문의 계정 ID를 신뢰하지 않음\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController#create m85a3864c9b94be48|create()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.AuthenticatedSessionService#requireAuthenticatedSession mad23075b25d06a28|requireAuthenticatedSession()]]"
+    },
+    {
+      "id": "step-2",
+      "type": "text",
+      "x": 520,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 02  JSON 구조 확인\n\n허용 필드와 타입을 검사\n\n검증할 요청 객체 생성\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#fromJson mf8c618d868acf95b|fromJson()]]"
+    },
+    {
+      "id": "step-3",
+      "type": "text",
+      "x": 520,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 03  값 검증 · 정규화\n\n생년월일·이름·캐릭터 검사\n\n업무 트랜잭션 안에서 수행\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.application.ChildService#create m022c1fb522a0efea|create()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.dto.CreateChildRequest#normalized mf6b45ea2162d93f1|normalized()]]"
+    },
+    {
+      "id": "step-4",
+      "type": "text",
+      "x": 40,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 04  현재 보안 문맥 잠금\n\n계정 → 문맥 순서로 잠금\n\n폐기·버전 변경과 직렬화\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/auth.session.SessionSecurityRepository#requireCurrentContextForUpdate m950184451aa631db|requireCurrentContextForUpdate()]]"
+    },
+    {
+      "id": "step-5",
+      "type": "text",
+      "x": 40,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 05  아이 저장\n\nchildren에 등록\n\n계정별 등록 제한 처리\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.infrastructure.ChildRepository#insert mcdb7b197a0d8c26e|insert()]]"
+    },
+    {
+      "id": "step-6",
+      "type": "text",
+      "x": 520,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 06  등록 결과 응답\n\n공개 프로필 + 식별 URI\n\n단건 조회 API 추가는 아님\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/child.api.ChildController#create m85a3864c9b94be48|create()]]"
+    },
+    {
+      "id": "legend",
+      "type": "text",
+      "x": 40,
+      "y": 1050,
+      "width": 920,
+      "height": 55,
+      "text": "번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인"
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow-0",
+      "fromNode": "step-1",
+      "fromSide": "right",
+      "toNode": "step-2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-1",
+      "fromNode": "step-2",
+      "fromSide": "bottom",
+      "toNode": "step-3",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-2",
+      "fromNode": "step-3",
+      "fromSide": "left",
+      "toNode": "step-4",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-3",
+      "fromNode": "step-4",
+      "fromSide": "bottom",
+      "toNode": "step-5",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-4",
+      "fromNode": "step-5",
+      "fromSide": "right",
+      "toNode": "step-6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    }
+  ]
+}

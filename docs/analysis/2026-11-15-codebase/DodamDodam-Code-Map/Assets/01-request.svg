@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1120" viewBox="0 0 1000 1120" role="img" aria-labelledby="title desc">
+<title id="title">요청은 어디서 검사되는가</title><desc id="desc">HTTP 요청 → 공통 필터 → 보안 체인 → MVC</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8a99ad"/></marker></defs>
+<rect width="1000" height="1120" rx="20" fill="#f6f8fc"/>
+<g font-family="Apple SD Gothic Neo, Noto Sans CJK KR, Arial, sans-serif" fill="#17253b">
+<text x="40" y="58" font-size="32" fill="#17253b" font-weight="700">요청은 어디서 검사되는가</text>
+<text x="40" y="96" font-size="19" fill="#53647b" font-weight="400">HTTP 요청 → 공통 필터 → 보안 체인 → MVC</text>
+<path d="M480 277.5 L520 277.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M740.0 405 L740.0 450" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M520 577.5 L480 577.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M260.0 705 L260.0 750" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M480 877.5 L520 877.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fglobal.web.ApiResponseHeadersFilter.md%23doFilterInternal+mdb9438ca5f22a128&amp;paneType=tab">
+<rect x="40" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="190" font-size="22" fill="#2555a6" font-weight="700">01  요청 추적 · 응답 보호</text>
+<text x="62" y="227" font-size="20" fill="#17253b" font-weight="400">requestId와 no-store 설정</text>
+<text x="62" y="255" font-size="20" fill="#17253b" font-weight="400">인증 오류 처리 경계 구성</text>
+<text x="62" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.SessionCookieRenewalFilter.md%23doFilterInternal+m5b3b8f1a080501e9&amp;paneType=tab">
+<rect x="520" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="190" font-size="22" fill="#2555a6" font-weight="700">02  세션 · 보안 체인</text>
+<text x="542" y="227" font-size="20" fill="#17253b" font-weight="400">세션 쿠키 갱신 경계</text>
+<text x="542" y="255" font-size="20" fill="#17253b" font-weight="400">Spring Session 뒤 CORS 처리</text>
+<text x="542" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fglobal.web.GlobalApiRateLimitFilter.md%23doFilterInternal+me8918f88c454eb77&amp;paneType=tab">
+<rect x="520" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="490" font-size="22" fill="#2555a6" font-weight="700">03  전역 요청 제한</text>
+<text x="542" y="527" font-size="20" fill="#17253b" font-weight="400">API / OAuth IP 예산 예약</text>
+<text x="542" y="555" font-size="20" fill="#17253b" font-weight="400">과도한 요청은 여기서 중단</text>
+<text x="542" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fglobal.web.Part2JsonRequestGuardFilter.md%23doFilterInternal+m6ee42797d374d4fc&amp;paneType=tab">
+<rect x="40" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="490" font-size="22" fill="#2555a6" font-weight="700">04  본문 전송 검사</text>
+<text x="62" y="527" font-size="20" fill="#17253b" font-weight="400">해당 경로의 크기·형식 검사</text>
+<text x="62" y="555" font-size="20" fill="#17253b" font-weight="400">Part 2 → Part 1 필터 순서</text>
+<text x="62" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fglobal.config.SecurityConfig.md%23applicationSecurityFilterChain+m8a28e16ae80b5e1e&amp;paneType=tab">
+<rect x="40" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="790" font-size="22" fill="#2555a6" font-weight="700">05  CSRF · 인증 · 업무 처리</text>
+<text x="62" y="827" font-size="20" fill="#17253b" font-weight="400">Spring Security 검사 후 MVC</text>
+<text x="62" y="855" font-size="20" fill="#17253b" font-weight="400">예시: 아이 등록 Controller</text>
+<text x="62" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.AuthStateErrorFilter.md%23verifyResponseAccess+m1098528f38d3ff11&amp;paneType=tab">
+<rect x="520" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="790" font-size="22" fill="#2555a6" font-weight="700">06  응답 직전 재검사</text>
+<text x="542" y="827" font-size="20" fill="#17253b" font-weight="400">대상 요청의 최신 권한 확인</text>
+<text x="542" y="855" font-size="20" fill="#17253b" font-weight="400">실패한 성공 본문·쿠키 제거</text>
+<text x="542" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<text x="40" y="1080" font-size="17" fill="#53647b" font-weight="400">번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인</text>
+</g></svg>

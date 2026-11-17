@@ -1,0 +1,129 @@
+{
+  "nodes": [
+    {
+      "id": "heading",
+      "type": "text",
+      "x": 40,
+      "y": 20,
+      "width": 920,
+      "height": 100,
+      "text": "# 대화 시작과 재전송\n\nPOST /api/v1/children/{childId}/conversations"
+    },
+    {
+      "id": "step-1",
+      "type": "text",
+      "x": 40,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 01  인증 · 입력 · 소유권\n\n로그인 → UUID / JSON 검사\n\n해당 아이의 소유권 확인\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationController#prepareStart m1cac5f319ccf317a|prepareStart()]]"
+    },
+    {
+      "id": "step-2",
+      "type": "text",
+      "x": 520,
+      "y": 150,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 02  상위 데이터 잠금\n\n계정 → 문맥 → 아이 → 대화\n\n대기 후 DB 시각 재확인\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#create mf9ff06c04e6d7fad|create()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#decideStart m074dea56e9276dfa|decideStart()]]"
+    },
+    {
+      "id": "step-3",
+      "type": "text",
+      "x": 520,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 03  이전 대화 · 시간 판단\n\n필요하면 기존 종료 상태 정리\n\n이용시간과 시작 키를 판단\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#decideStart m074dea56e9276dfa|decideStart()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationClosureCoordinator#reconcile m5c7d3b9b2dd0cb88|reconcile()]]"
+    },
+    {
+      "id": "step-4",
+      "type": "text",
+      "x": 40,
+      "y": 450,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 04  신규 또는 재전송\n\n신규: 대화와 세션 연결 저장\n\n같은 키: 기존 연결 재검사\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.infrastructure.ConversationRepository#insertActive mff8e74c752863f8c|insertActive()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#replay m8a9b848e75e75181|replay()]]"
+    },
+    {
+      "id": "step-5",
+      "type": "text",
+      "x": 40,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 05  응답 대상 기록\n\n검증한 대화 ID를 요청에 기록\n\n신규 / 재전송 응답 구분\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationController#start m255287826e69c022|start()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter#protect m24d9b8b621ce0746|protect()]]"
+    },
+    {
+      "id": "step-6",
+      "type": "text",
+      "x": 520,
+      "y": 750,
+      "width": 440,
+      "height": 255,
+      "color": "5",
+      "text": "### 06  현재 상태 다시 확인\n\n응답 직전 권한·시간·상태 확인\n\n실패하면 성공 응답을 비움\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.api.ConversationStartResponseFilter#verify mbaf83885c918b297|verify()]] · [[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Classes/conversation.application.ConversationService#verifyStartResponse macdb3aca10ad50df|verifyStartResponse()]]"
+    },
+    {
+      "id": "legend",
+      "type": "text",
+      "x": 40,
+      "y": 1050,
+      "width": 920,
+      "height": 55,
+      "text": "번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인"
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow-0",
+      "fromNode": "step-1",
+      "fromSide": "right",
+      "toNode": "step-2",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-1",
+      "fromNode": "step-2",
+      "fromSide": "bottom",
+      "toNode": "step-3",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-2",
+      "fromNode": "step-3",
+      "fromSide": "left",
+      "toNode": "step-4",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-3",
+      "fromNode": "step-4",
+      "fromSide": "bottom",
+      "toNode": "step-5",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "color": "5"
+    },
+    {
+      "id": "flow-4",
+      "fromNode": "step-5",
+      "fromSide": "right",
+      "toNode": "step-6",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "color": "5"
+    }
+  ]
+}

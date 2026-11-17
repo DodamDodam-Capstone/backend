@@ -1,5 +1,7 @@
 package com.dodamdodam.backend.global.error;
 
+import com.dodamdodam.backend.auth.exception.EmailVerificationException;
+
 import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.auth.session.SessionCookieRenewalFilter.InvalidSessionException;
 import com.dodamdodam.backend.auth.session.SessionLifecycleService;
@@ -38,7 +40,7 @@ public class CommonApiExceptionHandler {
         // guardian 표식과 관계없이 인증 실패·확인 장애는 외곽 필터가 성공 헤더·본문부터 비운다.
         for (Throwable failure = exception; failure != null; failure = failure.getCause()) {
             if (failure instanceof AuthenticationException || failure instanceof InvalidSessionException
-                    || failure instanceof AuthStateUnavailableException) {
+                    || failure instanceof AuthStateUnavailableException || failure instanceof EmailVerificationException) {
                 throw exception;
             }
         }

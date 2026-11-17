@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1120" viewBox="0 0 1000 1120" role="img" aria-labelledby="title desc">
+<title id="title">아이 등록과 소유권</title><desc id="desc">POST /api/v1/children</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8a99ad"/></marker></defs>
+<rect width="1000" height="1120" rx="20" fill="#f6f8fc"/>
+<g font-family="Apple SD Gothic Neo, Noto Sans CJK KR, Arial, sans-serif" fill="#17253b">
+<text x="40" y="58" font-size="32" fill="#17253b" font-weight="700">아이 등록과 소유권</text>
+<text x="40" y="96" font-size="19" fill="#53647b" font-weight="400">POST /api/v1/children</text>
+<path d="M480 277.5 L520 277.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M740.0 405 L740.0 450" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M520 577.5 L480 577.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M260.0 705 L260.0 750" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<path d="M480 877.5 L520 877.5" stroke="#8a99ad" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fchild.api.ChildController.md%23create+m85a3864c9b94be48&amp;paneType=tab">
+<rect x="40" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="190" font-size="22" fill="#2555a6" font-weight="700">01  로그인 계정 확인</text>
+<text x="62" y="227" font-size="20" fill="#17253b" font-weight="400">accountId는 세션에서 가져옴</text>
+<text x="62" y="255" font-size="20" fill="#17253b" font-weight="400">본문의 계정 ID를 신뢰하지 않음</text>
+<text x="62" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fchild.dto.CreateChildRequest.md%23fromJson+mf8c618d868acf95b&amp;paneType=tab">
+<rect x="520" y="150" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="150" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="190" font-size="22" fill="#2555a6" font-weight="700">02  JSON 구조 확인</text>
+<text x="542" y="227" font-size="20" fill="#17253b" font-weight="400">허용 필드와 타입을 검사</text>
+<text x="542" y="255" font-size="20" fill="#17253b" font-weight="400">검증할 요청 객체 생성</text>
+<text x="542" y="384" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fchild.application.ChildService.md%23create+m022c1fb522a0efea&amp;paneType=tab">
+<rect x="520" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="490" font-size="22" fill="#2555a6" font-weight="700">03  값 검증 · 정규화</text>
+<text x="542" y="527" font-size="20" fill="#17253b" font-weight="400">생년월일·이름·캐릭터 검사</text>
+<text x="542" y="555" font-size="20" fill="#17253b" font-weight="400">업무 트랜잭션 안에서 수행</text>
+<text x="542" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fauth.session.SessionSecurityRepository.md%23requireCurrentContextForUpdate+m950184451aa631db&amp;paneType=tab">
+<rect x="40" y="450" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="450" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="490" font-size="22" fill="#2555a6" font-weight="700">04  현재 보안 문맥 잠금</text>
+<text x="62" y="527" font-size="20" fill="#17253b" font-weight="400">계정 → 문맥 순서로 잠금</text>
+<text x="62" y="555" font-size="20" fill="#17253b" font-weight="400">폐기·버전 변경과 직렬화</text>
+<text x="62" y="684" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fchild.infrastructure.ChildRepository.md%23insert+mcdb7b197a0d8c26e&amp;paneType=tab">
+<rect x="40" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="40" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="62" y="790" font-size="22" fill="#2555a6" font-weight="700">05  아이 저장</text>
+<text x="62" y="827" font-size="20" fill="#17253b" font-weight="400">children에 등록</text>
+<text x="62" y="855" font-size="20" fill="#17253b" font-weight="400">계정별 등록 제한 처리</text>
+<text x="62" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<a href="obsidian://open?path=%2FUsers%2Fyutak%2FDesktop%2Fbackend%2Fdocs%2Fanalysis%2F2026-11-15-codebase%2FDodamDodam-Code-Map%2FClasses%2Fchild.api.ChildController.md%23create+m85a3864c9b94be48&amp;paneType=tab">
+<rect x="520" y="750" width="440" height="255" rx="14" fill="white" stroke="#d5deea"/>
+<rect x="520" y="750" width="440" height="5" rx="2" fill="#2555a6"/>
+<text x="542" y="790" font-size="22" fill="#2555a6" font-weight="700">06  등록 결과 응답</text>
+<text x="542" y="827" font-size="20" fill="#17253b" font-weight="400">공개 프로필 + 식별 URI</text>
+<text x="542" y="855" font-size="20" fill="#17253b" font-weight="400">단건 조회 API 추가는 아님</text>
+<text x="542" y="984" font-size="17" fill="#2555a6" font-weight="400">대표 메서드 ↗</text>
+</a>
+<text x="40" y="1080" font-size="17" fill="#53647b" font-weight="400">번호 순서로 읽기 · 주요 처리 순서 요약 · 직접 호출·분기 전체는 연결된 메서드 노트에서 확인</text>
+</g></svg>
