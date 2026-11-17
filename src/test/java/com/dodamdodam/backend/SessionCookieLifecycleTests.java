@@ -87,7 +87,8 @@ class SessionCookieLifecycleTests {
         var account = UUID.randomUUID();
         jdbc.update("INSERT INTO accounts (id, email) VALUES (?, ?)", account, account + "@example.invalid");
         var csrf = csrf(null);
-        var response = mvc.perform(post("/api/v1/auth/login").param("account", account.toString())
+        var response = mvc.perform(post("/api/v1/auth/login").param("sessionCookieProbe", "true")
+                        .param("account", account.toString()).contentType("application/json").content("{}")
                         .cookie(csrf.cookie()).header("X-XSRF-TOKEN", csrf.token()))
                 .andExpect(status().isOk()).andReturn().getResponse();
         assertPersistentCookie(response, false, "Lax");
@@ -129,10 +130,12 @@ class SessionCookieLifecycleTests {
             assertThat(csrf.statusCode()).isEqualTo(200);
             var csrfCookie = csrf.headers().allValues("Set-Cookie").stream().filter(h -> h.startsWith("XSRF-TOKEN="))
                     .map(MockCookie::parse).findFirst().orElseThrow();
-            var login = client.send(HttpRequest.newBuilder(URI.create(baseUrl + "/api/v1/auth/login?account=" + account))
+            var login = client.send(HttpRequest.newBuilder(URI.create(baseUrl
+                            + "/api/v1/auth/login?sessionCookieProbe=true&account=" + account))
                             .header("Cookie", "XSRF-TOKEN=" + csrfCookie.getValue())
                             .header("X-XSRF-TOKEN", JsonPath.read(csrf.body(), "$.token"))
-                            .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.discarding());
             assertThat(login.statusCode()).isEqualTo(200);
             var issued = login.headers().allValues("Set-Cookie").stream().filter(h -> h.startsWith("JSESSIONID=")).toList();
             assertThat(issued.size()).as("one login session cookie").isEqualTo(1);
@@ -375,7 +378,7 @@ class SessionCookieLifecycleTests {
             this.sessions = sessions;
         }
 
-        @PostMapping("/api/v1/auth/login")
+        @PostMapping(value = "/api/v1/auth/login", params = "sessionCookieProbe")
         void login(@RequestParam("account") UUID account, HttpServletRequest request, HttpServletResponse response) throws IOException {
             var authentication = UsernamePasswordAuthenticationToken.authenticated(account.toString(), null,
                     List.of(new SimpleGrantedAuthority("ROLE_USER")));

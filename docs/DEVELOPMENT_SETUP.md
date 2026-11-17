@@ -801,7 +801,7 @@ Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
 검사 대상은 `POST /api/v1/auth/logout`, `POST /api/v1/children`,
-`POST /api/v1/auth/email-verifications`입니다. 세 경로 모두
+`POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/login`입니다. 네 경로 모두
 실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
 Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
 UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
@@ -812,6 +812,10 @@ UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃�
 읽고 구조·입력 검증과 등록 서비스를 연결합니다. JSON 읽기 오류는 해당 컨트롤러에서만 400으로,
 자녀 업무 예외는 [ChildExceptionHandler](../src/main/java/com/dodamdodam/backend/child/api/ChildExceptionHandler.java)에서
 400/404/409/500으로 처리해 인증 저장소 장애 503과 구분합니다. guard에서 JSON을 먼저 파싱하지 않습니다.
+
+이메일 로그인은 [로그인 구현 문서](PASSWORD_LOGIN.md)의 원문 입력·해시 포맷·CSRF 교체 계약을 따릅니다.
+로그인 Controller는 엄격한 UTF-8 디코딩 후 JSON을 파싱해 잘못된 인코딩의 조용한 대체·자동 감지와 요청 인자 DEBUG 노출을 막습니다.
+기존 세션 전략과 외곽 필터를 재사용하며 필터 순서는 변경하지 않습니다.
 
 [Part2JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part2JsonRequestGuardFilter.java)는
 Part 1 필터 바로 앞에 한 번 등록하며 `POST /api/v1/children/{childId}/conversations`에만 적용합니다.
@@ -894,7 +898,7 @@ flowchart TB
         CORS["5 CorsFilter"]
         RATE["6 GlobalApiRateLimitFilter<br/>API/OAuth IP 예산 별도 커밋 · 429/503"]
         PART2["7 Part2JsonRequestGuardFilter<br/>대화 시작 형식 415 · 본문 미소비"]
-        GUARD["8 Part1JsonRequestGuardFilter<br/>로그아웃·자녀·이메일 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
+        GUARD["8 Part1JsonRequestGuardFilter<br/>로그아웃·자녀·이메일·로그인 크기 413 · 형식 415<br/>UTF-8 본문 보관 · 로그아웃 EMPTY_BODY"]
         CSRF["9 CsrfFilter<br/>실패 403 CSRF_INVALID"]
         OAUTH["10 OAuth2AuthorizationRequestRedirectFilter<br/>11 OAuth2LoginAuthenticationFilter"]
         INTERMEDIATE["12 SecurityContextHolderAwareRequestFilter<br/>13 AnonymousAuthenticationFilter<br/>14 SessionManagementFilter<br/>15 ExceptionTranslationFilter"]

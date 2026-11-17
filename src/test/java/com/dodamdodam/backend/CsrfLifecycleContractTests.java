@@ -143,11 +143,13 @@ class CsrfLifecycleContractTests {
 
         assertClearedCookie(logout);
         assertThat(storedSession(session) == null).as("logout deletes the stored session").isTrue();
-        var rejected = expectCsrfInvalid(post(PUBLIC_PATH).header(CSRF_HEADER, beforeLogout.token()));
+        var rejected = expectCsrfInvalid(post(PUBLIC_PATH).contentType("application/json").content("{}")
+                .header(CSRF_HEADER, beforeLogout.token()));
         var refreshed = issuedCsrf(null, rejected.getCookie(CSRF_COOKIE));
         assertThat(refreshed.token().equals(beforeLogout.token())).as("logout token is replaced").isFalse();
 
-        mockMvc.perform(post(PUBLIC_PATH).cookie(refreshed.cookie())
+        mockMvc.perform(post(PUBLIC_PATH).param("csrfContractProbe", "true")
+                        .contentType("application/json").content("{}").cookie(refreshed.cookie())
                         .header(CSRF_HEADER, refreshed.token()))
                 .andExpect(status().isNoContent());
     }
@@ -165,7 +167,8 @@ class CsrfLifecycleContractTests {
         assertThat(failure.getResponse().getCookie(CSRF_COOKIE)).isNull();
         var retained = issuedCsrf(session, original.cookie());
         assertThat(retained.token().equals(original.token())).as("failed login retains the token").isTrue();
-        mockMvc.perform(post(PUBLIC_PATH).cookie(session, retained.cookie())
+        mockMvc.perform(post(PUBLIC_PATH).param("csrfContractProbe", "true")
+                        .contentType("application/json").content("{}").cookie(session, retained.cookie())
                         .header(CSRF_HEADER, retained.token()))
                 .andExpect(status().isNoContent());
     }

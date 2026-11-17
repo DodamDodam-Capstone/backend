@@ -1,5 +1,6 @@
 package com.dodamdodam.backend.auth.session;
 
+import com.dodamdodam.backend.auth.exception.PasswordLoginException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.core.convert.ConversionException;
@@ -20,6 +21,7 @@ public class SessionSecurityRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /** 외부 인증 완료 계정의 이전 문맥 폐기와 새 문맥 생성을 한 번에 커밋한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AuthenticatedSession createLoginContext(UUID accountId, AuthenticatedSession previous) {
         // 계정 간 재로그인도 같은 순서로 잠가 서로 역순으로 기다리지 않게 한다.
@@ -29,6 +31,30 @@ public class SessionSecurityRepository {
         var version = accounts.stream().filter(row -> accountId.equals(row.get("id")))
                 .map(row -> (Long) row.get("session_version")).findFirst()
                 .orElseThrow(() -> new InsufficientAuthenticationException("로그인 계정을 확인할 수 없습니다."));
+        return createContextAfterAccountLock(accountId, version, previous);
+    }
+
+    /** 잠금 밖에서 비교한 자격을 다시 확인한 뒤에만 이전 문맥을 교체한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AuthenticatedSession createPasswordLoginContext(UUID accountId, String expectedHash, long expectedVersion,
+                                                            AuthenticatedSession previous) {
+        // 서로 다른 계정으로 교체해도 기존 인증과 같은 UUID 정렬 잠금을 유지한다.
+        var accounts = jdbcTemplate.queryForList("""
+                SELECT id, password_hash, session_version FROM accounts
+                WHERE id IN (?, ?) ORDER BY id FOR UPDATE
+                """, accountId, previous == null ? accountId : previous.accountId());
+        var current = accounts.stream().filter(row -> accountId.equals(row.get("id"))).findFirst()
+                .orElseThrow(PasswordLoginException::failed);
+        if (expectedHash == null || !expectedHash.equals(current.get("password_hash"))
+                || expectedVersion != (Long) current.get("session_version")) {
+            // reset 또는 자격 변경은 기존 로그인 문맥을 건드리기 전에 거부한다.
+            throw PasswordLoginException.failed();
+        }
+        return createContextAfterAccountLock(accountId, expectedVersion, previous);
+    }
+
+    /** 호출자가 계정 잠금을 보유한 Tx에서만 기존 폐기·새 문맥 등록을 수행한다. */
+    private AuthenticatedSession createContextAfterAccountLock(UUID accountId, long version, AuthenticatedSession previous) {
         if (previous != null) {
             revokeCurrentContext(previous.accountId(), previous.securityContextId());
         }

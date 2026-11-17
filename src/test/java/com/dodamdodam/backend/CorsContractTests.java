@@ -70,6 +70,8 @@ class CorsContractTests {
         assertThat(cookie).isNotNull();
 
         var response = mockMvc.perform(post(LOGIN_PATH)
+                        .param("csrfContractProbe", "true")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}")
                         .header("Origin", ORIGIN)
                         .header("X-XSRF-TOKEN", token)
                         .cookie(cookie))
@@ -83,6 +85,7 @@ class CorsContractTests {
     void allowedOriginStillReceivesCsrfErrorWithContractHeaders() throws Exception {
         var response = mockMvc.perform(post(LOGIN_PATH)
                         .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("CSRF_INVALID"))

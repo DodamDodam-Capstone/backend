@@ -67,6 +67,8 @@ class CsrfContractTests {
         var csrf = issuedCsrf();
 
         mockMvc.perform(post(path)
+                        .param("csrfContractProbe", "true")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}")
                         .accept(MediaType.APPLICATION_JSON)
                         .cookie(csrf.cookie())
                         .header(CSRF_HEADER, csrf.token()))
@@ -105,7 +107,7 @@ class CsrfContractTests {
     void authenticatedRequestAcceptsIssuedCookieAndHeader() throws Exception {
         var csrf = issuedCsrf();
 
-        mockMvc.perform(post(LOGIN_PATH)
+        mockMvc.perform(loginRequest()
                         .with(user("csrf-contract-user"))
                         .accept(MediaType.APPLICATION_JSON)
                         .cookie(csrf.cookie())
@@ -117,7 +119,7 @@ class CsrfContractTests {
     void missingHeaderReturnsCsrfErrorContract() throws Exception {
         var csrf = issuedCsrf();
 
-        expectCsrfInvalid(post(LOGIN_PATH).cookie(csrf.cookie()));
+        expectCsrfInvalid(loginRequest().cookie(csrf.cookie()));
     }
 
     @ParameterizedTest
@@ -125,7 +127,7 @@ class CsrfContractTests {
     void emptyOrMismatchedHeaderReturnsCsrfErrorContract(String token) throws Exception {
         var csrf = issuedCsrf();
 
-        expectCsrfInvalid(post(LOGIN_PATH)
+        expectCsrfInvalid(loginRequest()
                 .cookie(csrf.cookie())
                 .header(CSRF_HEADER, token));
     }
@@ -134,14 +136,14 @@ class CsrfContractTests {
     void headerWithoutCookieReturnsCsrfErrorContract() throws Exception {
         var csrf = issuedCsrf();
 
-        expectCsrfInvalid(post(LOGIN_PATH).header(CSRF_HEADER, csrf.token()));
+        expectCsrfInvalid(loginRequest().header(CSRF_HEADER, csrf.token()));
     }
 
     @Test
     void queryParameterCannotReplaceCsrfHeader() throws Exception {
         var csrf = issuedCsrf();
 
-        expectCsrfInvalid(post(LOGIN_PATH)
+        expectCsrfInvalid(loginRequest()
                 .cookie(csrf.cookie())
                 .queryParam("_csrf", csrf.token()));
     }
@@ -150,10 +152,19 @@ class CsrfContractTests {
     void formParameterCannotReplaceCsrfHeader() throws Exception {
         var csrf = issuedCsrf();
 
-        expectCsrfInvalid(post(LOGIN_PATH)
+        // 로그인은 JSON 전용이므로 form은 CSRF 검사보다 앞서415로 거부한다.
+        mockMvc.perform(loginRequest()
                 .cookie(csrf.cookie())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .param("_csrf", csrf.token()));
+                .param("_csrf", csrf.token()))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    /** 실제 로그인과 충돌하지 않는 테스트 매핑에 유효한 전송 형식으로 접근한다. */
+    private MockHttpServletRequestBuilder loginRequest() {
+        return post(LOGIN_PATH).param("csrfContractProbe", "true")
+                .contentType(MediaType.APPLICATION_JSON).content("{}");
     }
 
     private IssuedCsrf issuedCsrf() throws Exception {
@@ -196,12 +207,12 @@ class CsrfContractTests {
     @RestController
     static class AuthProbe {
 
-        @PostMapping({
+        @PostMapping(value = {
                 "/api/v1/auth/email-verifications/verify",
                 "/api/v1/auth/signup",
                 LOGIN_PATH,
                 "/api/v1/auth/password-resets"
-        })
+        }, params = "csrfContractProbe")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void publicAuth() {
         }

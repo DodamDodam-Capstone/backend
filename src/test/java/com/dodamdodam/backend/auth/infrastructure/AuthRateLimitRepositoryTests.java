@@ -63,6 +63,8 @@ class AuthRateLimitRepositoryTests {
         var key = key(action);
         int capacity = switch (action) {
             case API_IP -> 300;
+            case LOGIN_EMAIL -> 10;
+            case LOGIN_IP -> 100;
             case EMAIL_SEND_SUBJECT -> 5;
             case EMAIL_SEND_IP -> 20;
             case EMAIL_RESEND -> 1;
