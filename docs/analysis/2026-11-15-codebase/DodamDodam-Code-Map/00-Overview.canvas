@@ -1,0 +1,83 @@
+{
+  "nodes": [
+    {
+      "id": "heading",
+      "type": "text",
+      "x": 40,
+      "y": 20,
+      "width": 920,
+      "height": 100,
+      "text": "# DodamDodam  |  한눈에 보는 구현 구조\n\nHTTP → 공통 검사 → Controller → Service → DB / 외부 연결"
+    },
+    {
+      "id": "global",
+      "type": "text",
+      "x": 40,
+      "y": 140,
+      "width": 440,
+      "height": 225,
+      "color": "5",
+      "text": "### 01  공통 요청 · 오류\n\nCORS · CSRF · 요청 제한\n\nJSON 형식 · 크기 · 오류 응답\n\n구현됨 · 공통 진입 경계\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/global|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "auth",
+      "type": "text",
+      "x": 520,
+      "y": 140,
+      "width": 440,
+      "height": 225,
+      "color": "5",
+      "text": "### 02  인증 · 이메일\n\n로그인 문맥 · 로그아웃\n\n인증번호 발급 · SMTP 전송\n\n부분 구현 · 가입 / OAuth 연동 후속\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/auth|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "child",
+      "type": "text",
+      "x": 40,
+      "y": 395,
+      "width": 440,
+      "height": 225,
+      "color": "3",
+      "text": "### 03  아이 등록 · 소유권\n\n아이 등록 · 입력 검증\n\n다른 계정의 아이 접근 차단\n\n선행 조건 · 실제 캐릭터 목록 미정\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/child|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "conversation",
+      "type": "text",
+      "x": 520,
+      "y": 395,
+      "width": 440,
+      "height": 225,
+      "color": "5",
+      "text": "### 04  대화 시작 · 상태\n\n신규 시작 · 재전송 구분\n\nACTIVE → CLOSING → ENDED\n\n부분 구현 · 음성 / 종료 API 후속\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/conversation|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "guardian",
+      "type": "text",
+      "x": 40,
+      "y": 650,
+      "width": 440,
+      "height": 225,
+      "color": "4",
+      "text": "### 05  보호자 권한\n\nPIN 버전 · 보호자 확인 기한\n\n응답 직전 권한 재검사\n\n기반 구현 · PIN / 기록 API 후속\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/guardian|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "app",
+      "type": "text",
+      "x": 520,
+      "y": 650,
+      "width": 440,
+      "height": 225,
+      "color": "3",
+      "text": "### 06  실행 · 저장 · 외부 연결\n\nPostgreSQL · Flyway · SMTP\n\nSTT / TTS 연결은 후속 구현\n\n현재 연결과 후속 연결을 구분\n\n[[analysis/2026-11-15-codebase/DodamDodam-Code-Map/Features/app|담당 역할 · 주요 코드]]"
+    },
+    {
+      "id": "legend",
+      "type": "text",
+      "x": 40,
+      "y": 910,
+      "width": 920,
+      "height": 55,
+      "text": "기능별 책임 지도 · 노트의 링크 / Canvas 카드로 탐색 · 카드 배치는 호출 순서가 아님"
+    }
+  ],
+  "edges": []
+}

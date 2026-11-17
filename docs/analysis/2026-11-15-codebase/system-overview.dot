@@ -1,0 +1,30 @@
+digraph Dodam {
+  graph [rankdir=TB, bgcolor="white", pad=.3, nodesep=.3, ranksep=.55, fontname="Arial", label="현재 구현: 업무 규칙은 Spring, 데이터는 PostgreSQL\n점선: 문서상의 후속 구현", labelloc=t];
+  node [shape=box, style=rounded, fontname="Arial", fontsize=13, margin=".16,.12"];
+  edge [fontname="Arial", fontsize=11, arrowsize=.7];
+  client [label="React / 앱 클라이언트"];
+  web [label="공통 HTTP 경계\nApiResponseHeadersFilter · AuthStateErrorFilter\nSessionCookieRenewalFilter · Spring Session\nSecurityConfig: CORS → GlobalApiRateLimitFilter\n→ Part2/Part1 guard → CSRF → 인증·인가"];
+  client -> web;
+  subgraph cluster_auth {
+    label="auth";
+    mail [label="EmailVerificationController.issue\n→ IssuanceService.issue\n→ preparePublic / preparePin\n→ DeliveryService.deliver"];
+    session [label="AuthenticatedSessionService.validate\nSessionLifecycleService: beginLogin / verifyLogin / failLogin\nSessionSecurityRepository: 버전·폐기·만료"];
+    logout [label="AuthLogoutController.logout\n→ revokeCurrentContext → 세션/CSRF 정리"];
+  }
+  child [label="child\nChildController.create → ChildService.create\n→ Request.normalized → 문맥 잠금 → Repository.insert\n실제 characterId 목록 연결은 보류"];
+  conv [label="conversation\nConversationController.start → Service.create / decideStart\n→ 대화/요청 키 조회 → replay 또는 insertActive / insertLink\n응답 전 verifyStartResponse"];
+  closure [label="ConversationClosureCoordinator.reconcile\n최초 종료 경계 → PROCESSING drain/만료\n→ ENDED → 적격 연결에 복구 기한"];
+  guardian [label="guardian 공통 권한 기반\nrequireGuardianAccess → findState\n로그인 / PIN version / guardian_until"];
+  pg [shape=cylinder,label="PostgreSQL / Flyway V1~V7\n11개 현재 테이블\naccounts · session_security · framework sessions\nchildren · guardian_pins · email_verifications\nconversations · conversation_turns\nconversation_session_links · auth_rate_limits"];
+  smtp [label="외부 SMTP\n업무 Tx commit 뒤 전송\n실패 시 별도 Tx로 challenge 폐기"];
+  future [style="rounded,dashed",label="후속: 별도 FastAPI / AI worker\nSTT → 안전 판정 / LLM → TTS\nbackend 업무 DB 직접 접근 없음"];
+  audio [style="rounded,dashed",label="후속: 비공개 임시 음성\nturn_audio_assets / 인증된 음성 GET\n종료·자정·만료 접근 차단"];
+  web -> mail; web -> session; web -> logout; web -> child; web -> conv;
+  mail -> smtp; mail -> pg; mail -> session;
+  session -> pg; logout -> session;
+  guardian -> pg; web -> guardian [label="응답 재검사"];
+  child -> pg; conv -> child [label="소유권"];conv -> session;
+  conv -> pg; conv -> closure; closure -> pg;
+  conv -> future [style=dashed,label="후속 API 계약"];
+  future -> audio [style=dashed,label="허용 결과"];
+}
