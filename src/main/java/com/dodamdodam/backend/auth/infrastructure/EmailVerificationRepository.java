@@ -7,6 +7,7 @@ import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -118,8 +119,68 @@ public class EmailVerificationRepository {
         return !states.isEmpty() && Boolean.TRUE.equals(states.getFirst());
     }
 
+    /** 검증 예산과 상위 잠금 대상을 정할 때 challenge를 잠금 없이 읽는다. */
+    public Optional<Challenge> findChallenge(UUID id) {
+        return readChallenge(id, false);
+    }
+
+    /** 같은 번호 검증·토큰 소비를 직렬화하며 PIN의 상위 잠금 뒤에 호출한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Challenge> lockChallenge(UUID id) {
+        return readChallenge(id, true);
+    }
+
+    /** 목적과 발급 snapshot은 불변이며 갱신 가능한 검증 상태는 잠금 뒤 다시 읽는다. */
+    private Optional<Challenge> readChallenge(UUID id, boolean lock) {
+        return jdbc.query("""
+                SELECT email, purpose, eligible, code_hash, created_at, expires_at, attempt_count,
+                       verified_at, token_hash, token_expires_at, token_consumed_at, invalidated_at,
+                       setup_account_id, setup_session_binding, setup_generation, pin_version_snapshot,
+                       reset_account_id, reset_session_version
+                FROM email_verifications WHERE id = ?
+                """ + (lock ? " FOR UPDATE" : ""), (row, index) -> new Challenge(
+            row.getString("email"), Purpose.valueOf(row.getString("purpose")), row.getBoolean("eligible"),
+            row.getBytes("code_hash"), row.getObject("created_at", OffsetDateTime.class),
+            row.getObject("expires_at", OffsetDateTime.class), row.getInt("attempt_count"),
+            row.getObject("verified_at", OffsetDateTime.class), row.getBytes("token_hash"),
+            row.getObject("token_expires_at", OffsetDateTime.class),
+            row.getObject("token_consumed_at", OffsetDateTime.class),
+            row.getObject("invalidated_at", OffsetDateTime.class), row.getObject("setup_account_id", UUID.class),
+            row.getObject("setup_session_binding", UUID.class), row.getObject("setup_generation", Long.class),
+            row.getObject("pin_version_snapshot", Long.class), row.getObject("reset_account_id", UUID.class),
+            row.getObject("reset_session_version", Long.class)), id).stream().findFirst();
+    }
+
+    /** 잠근 행에만 오답과 한도 도달 시각을 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordWrongCode(UUID id, int attemptCount, OffsetDateTime invalidatedAt) {
+        jdbc.update("UPDATE email_verifications SET attempt_count=?, invalidated_at=? WHERE id=?",
+            attemptCount, invalidatedAt, id);
+    }
+
+    /** 잠근 행에서 번호 사용 완료와 토큰 해시·기한을 한 번에 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void storeGrant(UUID id, OffsetDateTime verifiedAt, byte[] hash, OffsetDateTime expiresAt) {
+        jdbc.update("""
+                UPDATE email_verifications SET verified_at=?, token_hash=?, token_expires_at=? WHERE id=?
+                """, verifiedAt, hash, expiresAt, id);
+    }
+
+    /** 업무 트랜잭션이 잠근 유효 토큰의 소비 시각만 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void markConsumed(UUID id, OffsetDateTime now) {
+        jdbc.update("UPDATE email_verifications SET token_consumed_at=? WHERE id=?", now, id);
+    }
+
+    /** 번호 해시와 토큰 해시, 발급 당시 권한 결합을 함께 읽는다. */
+    public record Challenge(String email, Purpose purpose, boolean eligible, byte[] codeHash, OffsetDateTime createdAt,
+                            OffsetDateTime expiresAt, int attemptCount, OffsetDateTime verifiedAt, byte[] tokenHash,
+                            OffsetDateTime tokenExpiresAt, OffsetDateTime tokenConsumedAt, OffsetDateTime invalidatedAt,
+                            UUID setupAccountId, UUID setupSessionBinding, Long setupGeneration, Long pinVersionSnapshot,
+                            UUID resetAccountId, Long resetSessionVersion) { }
+
     /** 트랜잭션 시작 시각 대신 모든 잠금 대기가 끝난 현재 DB 시각을 읽는다. */
-    private OffsetDateTime databaseNow() {
+    public OffsetDateTime databaseNow() {
         return jdbc.queryForObject("SELECT clock_timestamp()", OffsetDateTime.class);
     }
 

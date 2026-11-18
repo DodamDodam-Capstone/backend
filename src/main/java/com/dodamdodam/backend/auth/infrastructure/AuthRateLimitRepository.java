@@ -41,15 +41,9 @@ public class AuthRateLimitRepository {
         for (var entry : ordered.entrySet()) {
             // 최초 row 생성도 직렬화하고 모든 요청이 같은 순서로 잠금을 얻는다.
             jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended('auth-rate:' || ?, 0))",
-                    (result, row) -> true, entry.getKey());
+                (result, row) -> true, entry.getKey());
             var key = entry.getValue();
-            var rows = jdbc.query("""
-                    SELECT window_started_at, attempt_count, blocked_until FROM auth_rate_limits
-                    WHERE action = ? AND key_hash = ? FOR UPDATE
-                    """, (result, row) -> new RateLimitState(
-                    result.getObject("window_started_at", OffsetDateTime.class), result.getLong("attempt_count"),
-                    result.getObject("blocked_until", OffsetDateTime.class)), key.action().name(), key.keyHash());
-            states.put(key, rows.isEmpty() ? null : rows.getFirst());
+            states.put(key, findState(key, true));
         }
 
         // 모든 잠금 대기 뒤 한 DB 시각으로 판정해 여러 키의 경계를 일치시킨다.
@@ -67,6 +61,30 @@ public class AuthRateLimitRepository {
             reserveAllowed(entry.getKey(), entry.getValue(), checkedAt);
         }
         return 0;
+    }
+
+    /** 이미 예약한 예산은 건드리지 않고 해당 요청에 적용되는 최늦은 제한 해제 시간을 읽는다. */
+    public long retryAfterSeconds(List<AuthRateLimitKey> keys) {
+        var checkedAt = jdbc.queryForObject("SELECT clock_timestamp()", OffsetDateTime.class);
+        long retryAfter = 0;
+        for (var key : keys) {
+            var state = findState(key, false);
+            if (state != null) {
+                retryAfter = Math.max(retryAfter, state.retryAfterSeconds(key.action(), checkedAt));
+            }
+        }
+        return retryAfter;
+    }
+
+    /** 예산을 예약하는 경로만 행을 잠그고, 429 응답 생성 중에는 상태를 조회한다. */
+    private RateLimitState findState(AuthRateLimitKey key, boolean lock) {
+        var states = jdbc.query("""
+                SELECT window_started_at, attempt_count, blocked_until FROM auth_rate_limits
+                WHERE action = ? AND key_hash = ?
+                """ + (lock ? " FOR UPDATE" : ""), (result, row) -> new RateLimitState(
+            result.getObject("window_started_at", OffsetDateTime.class), result.getLong("attempt_count"),
+            result.getObject("blocked_until", OffsetDateTime.class)), key.action().name(), key.keyHash());
+        return states.isEmpty() ? null : states.getFirst();
     }
 
     /** 모든 제한이 허용된 뒤에만 count를 쓰며 기존 창·차단을 임의로 연장하지 않는다. */

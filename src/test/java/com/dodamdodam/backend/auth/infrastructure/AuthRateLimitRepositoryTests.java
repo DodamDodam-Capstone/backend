@@ -68,6 +68,8 @@ class AuthRateLimitRepositoryTests {
             case EMAIL_SEND_SUBJECT -> 5;
             case EMAIL_SEND_IP -> 20;
             case EMAIL_RESEND -> 1;
+            case EMAIL_VERIFY_IP -> 100;
+            case EMAIL_VERIFY_SUBJECT -> 10;
         };
         for (int index = 0; index < capacity; index++) {
             service.reserve(List.of(key));

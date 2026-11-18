@@ -26,6 +26,11 @@ public class AuthRateLimitService {
         this.reservation.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    /** 사전 예약이나 업무 저장을 다시 실행하지 않고 429 응답의 남은 제한 시간을 확인한다. */
+    public long retryAfterSeconds(List<AuthRateLimitKey> keys) {
+        return repository.retryAfterSeconds(keys);
+    }
+
     /** 업무 row lock 전에 호출하며 API_IP 단독 예약 뒤 같은 단계의 업무 키들을 함께 예약한다. */
     public void reserve(List<AuthRateLimitKey> keys) {
         Long retryAfter;

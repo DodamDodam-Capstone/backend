@@ -4,6 +4,10 @@ import com.dodamdodam.backend.auth.application.EmailVerificationIssuanceService;
 import com.dodamdodam.backend.auth.dto.*;
 import com.dodamdodam.backend.auth.session.*;
 import com.dodamdodam.backend.global.web.ClientAddressResolver;
+import com.dodamdodam.backend.auth.application.EmailVerificationService;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.io.IOException;
@@ -20,12 +24,14 @@ public class EmailVerificationController {
     private final AuthenticatedSessionService authentication;
     private final EmailVerificationIssuanceService issuance;
     private final JsonMapper requestMapper;
+    private final EmailVerificationService verification;
 
-    /** 조건부 로그인과 기존 입력·발급 업무를 연결한다. */
+    /** 조건부 로그인과 인증번호 발급·검증을 연결한다. */
     public EmailVerificationController(AuthenticatedSessionService authentication, EmailVerificationIssuanceService issuance,
-                                       JsonMapper mapper) {
+                                       EmailVerificationService verification, JsonMapper mapper) {
         this.authentication = authentication;
         this.issuance = issuance;
+        this.verification = verification;
         this.requestMapper = mapper.rebuild().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
     }
@@ -48,5 +54,21 @@ public class EmailVerificationController {
         var current = pin ? authentication.requireAuthenticatedSession(request) : null;
         var input = IssueEmailVerificationRequest.fromJson(body);
         return Map.of("data", issuance.issue(request, input, current, ClientAddressResolver.resolve(request)));
+    }
+
+    /** 인증번호 원문을 MVC 인자에 노출하지 않고 검증 서비스로 넘긴다. */
+    @PostMapping("/api/v1/auth/email-verifications/verify")
+    public Map<String, VerificationGrantResponse> verify(HttpServletRequest request) throws IOException {
+        JsonNode body;
+        try {
+            var bytes = ByteBuffer.wrap(request.getInputStream().readAllBytes());
+            body = requestMapper.readTree(StandardCharsets.UTF_8.newDecoder().decode(bytes).toString());
+        }
+        catch (JacksonException | CharacterCodingException invalid) {
+            throw EmailVerificationException.validation("body");
+        }
+        var id = VerifyEmailCodeRequest.readChallengeId(body);
+        return Map.of("data", verification.verify(request, id, () -> VerifyEmailCodeRequest.readCode(body),
+            ClientAddressResolver.resolve(request)));
     }
 }
