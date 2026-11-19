@@ -154,7 +154,7 @@ def build_payload(event, token, helper, app_id="", on_high_risk=None):
 
     # 유료 작업에는 공식 완료 이벤트에서 재확인한 내부 PR의 SHA만 전달한다.
     if (codex and risk == "높음" and on_high_risk and pr.get("state") == "open"
-            and pr["base"]["ref"] in {"main", "development"}
+            and pr["base"]["ref"] == "development"
             and (pr["head"].get("repo") or {}).get("full_name") == repo):
         on_high_risk(sha)
 

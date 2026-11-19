@@ -139,6 +139,17 @@ class SlackReviewTests(unittest.TestCase):
         build_payload(event, "token", self.helper, on_high_risk=queue)
         queue.assert_called_once()
 
+    def test_release_keeps_human_risk_notification_without_queueing_sol_max(self):
+        self.pr.update(state="open", base={"ref": "main"}, head={
+            "sha": self.sha, "ref": "development", "repo": {"full_name": "org/backend"}})
+        self.files = [{"filename": ".github/workflows/ci.yml"}]
+        for findings in (False, True):
+            with self.subTest(findings=findings):
+                queue = Mock()
+                result = build_payload(self.codex_event(findings=findings), "token", self.helper, on_high_risk=queue)
+                self.assertIn("위험도 높음", result["text"])
+                queue.assert_not_called()
+
     def test_official_unresolved_findings_are_actionable(self):
         result = build_payload(self.codex_event(findings=True), "token", self.helper)
         self.assertIn("중간 · 리뷰 지적 확인", result["text"])

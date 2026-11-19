@@ -67,6 +67,24 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIsNone(self.run_review())
         self.paid.assert_not_called()
 
+    def test_development_release_to_main_never_calls_model_or_creates_check(self):
+        # 실제 승격 방향으로 보호 파일과 고위험 판정이 있어도 유료 호출은 0회다.
+        self.pr["head"]["ref"] = "development"
+        self.pr["base"]["ref"] = "main"
+        self.assertTrue(deep.high_risk_reason(self.pr, [self.file]))
+        self.assertIsNone(self.run_review())
+        self.paid.assert_not_called()
+        self.assertEqual(self.writes, [])
+
+    def test_retarget_to_main_before_charge(self):
+        changed = self.pr | {"base": self.pr["base"] | {"ref": "main"}}
+        snapshots = iter([self.pr, changed])
+        with patch.object(deep, "api", side_effect=lambda path, **kw:
+                          next(snapshots) if path.endswith("/pulls/62") else self.api(path, **kw)):
+            self.assertIsNone(self.run_review())
+        self.paid.assert_not_called()
+        self.assertEqual(self.writes, [])
+
     def test_known_flow_service_and_moved_protected_file(self):
         self.file["filename"] = BASE + "conversation/application/TurnAcceptanceService.java"
         self.assertIn("대화 턴", deep.high_risk_reason(self.pr, [self.file]))
