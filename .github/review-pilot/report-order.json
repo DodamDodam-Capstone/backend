@@ -1,0 +1,6 @@
+{
+  "steps": [
+    "publish_report",
+    "validate_report"
+  ]
+}
