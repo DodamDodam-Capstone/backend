@@ -292,6 +292,24 @@ class EmailVerificationHttpTests {
                 Long.class)).isEqualTo(1);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void inactivePublicCodeLeavesLastSubjectSlotForFreshCode(boolean expired) throws Exception {
+        var csrf = csrf("");
+        var stale = publicChallenge(true, expired);
+        if (!expired) {
+            issuedToken(stale, csrf);
+        }
+        var key = keys.rateHasher().emailVerifySubject(Purpose.SIGNUP, "verify@example.invalid", null);
+        jdbc.update("""
+                INSERT INTO auth_rate_limits(action,key_hash,window_started_at,attempt_count,expires_at)
+                VALUES(?,?,clock_timestamp(),?,clock_timestamp()+interval '900 seconds')
+                ON CONFLICT (action,key_hash) DO UPDATE SET attempt_count=EXCLUDED.attempt_count
+                """, key.action().name(), key.keyHash(), key.action().capacity() - 1);
+        assertError(send(verifyPost(stale, "012345", csrf)), 400, "VERIFICATION_INVALID");
+        assertThat(send(verifyPost(publicChallenge(true, false), "012345", csrf)).statusCode()).isEqualTo(200);
+    }
+
     @Test void fifthWrongCodeReportsTheLongerSubjectWindow() throws Exception {
         var id = publicChallenge(true, false);
         var key = keys.rateHasher().emailVerifySubject(Purpose.SIGNUP, "verify@example.invalid", null);
