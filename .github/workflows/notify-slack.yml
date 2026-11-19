@@ -1,6 +1,8 @@
 name: Slack Notification
 
 on:
+  issue_comment:
+    types: [created, edited]
   workflow_run:
     workflows:
       - Backend CI
@@ -16,12 +18,13 @@ permissions:
   checks: read
 
 concurrency:
-  group: slack-notification-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  group: slack-notification-${{ github.event.workflow_run.id || github.run_id }}-${{ github.event.workflow_run.run_attempt || github.run_attempt }}
   cancel-in-progress: false
 
 jobs:
   notify:
     name: slack-notification
+    if: github.event_name == 'workflow_run' || (github.event.issue.pull_request && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

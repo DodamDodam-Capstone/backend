@@ -10,9 +10,27 @@ from review_routing import protected_reason
 
 PENDING = ("미판정", "리뷰 대기", "최신 커밋의 SCRUM 완료 조건과 호출 흐름 확인이 필요합니다.",
            "수정 커밋이면 PR 댓글에 @codex review를 남기세요.")
+CODEX_APP_ID = 1144995
+CODEX_BOT_ID = 199175422
 
 
-def risk_for_pr(run, pr, get, app_id):
+def review_state(body):
+    # 공식 앱의 버전 있는 메타데이터만 읽고 표시용 문구나 이모지는 판정에 쓰지 않는다.
+    match = re.match(r"^<!-- codex-pull-request-review-summary -->\r?\n<!-- codex-review-state:v1 (\{[^\r\n]*\}) -->", body or "")
+    if not match:
+        return None
+    try:
+        state = json.loads(match[1])["code_review"]
+        if (isinstance(state, dict) and state.get("status") == "completed"
+                and re.fullmatch(r"[0-9a-f]{40}", state.get("commit_sha") or "")
+                and isinstance(state.get("has_unresolved_findings"), bool)):
+            return state
+    except (ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def risk_for_pr(run, pr, get, app_id, codex=None):
     sha = run["head_sha"]
     api = f"https://api.github.com/repos/{run['repository']['full_name']}"
     url = f"{api}/pulls/{pr['number']}"
@@ -36,6 +54,17 @@ def risk_for_pr(run, pr, get, app_id):
         risk, decision = "높음", "팀원 확인"
         reason = protected or "main 릴리스 승인 대상입니다."
         action = "작성자와 마지막 푸시자를 제외한 팀원 1명의 승인을 받으세요."
+    if codex:
+        if codex["has_unresolved_findings"]:
+            risk, decision = ("높음" if risk == "높음" else "중간"), "리뷰 지적 확인"
+            reason = f"{protected}. " if protected else ""
+            reason += "공식 Codex 리뷰에 미해결 지적이 있습니다."
+            action = "리뷰 링크에서 지적을 확인하고 변경 후 수동 재리뷰를 요청하세요."
+        elif risk == "높음":
+            reason += ". 최신 Codex 리뷰에 미해결 지적이 없습니다."
+        else:
+            decision, reason, action = ("명세 확인 대기", "최신 Codex 리뷰에 미해결 지적이 없습니다.",
+                                       "SCRUM 완료 조건별 근거와 필수 CI를 확인하세요.")
 
     # 체크 이름만 같은 다른 앱이나 같은 SHA를 공유하는 다른 PR의 판정을 제외한다.
     if app_id and app_id.isascii() and app_id.isdigit():
@@ -69,19 +98,42 @@ def risk_for_pr(run, pr, get, app_id):
 
 
 def build_payload(event, token, helper, app_id=""):
-    run = event["workflow_run"]
-    if run.get("event") != "pull_request":
-        return helper.build_payload(event, token)
-    sha = run["head_sha"]
-    repo = run["repository"]["full_name"]
-    matches = [pr for pr in helper.associated_pull_requests(run, token)
-               if pr.get("head", {}).get("sha") == sha and pr["head"].get("ref") == run["head_branch"]]
-    if run["name"] in {"Backend CI", "Jira Key"}:
-        matches = [pr for pr in matches if pr["base"]["ref"] in {"development", "main"}]
-    pr = matches[0] if len(matches) == 1 else None
+    codex = None
+    if "comment" in event:
+        comment, issue = event["comment"], event["issue"]
+        if not issue.get("pull_request") or comment.get("user", {}).get("id") != CODEX_BOT_ID:
+            return None
+        codex = review_state(comment.get("body"))
+        previous = review_state(event.get("changes", {}).get("body", {}).get("from"))
+        if not codex or codex == previous:
+            return None
+        repo = event["repository"]["full_name"]
+        api = f"https://api.github.com/repos/{repo}"
+        verified = helper.github_json(f"{api}/issues/comments/{int(comment['id'])}", token)
+        if ((verified.get("performed_via_github_app") or {}).get("id") != CODEX_APP_ID
+                or verified.get("user", {}).get("id") != CODEX_BOT_ID or review_state(verified.get("body")) != codex
+                or verified.get("issue_url") != f"{api}/issues/{int(issue['number'])}"):
+            return None
+        pr = helper.github_json(f"{api}/pulls/{issue['number']}", token)
+        sha = codex["commit_sha"]
+        if pr["head"]["sha"] != sha:
+            return None
+        run = {"name": "Codex 코드 리뷰", "head_branch": pr["head"]["ref"], "head_sha": sha,
+               "repository": event["repository"], "html_url": verified["html_url"], "conclusion": "리뷰 결과"}
+    else:
+        run = event["workflow_run"]
+        if run.get("event") != "pull_request":
+            return helper.build_payload(event, token)
+        sha = run["head_sha"]
+        repo = run["repository"]["full_name"]
+        matches = [pr for pr in helper.associated_pull_requests(run, token)
+                   if pr.get("head", {}).get("sha") == sha and pr["head"].get("ref") == run["head_branch"]]
+        if run["name"] in {"Backend CI", "Jira Key"}:
+            matches = [pr for pr in matches if pr["base"]["ref"] in {"development", "main"}]
+        pr = matches[0] if len(matches) == 1 else None
     if pr:
         try:
-            risk, decision, reason, action = risk_for_pr(run, pr, lambda url: helper.github_json(url, token), app_id)
+            risk, decision, reason, action = risk_for_pr(run, pr, lambda url: helper.github_json(url, token), app_id, codex)
         except (RuntimeError, KeyError, TypeError, ValueError):
             risk, decision, reason, action = "미판정", "조회 대기", "GitHub 검증 근거를 확인할 수 없습니다.", "PR에서 최신 검사와 변경 범위를 확인하세요."
     else:
@@ -93,7 +145,8 @@ def build_payload(event, token, helper, app_id=""):
     if key:
         header = f"{key.group()} · {header}"
     result = {"success": "통과", "failure": "실패", "cancelled": "취소", "timed_out": "시간 초과"}.get(run.get("conclusion"), run.get("conclusion") or "미확인")
-    links = [f"<{run['html_url']}|실행 로그>", f"<https://github.com/{repo}/commit/{sha}|{sha[:7]}>"]
+    source = "공식 리뷰" if codex else "실행 로그"
+    links = [f"<{run['html_url']}|{source}>", f"<https://github.com/{repo}/commit/{sha}|{sha[:7]}>"]
     if pr:
         links.insert(0, f"<https://github.com/{repo}/pull/{pr['number']}|PR 보기>")
     # 경로 등 PR 작성자가 바꿀 수 있는 값은 plain_text로만 표시한다.
@@ -114,4 +167,5 @@ if __name__ == "__main__":
 
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
     payload = build_payload(event, os.environ["GITHUB_API_TOKEN"], shared, os.getenv("REVIEW_RISK_APP_ID", ""))
-    shared.post_slack(os.environ["SLACK_WEBHOOK_URL"], payload)
+    if payload is not None:
+        shared.post_slack(os.environ["SLACK_WEBHOOK_URL"], payload)

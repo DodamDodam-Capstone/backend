@@ -1,9 +1,10 @@
 """PR 알림이 실제로 확인한 근거와 최신 커밋만 표시하는지 검증한다."""
 
+import json
 import unittest
 from unittest.mock import Mock
 
-from notify_pr_review import build_payload
+from notify_pr_review import CODEX_APP_ID, CODEX_BOT_ID, build_payload
 
 
 class SlackReviewTests(unittest.TestCase):
@@ -93,6 +94,50 @@ class SlackReviewTests(unittest.TestCase):
     def test_non_pr_uses_existing_notification(self):
         self.run["event"] = "push"
         self.assertIs(self.message(), self.helper.build_payload.return_value)
+
+    def codex_event(self, status="completed", findings=False):
+        state = {"code_review": {"status": status, "commit_sha": self.sha, "has_unresolved_findings": findings}}
+        body = "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 " + json.dumps(state) + " -->"
+        self.comment = {"id": 88, "user": {"id": CODEX_BOT_ID}, "body": body,
+                        "performed_via_github_app": {"id": CODEX_APP_ID},
+                        "html_url": "https://github.com/org/backend/pull/62#issuecomment-88",
+                        "issue_url": "https://api.github.com/repos/org/backend/issues/62"}
+
+        def lookup(url, token):
+            if url.endswith("/issues/comments/88"):
+                return self.comment
+            if url.endswith("/pulls/62"):
+                return self.pr | {"changed_files": len(self.files)}
+            return self.get(url, token)
+
+        self.helper.github_json.side_effect = lookup
+        return {"repository": self.run["repository"], "issue": {"number": 62, "pull_request": {"url": "pull/62"}},
+                "comment": dict(self.comment)}
+
+    def test_official_review_without_findings_still_needs_task_evidence(self):
+        result = build_payload(self.codex_event(), "token", self.helper)
+        self.assertIn("미판정 · 명세 확인 대기", result["text"])
+        self.assertIn("공식 리뷰", result["blocks"][2]["elements"][1]["text"])
+        self.files = [{"filename": ".github/workflows/ci.yml"}]
+        result = build_payload(self.codex_event(), "token", self.helper)
+        self.assertIn("높음 · 팀원 확인", result["text"])
+
+    def test_official_unresolved_findings_are_actionable(self):
+        result = build_payload(self.codex_event(findings=True), "token", self.helper)
+        self.assertIn("중간 · 리뷰 지적 확인", result["text"])
+
+    def test_skips_unsigned_stale_repeated_and_running_comments(self):
+        event = self.codex_event(status="running")
+        self.assertIsNone(build_payload(event, "token", self.helper))
+        event = self.codex_event()
+        self.comment["performed_via_github_app"] = {"id": 99}
+        self.assertIsNone(build_payload(event, "token", self.helper))
+        event = self.codex_event()
+        event["changes"] = {"body": {"from": event["comment"]["body"]}}
+        self.assertIsNone(build_payload(event, "token", self.helper))
+        event = self.codex_event()
+        self.pr["head"] = self.pr["head"] | {"sha": "f" * 40}
+        self.assertIsNone(build_payload(event, "token", self.helper))
 
 
 if __name__ == "__main__":
