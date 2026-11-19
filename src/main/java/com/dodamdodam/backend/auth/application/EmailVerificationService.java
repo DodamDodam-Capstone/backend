@@ -79,7 +79,7 @@ public class EmailVerificationService {
             var rateHasher = keys.rateHasher();
             var apiKey = rateHasher.apiIp(address);
             var ipKey = rateHasher.emailVerifyIp(address);
-            reserveVerificationBudget(ipKey, List.of(apiKey));
+            reserveVerificationBudget(ipKey, List.of(apiKey), () -> {});
             var found = repository.findChallenge(id);
 
             // PIN challenge는 번호 타입과 추가 필드를 검사하기 전에 로그인을 확인한다.
@@ -89,7 +89,11 @@ public class EmailVerificationService {
             var initial = found.orElseThrow(EmailVerificationException::invalid);
             requireVerifiableCode(initial, current);
             var subjectKey = rateHasher.emailVerifySubject(initial.purpose(), initial.email(), initial.setupAccountId());
-            reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey));
+            reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey), () -> {
+                // 대상 잠금을 기다리는 동안 끝난 번호는 새 번호와 공유하는 슬롯을 쓰지 않는다.
+                var latest = repository.findChallenge(id).orElseThrow(EmailVerificationException::invalid);
+                requireVerifiableCode(latest, current);
+            });
 
             var pending = PendingGrant.from(id, initial, current);
             var check = work.execute(status -> verifyLocked(input, pending, initial));
@@ -115,9 +119,9 @@ public class EmailVerificationService {
     }
 
     /** 현재 단계만 예약하고, 거부되면 앞서 사용한 예산까지 반영해 재시도 시간을 계산한다. */
-    private void reserveVerificationBudget(AuthRateLimitKey key, List<AuthRateLimitKey> priorKeys) {
+    private void reserveVerificationBudget(AuthRateLimitKey key, List<AuthRateLimitKey> priorKeys, Runnable recheck) {
         try {
-            limits.reserve(List.of(key));
+            limits.reserve(List.of(key), recheck);
         }
         catch (AuthRateLimitException rejected) {
             throw new AuthRateLimitException(Math.max(rejected.retryAfterSeconds(), limits.retryAfterSeconds(priorKeys)));

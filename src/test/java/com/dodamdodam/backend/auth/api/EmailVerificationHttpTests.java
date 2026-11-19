@@ -310,6 +310,49 @@ class EmailVerificationHttpTests {
         assertThat(send(verifyPost(publicChallenge(true, false), "012345", csrf)).statusCode()).isEqualTo(200);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void subjectReservationRechecksCodeAfterItsLockWait(boolean expired) throws Exception {
+        var csrf = csrf("");
+        var id = publicChallenge(true, false);
+        var key = keys.rateHasher().emailVerifySubject(Purpose.SIGNUP, "verify@example.invalid", null);
+        jdbc.update("""
+                INSERT INTO auth_rate_limits(action,key_hash,window_started_at,attempt_count,expires_at)
+                VALUES(?,?,clock_timestamp(),?,clock_timestamp()+interval '900 seconds')
+                """, key.action().name(), key.keyHash(), key.action().capacity() - 1);
+
+        var request = verifyPost(id, "012345", csrf);
+        var pending = new TransactionTemplate(transactions).execute(status -> {
+            jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action=? AND key_hash=? FOR UPDATE",
+                    Integer.class, key.action().name(), key.keyHash());
+            var response = client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+            // 대상 슬롯에서 실제로 대기한 요청만 상태 변경과 경합하도록 한다.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+            boolean waiting;
+            do {
+                waiting = Boolean.TRUE.equals(jdbc.queryForObject("""
+                        SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted
+                            AND pg_backend_pid() = ANY(pg_blocking_pids(pid)))
+                        """, Boolean.class));
+            } while (!waiting && System.nanoTime() < deadline);
+            assertThat(waiting).isTrue();
+            if (expired) {
+                jdbc.update("""
+                        UPDATE email_verifications SET created_at=clock_timestamp()-interval '601 seconds',
+                            expires_at=clock_timestamp()-interval '1 second' WHERE id=?
+                        """, id);
+            } else {
+                var now = challenges.databaseNow();
+                challenges.storeGrant(id, now, new byte[32], now.plusMinutes(10));
+            }
+            return response;
+        });
+        assertError(pending.get(10, TimeUnit.SECONDS), 400, "VERIFICATION_INVALID");
+        assertThat(jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action='EMAIL_VERIFY_IP'",
+                Integer.class)).isOne();
+        assertThat(send(verifyPost(publicChallenge(true, false), "012345", csrf)).statusCode()).isEqualTo(200);
+    }
+
     @Test void fifthWrongCodeReportsTheLongerSubjectWindow() throws Exception {
         var id = publicChallenge(true, false);
         var key = keys.rateHasher().emailVerifySubject(Purpose.SIGNUP, "verify@example.invalid", null);
@@ -600,10 +643,30 @@ class EmailVerificationHttpTests {
                 Boolean.class, id)).isTrue();
     }
 
-    @Test void changedResetAccountVersionPreventsIssuingToken() throws Exception {
+    @Test void accountVersionChangeRevokesOutstandingResetProofsInTheSameTransaction() throws Exception {
         var account = UUID.randomUUID();
         var id = resetChallenge(account);
-        jdbc.update("UPDATE accounts SET session_version=3 WHERE id=?", account);
+        var tx = new TransactionTemplate(transactions);
+        tx.executeWithoutResult(status -> {
+            jdbc.update("UPDATE accounts SET session_version=session_version+1 WHERE id=?", account);
+            assertThat(jdbc.queryForObject("SELECT invalidated_at IS NOT NULL FROM email_verifications WHERE id=?",
+                    Boolean.class, id)).isTrue();
+            status.setRollbackOnly();
+        });
+        assertThat(jdbc.queryForObject("SELECT invalidated_at IS NULL FROM email_verifications WHERE id=?",
+                Boolean.class, id)).isTrue();
+        jdbc.update("UPDATE accounts SET session_version=session_version+1 WHERE id=?", account);
+        var csrf = csrf("");
+        assertError(send(verifyPost(id, "012345", csrf)), 400, "VERIFICATION_INVALID");
+        assertError(send(verifyPost(id, "012346", csrf)), 400, "VERIFICATION_INVALID");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_rate_limits WHERE action='EMAIL_VERIFY_SUBJECT'",
+                Integer.class)).isZero();
+    }
+
+    @Test void mismatchedResetSnapshotPreventsIssuingToken() throws Exception {
+        var account = UUID.randomUUID();
+        var id = resetChallenge(account);
+        jdbc.update("UPDATE email_verifications SET reset_session_version=1 WHERE id=?", id);
         assertError(send(verifyPost(id, "012345", csrf(""))), 400, "VERIFICATION_INVALID");
         assertThat(jdbc.queryForObject("SELECT verified_at IS NULL AND token_hash IS NULL FROM email_verifications WHERE id=?",
                 Boolean.class, id)).isTrue();
@@ -616,7 +679,8 @@ class EmailVerificationHttpTests {
         if (eligible) {
             var account = UUID.randomUUID();
             id = resetChallenge(account);
-            jdbc.update("UPDATE accounts SET session_version=session_version+1 WHERE id=?", account);
+            // 폐기 전의 손상된 snapshot에서도 실제 오답은 decoy와 같은 상태 전이를 거친다.
+            jdbc.update("UPDATE email_verifications SET reset_session_version=1 WHERE id=?", id);
         } else {
             id = publicChallenge(false, false);
             jdbc.update("UPDATE email_verifications SET purpose='RESET_PASSWORD' WHERE id=?", id);
@@ -632,12 +696,12 @@ class EmailVerificationHttpTests {
                 """, Boolean.class, id)).isTrue();
     }
 
-    @Test void finalGrantCheckRejectsChangedResetAccountVersion() {
+    @Test void finalGrantCheckRejectsMismatchedResetSnapshot() {
         var account = UUID.randomUUID();
         var id = resetChallenge(account);
         var request = new MockHttpServletRequest();
         verification.verify(request, id, () -> "012345", InetAddress.ofLiteral("192.0.2.10"));
-        jdbc.update("UPDATE accounts SET session_version=3 WHERE id=?", account);
+        jdbc.update("UPDATE email_verifications SET reset_session_version=1 WHERE id=?", id);
         assertThatThrownBy(() -> verification.verifyResponseAccess(request))
                 .isInstanceOfSatisfying(EmailVerificationException.class, error ->
                         assertThat(error.code()).isEqualTo("VERIFICATION_INVALID"));
