@@ -2,8 +2,10 @@ name: Development Manual Review
 
 on:
   workflow_run:
-    workflows: [Slack Notification]
+    workflows: [Slack Notification, Review State Changed]
     types: [completed]
+  issue_comment:
+    types: [created, edited]
   schedule:
     # 승인·대화 해결 뒤의 재평가와 GitHub 이벤트 누락을 보완한다.
     - cron: '7,22,37,52 * * * *'
@@ -18,7 +20,13 @@ concurrency:
 
 jobs:
   candidates:
-    if: github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' && vars.DEVELOPMENT_MANUAL_REVIEW == 'true'
+    if: >-
+      github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' &&
+      vars.DEVELOPMENT_MANUAL_REVIEW == 'true' &&
+      (github.event_name != 'issue_comment' || (github.event.issue.pull_request &&
+        ((github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->')) ||
+        (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+        startsWith(github.event.comment.body, '@codex review')))))
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read

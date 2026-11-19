@@ -1,0 +1,18 @@
+name: Review State Changed
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request:
+    branches: [development]
+    types: [opened, reopened, edited]
+
+permissions: {}
+
+jobs:
+  signal:
+    if: github.event.pull_request.base.ref == 'development' && vars.DEVELOPMENT_MANUAL_REVIEW == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # PR의 코드를 실행하지 않고 기본 브랜치 발행기에 이벤트만 알린다.
+      - run: echo '리뷰 상태 재확인'

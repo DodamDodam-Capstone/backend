@@ -29,6 +29,11 @@ def codex_clear(comments, sha):
     latest = latest_codex_summary(comments)
     if not latest:
         return False
+    # 공식 앱이 요약을 갱신하기 전에도 새 팀원 재리뷰 요청은 이전 결과를 만료시킨다.
+    if any(row.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"}
+           and row["user"].get("type") == "User" and re.match(r"^@codex\s+review\b", row["body"].strip(), re.I)
+           and row["created_at"] >= latest["updated_at"] for row in comments):
+        return False
     state = review_state(latest["body"]) or {}
     return (state.get("commit_sha") == sha and state.get("has_any_findings") is False
             and state.get("has_unresolved_findings") is False)
@@ -104,18 +109,19 @@ def team_approved(repo, pr, app_token, latest):
 def pull_reviews(repo, number):
     owner, name = repo.split("/")
     query = """query($owner:String!, $name:String!, $n:Int!, $after:String) {
-      repository(owner:$owner,name:$name) { pullRequest(number:$n) { reviewDecision headRefOid baseRefOid autoMergeRequest { enabledAt }
+      repository(owner:$owner,name:$name) { autoMergeAllowed pullRequest(number:$n) { reviewDecision headRefOid baseRefOid autoMergeRequest { enabledAt }
         reviewThreads(first:100,after:$after) { nodes { isResolved } pageInfo {hasNextPage endCursor} }
       } } }"""
     after = None
     while True:
         data = api("graphql", {"query": query, "variables": {"owner": owner, "name": name, "n": number, "after": after}})
-        page = data["data"]["repository"]["pullRequest"]
+        repository = data["data"]["repository"]
+        page = repository["pullRequest"]
         threads = page["reviewThreads"]
         if any(node["isResolved"] is not True for node in threads["nodes"]):
             return None
         if not threads["pageInfo"]["hasNextPage"]:
-            return page
+            return page | {"autoMergeAllowed": repository["autoMergeAllowed"]}
         after = threads["pageInfo"]["endCursor"]
 
 
@@ -146,8 +152,8 @@ def evaluate(repo, number, app_token):
     if (not reviews or reviews["headRefOid"] != sha or reviews["baseRefOid"] != pr["base"]["sha"]
             or reviews["reviewDecision"] == "CHANGES_REQUESTED"):
         return None, "미해결 대화·변경 요청 또는 커밋 변경"
-    if reviews.get("autoMergeRequest"):
-        return None, "수동 병합을 위해 PR의 자동 병합 해제 필요"
+    if reviews.get("autoMergeAllowed") is not False or reviews.get("autoMergeRequest"):
+        return None, "저장소 자동 병합 설정 해제와 PR 예약 해제 필요"
     # Ruleset만 사용하는 저장소에서는 실제 리뷰가 있어도 reviewDecision이 null일 수 있다.
     opinions = latest_opinions(repo, number)
     if any(row["state"] == "CHANGES_REQUESTED" for row in opinions.values()):
@@ -219,6 +225,11 @@ def policy_active(root):
                           for r in rules if r["type"] == "required_status_checks" for c in r["parameters"]["required_status_checks"])
 
 
+def shares_head(root, number, head):
+    peers = api(f"{root}/pulls?state=open&base=development&per_page=100", paginate=True)
+    return any(p["number"] != number and p["head"]["sha"] == head for p in peers)
+
+
 def report(repo, number, *, token=None):
     root = f"repos/{repo}"
     url = f"{root}/pulls/{number}"
@@ -270,8 +281,7 @@ def report(repo, number, *, token=None):
         decision, title = evaluate(repo, number, token)
         if decision and decision[1:] == (head, base):
             # 검사 발행 전 같은 head를 쓰는 열린 PR이 있으면 양쪽 모두 보류한다.
-            peers = api(f"{root}/pulls?state=open&base=development&per_page=100", paginate=True)
-            shared = shared or any(p["number"] != number and p["head"]["sha"] == head for p in peers)
+            shared = shared or shares_head(root, number, head)
             if not shared:
                 result = "success"
                 title = ("팀원 승인 생략 · 수동 병합 가능" if decision[0] == "low"
@@ -293,6 +303,8 @@ def report(repo, number, *, token=None):
     if not token:
         print(f"PR #{number} · {title}")
         return
+    low_risk = False
+    withdraw = False
     try:
         low_risk = bool(decision and result == "success" and decision[0] == "low")
         if result == "success" and not policy_active(root):
@@ -310,9 +322,24 @@ def report(repo, number, *, token=None):
                     title = "독립된 팀원 승인 확인 · 수동 병합 가능"
                 else:
                     result, title = "action_required", "앱 승인 미집계 또는 철회 · 독립된 backend 팀원 승인 필요"
+        if result == "success":
+            # 승인 API 호출 중에도 권한, 공식 재리뷰, 필수 CI 및 열린 PR이 바뀔 수 있다.
+            confirmed, reason = evaluate(repo, number, token)
+            if confirmed != decision:
+                result, title = "action_required", reason if not confirmed else "검토 대상 변경 · 재확인 필요"
+                withdraw = low_risk
+            elif shares_head(root, number, head):
+                result, title = "action_required", "동일한 검사 커밋을 공유하는 PR · 별도 커밋 필요"
+                withdraw = low_risk
+            elif api(ref)["object"]["sha"] != target:
+                result, title = "action_required", "GitHub 테스트 병합 커밋 변경 · 재확인 필요"
+                withdraw = low_risk
     except (RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
-        result, title = "action_required", "전용 앱 승인 상태 재확인 필요"
+        result, title = "action_required", "최종 리뷰 근거 재확인 필요"
+        withdraw = low_risk
     publish(root, target, CHECK, identity, result, title, summary, prior, token)
+    if withdraw:
+        reconcile_app_approval(url, head, identity, False, token)
     # PR의 Checks 탭은 head 검사를 보여 준다. 안내 이름은 필수 검사와 분리한다.
     publish(root, head, info, identity, result, title, summary, existing_check(root, head, info), token)
     print(f"PR #{number} · {title}")
