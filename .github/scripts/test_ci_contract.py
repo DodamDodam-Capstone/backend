@@ -25,6 +25,7 @@ class CiContractTests(unittest.TestCase):
         self.assertIn("    needs: quality", release)
         self.assertIn("if: github.event_name == 'push' && github.ref == 'refs/heads/main'", release)
         self.assertIn("      contents: write", release)
+        self.assertIn("      pull-requests: read", release)
         self.assertIn("          ref: ${{ github.sha }}", release)
         self.assertNotIn("always()", release)
         notification = workflow.split("\n  notify-integration:\n")[1]
