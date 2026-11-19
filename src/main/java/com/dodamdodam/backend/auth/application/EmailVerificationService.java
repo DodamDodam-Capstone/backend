@@ -87,12 +87,7 @@ public class EmailVerificationService {
                 ? authentication.requireAuthenticatedSession(request) : null;
             var input = new VerifyEmailCodeRequest(id, readCode.get());
             var initial = found.orElseThrow(EmailVerificationException::invalid);
-            if (current != null) {
-                // 대상 예산을 쓰기 전에 현재 권한을 확인하고, 잠금 대기 중 변경은 verifyLocked에서 다시 확인한다.
-                checkPinContext(initial, current);
-            } else if (initial.invalidatedAt() != null) {
-                throw EmailVerificationException.invalid();
-            }
+            requireVerifiableCode(initial, current);
             var subjectKey = rateHasher.emailVerifySubject(initial.purpose(), initial.email(), initial.setupAccountId());
             reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey));
 
@@ -138,11 +133,7 @@ public class EmailVerificationService {
         var challenge = wrongReset
             ? repository.lockChallenge(input.challengeId()).orElseThrow(EmailVerificationException::invalid)
             : lockChallenge(pending);
-        var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
-        if (challenge.invalidatedAt() != null || challenge.verifiedAt() != null
-            || challenge.attemptCount() >= MAX_WRONG_CODES || !now.isBefore(challenge.expiresAt())) {
-            throw EmailVerificationException.invalid();
-        }
+        var now = requireVerifiableCode(challenge, current);
         boolean matches = MessageDigest.isEqual(challenge.codeHash(), codeHash);
         // 공개 decoy에도 일반 오답과 같은 제한을 적용하되 성공 상태는 만들지 않는다.
         if (!matches || !challenge.eligible() || wrongReset) {
@@ -159,6 +150,16 @@ public class EmailVerificationService {
         repository.storeGrant(input.challengeId(), now, digest(secret), expiresAt);
         return new CodeCheck(new VerificationGrantResponse(input.challengeId() + "." + secret,
             expiresAt.withOffsetSameInstant(ZoneOffset.ofHours(9))), 0);
+    }
+
+    /** 대상 예산 예약 전과 행 잠금 후에 PIN 권한을 먼저 확인하고 DB 시각으로 번호의 유효성을 판단한다. */
+    private OffsetDateTime requireVerifiableCode(Challenge challenge, AuthenticatedSession current) {
+        var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
+        if (challenge.invalidatedAt() != null || challenge.verifiedAt() != null
+            || challenge.attemptCount() >= MAX_WRONG_CODES || !now.isBefore(challenge.expiresAt())) {
+            throw EmailVerificationException.invalid();
+        }
+        return now;
     }
 
     /** 커밋 뒤 응답이 늦어진 동안 세션·PIN·토큰이 바뀌었으면 성공 본문을 보내지 않는다. */
