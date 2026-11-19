@@ -105,7 +105,8 @@ class ManualReviewTests(unittest.TestCase):
         with patch.object(merge, "api", side_effect=get), patch.object(merge.subprocess, "run", return_value=checks), \
                 patch.object(merge, "pull_reviews", return_value=review) as reviews:
             self.assertEqual(merge.evaluate(REPO, 12, None)[0], ("low", SHA, BASE_SHA))
-            for value in (None, review | {"reviewDecision": "CHANGES_REQUESTED"}, review | {"headRefOid": BASE_SHA}):
+            for value in (None, review | {"reviewDecision": "CHANGES_REQUESTED"}, review | {"headRefOid": BASE_SHA},
+                          review | {"autoMergeRequest": {"enabledAt": "2026-11-19"}}):
                 reviews.return_value = value
                 self.assertIsNone(merge.evaluate(REPO, 12, None)[0])
 
@@ -139,9 +140,11 @@ class ManualReviewTests(unittest.TestCase):
     def test_only_verified_merge_parents_and_current_base_may_receive_success(self):
         target = "c" * 40
         pr = PR | {"merge_commit_sha": target}
-        for parents, base, written, passed in (([BASE_SHA, SHA], BASE_SHA, True, True),
-                                               ([SHA, BASE_SHA], BASE_SHA, False, False),
-                                               ([BASE_SHA, SHA], SHA, True, False)):
+        for parents, base, counted, shared, written, passed in (([BASE_SHA, SHA], BASE_SHA, True, False, True, True),
+                                                                ([BASE_SHA, SHA], BASE_SHA, False, False, True, False),
+                                                                ([BASE_SHA, SHA], BASE_SHA, True, True, True, False),
+                                                                ([SHA, BASE_SHA], BASE_SHA, True, False, False, False),
+                                                                ([BASE_SHA, SHA], SHA, True, False, True, False)):
             def api(endpoint, data=None, **kwargs):
                 if data:
                     return {}
@@ -151,16 +154,26 @@ class ManualReviewTests(unittest.TestCase):
                     return {"parents": [{"sha": p} for p in parents]}
                 if "/git/ref/heads/" in endpoint:
                     return {"object": {"sha": base}}
+                if "/pulls?state=open" in endpoint:
+                    return [pr, pr | {"number": 24}] if shared else [pr]
+                if "/reviews?" in endpoint:
+                    return []
                 if "/check-runs?" in endpoint:
                     return {"check_runs": []}
                 return pr
-            with self.subTest(parents=parents, base=base), patch.object(merge, "api", side_effect=api) as calls, \
+            review = {"headRefOid": SHA, "baseRefOid": BASE_SHA, "reviewDecision": "APPROVED" if counted else "REVIEW_REQUIRED"}
+            with self.subTest(parents=parents, base=base, counted=counted, shared=shared), patch.object(merge, "api", side_effect=api) as calls, \
+                    patch.object(merge, "pull_reviews", return_value=review), \
                     patch.object(merge, "evaluate", return_value=(("low", SHA, BASE_SHA), "허용")):
                 merge.report(REPO, 12, token="checks-only")
                 writes = [c for c in calls.call_args_list if len(c.args) > 1]
-                self.assertEqual(len(writes), 2 if written else 0)
+                vote = base == BASE_SHA and not shared
+                self.assertEqual(len(writes), (2 + int(vote)) if written else 0)
                 if written:
-                    call, info = writes
+                    if vote:
+                        self.assertEqual(writes[0].args[1]["event"], "APPROVE")
+                        self.assertEqual(writes[0].args[1]["commit_id"], SHA)
+                    call, info = writes[-2:]
                     self.assertNotEqual(info.args[1]["name"], merge.CHECK)
                     self.assertEqual(info.args[1]["head_sha"], SHA)
                     self.assertEqual(call.args[0], "repos/org/backend/check-runs")
@@ -182,3 +195,25 @@ class ManualReviewTests(unittest.TestCase):
                 self.assertEqual(decision is not None, allowed)
                 if not human:
                     self.assertIn("팀원 승인 필요", reason)
+
+    def test_medium_and_revoked_low_never_keep_the_apps_approval(self):
+        url = "repos/org/backend/pulls/12"
+        bot = {"id": merge.APP_BOT_ID, "type": "Bot"}
+        vote = {"id": 44, "user": bot, "state": "APPROVED", "commit_id": SHA, "body": "<!-- proof -->"}
+        human = vote | {"id": 45, "user": {"id": 27, "type": "User"}}
+        with patch.object(merge, "api", side_effect=[[vote, human], {}]) as api:
+            merge.reconcile_app_approval(url, SHA, "proof", False, "app")
+            self.assertEqual(api.call_count, 2)
+            self.assertEqual(api.call_args.args[0], url + "/reviews/44/dismissals")
+        with patch.object(merge, "api", return_value=[vote, human]) as api:
+            merge.reconcile_app_approval(url, SHA, "proof", True, "app")
+            self.assertEqual(api.call_count, 1)
+
+    def test_high_risk_fork_points_to_internal_review(self):
+        fork = PR | {"head": PR["head"] | {"repo": {"full_name": "fork/backend"}}}
+        with patch.object(merge, "api", side_effect=[fork, [summary()], [FILE]]), \
+                patch.object(merge, "change_risk", return_value="high"), patch.object(merge, "paid_clear") as paid:
+            decision, reason = merge.evaluate(REPO, 12, None)
+            self.assertIsNone(decision)
+            self.assertIn("내부 브랜치", reason)
+            paid.assert_not_called()

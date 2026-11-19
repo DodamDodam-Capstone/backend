@@ -13,6 +13,7 @@ from review_routing import change_risk, independent_approval
 
 CHECK = "backend-review-policy"
 APP_ID = 5832717
+APP_BOT_ID = 358725565
 REQUIRED = {"backend-quality", "gitmoji-conventional-title", "jira-issue-key"}
 
 
@@ -102,7 +103,7 @@ def team_approved(repo, pr, app_token, latest):
 def pull_reviews(repo, number):
     owner, name = repo.split("/")
     query = """query($owner:String!, $name:String!, $n:Int!, $after:String) {
-      repository(owner:$owner,name:$name) { pullRequest(number:$n) { reviewDecision headRefOid baseRefOid
+      repository(owner:$owner,name:$name) { pullRequest(number:$n) { reviewDecision headRefOid baseRefOid autoMergeRequest { enabledAt }
         reviewThreads(first:100,after:$after) { nodes { isResolved } pageInfo {hasNextPage endCursor} }
       } } }"""
     after = None
@@ -132,6 +133,8 @@ def evaluate(repo, number, app_token):
     if len(files) != pr["changed_files"]:
         return None, "전체 변경 목록 확인 필요"
     level = change_risk(pr, files)
+    if level == "high" and (pr["head"].get("repo") or {}).get("full_name") != repo:
+        return None, "고위험 포크 · 내부 브랜치에서 CI와 공식 리뷰 재검증 필요"
     if level == "low" and not eligible(pr, repo):
         level = "medium"  # 내부 작업 브랜치에서만 사람 승인을 생략한다.
     result = subprocess.run(["gh", "pr", "checks", str(number), "-R", repo, "--required", "--json", "name,state"],
@@ -142,6 +145,8 @@ def evaluate(repo, number, app_token):
     if (not reviews or reviews["headRefOid"] != sha or reviews["baseRefOid"] != pr["base"]["sha"]
             or reviews["reviewDecision"] == "CHANGES_REQUESTED"):
         return None, "미해결 대화·변경 요청 또는 커밋 변경"
+    if reviews.get("autoMergeRequest"):
+        return None, "수동 병합을 위해 PR의 자동 병합 해제 필요"
     # Ruleset만 사용하는 저장소에서는 실제 리뷰가 있어도 reviewDecision이 null일 수 있다.
     opinions = latest_opinions(repo, number)
     if any(row["state"] == "CHANGES_REQUESTED" for row in opinions.values()):
@@ -170,6 +175,26 @@ def publish(root, sha, name, identity, result, title, summary, prior, token):
         api(f"{root}/check-runs", payload | {"head_sha": sha}, token=token)
 
 
+def reconcile_app_approval(url, head, identity, low_risk, token):
+    """일반 승인은 GitHub가 직접 강제한다. 앱은 자기 저위험 승인만 관리한다."""
+    marker = f"<!-- {identity} -->"
+    reviews = api(f"{url}/reviews?per_page=100", paginate=True)
+    active = [r for r in reviews if r["user"]["id"] == APP_BOT_ID and r["user"]["type"] == "Bot"
+              and r["state"] == "APPROVED"]
+    approved = False
+    for review in active:
+        if low_risk and review["commit_id"] == head and (review.get("body") or "").startswith(marker):
+            approved = True
+        else:
+            api(f"{url}/reviews/{review['id']}/dismissals",
+                {"message": "현재 커밋과 검토 근거에 대한 저위험 조건을 다시 확인해야 합니다."},
+                method="PUT", token=token)
+    if low_risk and not approved:
+        api(f"{url}/reviews", {"event": "APPROVE", "commit_id": head,
+            "body": marker + "\n최신 Codex 무지적, 필수 CI와 저위험 변경을 확인했습니다. 병합은 팀원이 직접 실행합니다."},
+            token=token)
+
+
 def report(repo, number, *, token=None):
     root = f"repos/{repo}"
     url = f"{root}/pulls/{number}"
@@ -187,6 +212,7 @@ def report(repo, number, *, token=None):
         if token:
             publish(root, head, info, identity, "action_required", title, summary,
                     existing_check(root, head, info), token)
+            reconcile_app_approval(url, head, identity, False, token)
         return
     # 동일한 head를 쓰는 다른 PR이나 이전 base에 성공 판정을 발행하지 않는다.
     ref = f"{root}/git/ref/pull/{number}/merge"
@@ -204,12 +230,19 @@ def report(repo, number, *, token=None):
                 "output": {"title": "최신 리뷰 재확인 중", "summary": f"PR #{number}"}}, method="PATCH", token=token)
             prior = prior | {"conclusion": "action_required", "output": {"title": "최신 리뷰 재확인 중"}}
     result = "action_required"
+    decision = None
     try:
         decision, title = evaluate(repo, number, token)
         if decision and decision[1:] == (head, base):
-            result = "success"
-            title = ("팀원 승인 생략 · 수동 병합 가능" if decision[0] == "low"
-                     else "독립된 팀원 승인 확인 · 수동 병합 가능")
+            # 검사 발행 전 같은 head를 쓰는 열린 PR이 있으면 양쪽 모두 보류한다.
+            peers = api(f"{root}/pulls?state=open&base=development&per_page=100", paginate=True)
+            shared = shared or any(p["number"] != number and p["head"]["sha"] == head for p in peers)
+            if not shared:
+                result = "success"
+                title = ("팀원 승인 생략 · 수동 병합 가능" if decision[0] == "low"
+                         else "독립된 팀원 승인 확인 · 수동 병합 가능")
+        elif decision:
+            title = "검토 중 커밋 변경 · 재확인 필요"
     except (RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
         title = "리뷰 근거 조회 실패 · 재확인 필요"
     latest = api(url)
@@ -222,12 +255,24 @@ def report(repo, number, *, token=None):
     if shared:
         identity = "shared-merge-commit"
         result, title = "action_required", "동일한 검사 커밋을 공유하는 PR · 별도 커밋 필요"
-    print(f"PR #{number} · {title}")
     if not token:
+        print(f"PR #{number} · {title}")
         return
+    try:
+        low_risk = bool(decision and result == "success" and decision[0] == "low")
+        reconcile_app_approval(url, head, identity, low_risk, token)
+        if low_risk:
+            # 리뷰 등록 성공과 브랜치 규칙의 실제 승인 집계는 다를 수 있다.
+            current = pull_reviews(repo, number)
+            if not (current and current["reviewDecision"] == "APPROVED" and current["headRefOid"] == head
+                    and current["baseRefOid"] == base and not current.get("autoMergeRequest")):
+                result, title = "action_required", "GitHub 기본 승인 집계와 현재 리뷰 상태 확인 필요"
+    except (RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
+        result, title = "action_required", "전용 앱 승인 상태 재확인 필요"
     publish(root, target, CHECK, identity, result, title, summary, prior, token)
     # PR의 Checks 탭은 head 검사를 보여 준다. 안내 이름은 필수 검사와 분리한다.
     publish(root, head, info, identity, result, title, summary, existing_check(root, head, info), token)
+    print(f"PR #{number} · {title}")
 
 
 if __name__ == "__main__":

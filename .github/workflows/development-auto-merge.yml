@@ -4,10 +4,6 @@ on:
   workflow_run:
     workflows: [Slack Notification]
     types: [completed]
-  pull_request_review:
-    types: [submitted, dismissed, edited]
-  pull_request_review_thread:
-    types: [resolved, unresolved]
   schedule:
     # 승인·대화 해결 뒤의 재평가와 GitHub 이벤트 누락을 보완한다.
     - cron: '7,22,37,52 * * * *'
@@ -20,22 +16,12 @@ on:
 
 permissions: {}
 
-jobs:
-  signal:
-    if: >-
-      (github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_thread') &&
-      github.event.pull_request.base.ref == 'development' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      # 비밀이나 PR 코드에 접근하지 않고 보호된 main에 PR 번호만 보낸다.
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          NUMBER: ${{ github.event.pull_request.number }}
-        run: gh workflow run development-auto-merge.yml --repo "$GITHUB_REPOSITORY" --ref main -f "number=$NUMBER"
+# 같은 테스트 병합 SHA를 공유하는 PR도 한 번에 하나씩만 처리한다.
+concurrency:
+  group: backend-manual-review-publisher
+  cancel-in-progress: false
 
+jobs:
   candidates:
     if: github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' && vars.DEVELOPMENT_MANUAL_REVIEW == 'true'
     runs-on: ubuntu-latest
@@ -61,11 +47,9 @@ jobs:
     if: needs.candidates.outputs.numbers != '[]'
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         number: ${{ fromJSON(needs.candidates.outputs.numbers) }}
-    concurrency:
-      group: development-manual-review-${{ matrix.number }}
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 8
     environment:
@@ -90,6 +74,7 @@ jobs:
           private-key: ${{ secrets.LOW_RISK_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: backend
+          permission-pull-requests: write
           permission-checks: write
           permission-members: read
       - name: 최신 리뷰와 CI를 재확인해 수동 병합 검사 발행

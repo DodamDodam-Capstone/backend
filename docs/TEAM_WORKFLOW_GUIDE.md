@@ -171,7 +171,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 <a id="review-policy"></a>
 ### SCRUM PR 리뷰어 조건 시범안
 
-수동 병합 검사 전환 전에는 모든 PR에 독립된 팀원 한 명의 승인이 필요합니다. 전환 후에는 아래 위험도별 조건을 적용합니다. `development`에서 인증·권한, DB·영속화, CI·정책 등 [보호 경로](https://github.com/DodamDodam-Capstone/backend/rules/27601021)를 변경하면 backend 팀원의 승인이 필요합니다. 시범 기간에는 CI가 판정 로직의 회귀 테스트를 실행합니다.
+GitHub는 모든 PR에 마지막 푸시자 외 승인 하나를 요구합니다. 수동 병합 정책을 활성화하면 아래 저위험 범위에서만 전용 앱이 이 승인을 제공합니다. `development`에서 인증·권한, DB·영속화, CI·정책 등 [보호 경로](https://github.com/DodamDodam-Capstone/backend/rules/27601021)를 변경하면 backend 팀원의 승인이 필요합니다. 시범 기간에는 CI가 판정 로직의 회귀 테스트를 실행합니다.
 
 backend의 [Codex 저장소 설정](https://chatgpt.com/settings/code-review/repositories/github-1340757090)은 모든 PR을 열 때 자동 리뷰를 요청합니다. 수정 커밋을 올린 뒤 다시 검토받으려면 해당 PR의 일반 댓글에 `@codex review`를 남깁니다. 이전 커밋의 결과는 새 커밋의 검증 근거로 쓸 수 없습니다.
 
@@ -190,23 +190,23 @@ GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브�
 <a id="development-작업-pr-자동-병합"></a>
 ### development 작업 PR 수동 병합
 
-PR에서 `backend-review-policy` 검사 결과를 확인합니다. 내부 저위험 변경은 최신 커밋의 공식 Codex 무지적 판정, 필수 CI 세 개의 성공, 리뷰 대화 해결 후 병합 권한이 있는 사람이 **Squash and merge**를 누릅니다. 새 커밋에서는 새 판정이 필요합니다.
+운영 전환 뒤에는 PR의 Checks 탭에서 수동 병합 안내를 확인합니다. 내부 저위험 변경은 최신 커밋의 공식 Codex 무지적 판정, 필수 CI 세 개의 성공, 리뷰 대화 해결이 필요합니다. GitHub가 전용 앱의 리뷰를 기본 승인으로 집계하고 `backend-review-policy`가 통과하면 병합 권한이 있는 사람이 **Squash and merge**를 누릅니다. 새 커밋에서는 새 판정이 필요합니다.
 
 | PR 상태 | 수동 병합 조건 |
 |---|---|
-| 내부 저위험 작업 | 팀원 승인을 생략합니다. |
+| 내부 저위험 작업 | 전용 앱이 검증한 최신 커밋을 승인합니다. 사람이 별도로 리뷰할 필요 없이 병합 버튼을 누릅니다. |
 | 중간 위험 또는 저위험 예외 범위 밖의 변경 | 작성자 및 마지막 푸시자와 다른 backend 팀원 한 명이 최신 커밋을 승인해야 합니다. |
 | 고위험 변경 | 독립 팀원 승인과 동일 PR·head·base의 운영 Sol Max 통과가 필요합니다. 보호 경로는 GitHub 팀 승인 규칙도 적용합니다. |
 | Draft, 충돌, 리뷰 지적, CI 미완료, 근거 조회 실패 | 원인을 해결한 뒤 다시 판정합니다. |
 
-승인·대화 변경이나 공식 리뷰 알림 뒤에 보호된 기본 브랜치가 증거를 다시 조회합니다. 정기 재확인과 Actions의 **Development Manual Review** 수동 실행도 지원합니다. 검사는 해당 PR의 head와 base를 부모로 갖는 GitHub 테스트 병합 커밋에 기록합니다.
+보호된 기본 브랜치에서 공식 리뷰·CI 알림 뒤와 15분 간격으로 증거를 다시 조회합니다. 승인이나 대화 해결 직후에는 Actions의 **Development Manual Review**를 직접 실행할 수 있습니다. 독립 승인을 철회하면 GitHub가 즉시 병합을 차단합니다. 고위험 외부 포크는 팀원이 검토할 커밋을 내부 작업 브랜치로 옮겨 CI와 공식 Codex·Sol Max 검사를 다시 받습니다. 검사는 해당 PR의 head와 base를 부모로 갖는 GitHub 테스트 병합 커밋에 기록합니다.
 
 **운영 전환 순서**
 
-1. `main`만 허용하는 환경 `development-review-merge`의 기존 전용 앱에 backend의 Checks 쓰기와 조직 Members 읽기를 설정합니다. 코드는 읽기 권한만 부여합니다.
-2. 기본 브랜치에 워크플로를 배포하고 `DEVELOPMENT_MANUAL_REVIEW=true`를 설정합니다. 기존 전체 승인 규칙이 활성화된 상태에서 저위험 통과와 팀원 승인 대기를 검증합니다.
-3. `Protect development`에 전용 앱을 발행자로 지정한 `backend-review-policy`를 필수로 추가합니다. GitHub가 해당 출처와 결과를 실제로 요구하는지 확인한 뒤 전체 PR에 중복된 승인 수와 마지막 푸시 승인 요건을 옮깁니다. 기존 필수 CI, 최신 base, 대화 해결, 보호 경로 팀 승인과 main 릴리스 규칙은 계속 적용합니다.
-4. 되돌릴 때는 전체 PR의 독립 승인 1명과 마지막 푸시 승인 요건을 먼저 복원하고 필수 검사 지정 및 실행 변수를 해제합니다.
+1. `main`만 허용하는 `development-review-merge` 환경에 전용 앱을 연결합니다. 앱은 backend 한 곳에서 검사를 발행하고 검증된 저위험 PR만 승인합니다.
+2. 기본 브랜치에 워크플로를 배포하고 `DEVELOPMENT_MANUAL_REVIEW=true`를 설정합니다. 시험 PR에서 앱 승인 집계와 철회 시 즉시 차단을 확인합니다.
+3. `Protect development`에서 전용 앱을 발행자로 지정한 `backend-review-policy`를 필수로 추가합니다. 기존의 전체 승인 1건, 마지막 푸시자 외 승인, 보호 경로 팀 승인, 필수 CI 세 개와 대화 해결 요건을 계속 적용합니다. 승인 규칙의 전용 앱 병합 예외는 제거합니다.
+4. 운영 중단 시 앱이 발행한 유효 저위험 승인을 먼저 철회하고 실행 변수와 추가 필수 검사 지정을 해제합니다. `development → main`은 기존 릴리스 절차를 따릅니다.
 
 ## 7. 완료 확인
 
