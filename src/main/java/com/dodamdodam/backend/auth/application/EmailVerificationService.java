@@ -88,14 +88,17 @@ public class EmailVerificationService {
             var input = new VerifyEmailCodeRequest(id, readCode.get());
             var initial = found.orElseThrow(EmailVerificationException::invalid);
             if (current != null) {
-                // 타 계정의 challenge ID로 그 계정의 예산을 소진할 수 없게 한다.
+                // 타인에게 속하거나 이미 폐기된 권한은 대상 예산을 예약하기 전에 거절한다.
                 requirePinBinding(initial, current);
+                if (initial.invalidatedAt() != null) {
+                    throw EmailVerificationException.authorizationRequired(initial.purpose());
+                }
             }
             var subjectKey = rateHasher.emailVerifySubject(initial.purpose(), initial.email(), initial.setupAccountId());
             reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey));
 
             var pending = PendingGrant.from(id, initial, current);
-            var check = work.execute(status -> verifyLocked(input, pending));
+            var check = work.execute(status -> verifyLocked(input, pending, initial));
             if (check == null) {
                 throw new AuthStateUnavailableException();
             }
@@ -127,18 +130,23 @@ public class EmailVerificationService {
         }
     }
 
-    /** 상위 권한과 challenge를 순서대로 잠근 뒤 같은 행에서 번호 검증을 완료한다. */
-    private CodeCheck verifyLocked(VerifyEmailCodeRequest input, PendingGrant pending) {
+    /** 재설정 오답은 challenge만 잠그고, 발급 후보는 상위 권한도 먼저 잠근다. */
+    private CodeCheck verifyLocked(VerifyEmailCodeRequest input, PendingGrant pending, Challenge initial) {
         var current = pending.current();
-        var challenge = lockChallenge(pending);
+        var codeHash = keys.codeHasher().hash(input.code());
+        boolean wrongReset = initial.purpose() == Purpose.RESET_PASSWORD
+            && (!MessageDigest.isEqual(initial.codeHash(), codeHash) || !initial.eligible());
+        var challenge = wrongReset
+            ? repository.lockChallenge(input.challengeId()).orElseThrow(EmailVerificationException::invalid)
+            : lockChallenge(pending);
         var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
         if (challenge.invalidatedAt() != null || challenge.verifiedAt() != null
             || challenge.attemptCount() >= MAX_WRONG_CODES || !now.isBefore(challenge.expiresAt())) {
             throw EmailVerificationException.invalid();
         }
-        boolean matches = MessageDigest.isEqual(challenge.codeHash(), keys.codeHasher().hash(input.code()));
+        boolean matches = MessageDigest.isEqual(challenge.codeHash(), codeHash);
         // 공개 decoy에도 일반 오답과 같은 제한을 적용하되 성공 상태는 만들지 않는다.
-        if (!matches || !challenge.eligible()) {
+        if (!matches || !challenge.eligible() || wrongReset) {
             int attempts = challenge.attemptCount() + 1;
             boolean exhausted = attempts == MAX_WRONG_CODES;
             repository.recordWrongCode(input.challengeId(), attempts, exhausted ? now : null);

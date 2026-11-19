@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.io.IOException;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -57,7 +58,7 @@ public class EmailVerificationController {
     }
 
     /** 인증번호 원문을 MVC 인자에 노출하지 않고 검증 서비스로 넘긴다. */
-    @PostMapping("/api/v1/auth/email-verifications/verify")
+    @PostMapping(value = "/api/v1/auth/email-verifications/verify", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, VerificationGrantResponse> verify(HttpServletRequest request) throws IOException {
         JsonNode body;
         try {
