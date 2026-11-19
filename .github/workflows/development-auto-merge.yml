@@ -8,11 +8,6 @@ on:
     # 승인·대화 해결 뒤의 재평가와 GitHub 이벤트 누락을 보완한다.
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
-    inputs:
-      number:
-        description: 다시 판정할 development PR 번호
-        required: true
-        type: number
 
 permissions: {}
 
@@ -33,14 +28,10 @@ jobs:
       - id: list
         env:
           GH_TOKEN: ${{ github.token }}
-          NUMBER: ${{ inputs.number }}
         run: |
-          if [[ "$NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-            echo "numbers=[$NUMBER]" >> "$GITHUB_OUTPUT"
-          else
-            numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | .number]')
-            echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
-          fi
+          # 대기 실행이 새 요청으로 합쳐져도 모든 열린 PR을 다시 확인한다.
+          numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | .number]')
+          echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
 
   review:
     needs: candidates

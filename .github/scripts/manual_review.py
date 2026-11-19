@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from urllib.parse import quote
 
 from notify_pr_review import latest_codex_summary, review_state
@@ -165,7 +166,8 @@ def existing_check(root, sha, name):
 
 
 def publish(root, sha, name, identity, result, title, summary, prior, token):
-    if prior and prior["conclusion"] == result and prior["output"]["title"] == title and prior.get("external_id") == identity:
+    if (prior and prior["conclusion"] == result and prior["output"]["title"] == title
+            and prior["output"].get("summary") == summary and prior.get("external_id") == identity):
         return
     payload = {"name": name, "status": "completed", "conclusion": result, "external_id": identity,
                "output": {"title": title, "summary": summary}}
@@ -179,26 +181,51 @@ def reconcile_app_approval(url, head, identity, low_risk, token):
     """일반 승인은 GitHub가 직접 강제한다. 앱은 자기 저위험 승인만 관리한다."""
     marker = f"<!-- {identity} -->"
     reviews = api(f"{url}/reviews?per_page=100", paginate=True)
-    active = [r for r in reviews if r["user"]["id"] == APP_BOT_ID and r["user"]["type"] == "Bot"
-              and r["state"] == "APPROVED"]
-    approved = False
-    for review in active:
+    own = [r for r in reviews if r["user"]["id"] == APP_BOT_ID and r["user"]["type"] == "Bot"]
+    # 같은 커밋에서 철회한 승인은 다시 발행하지 않는다.
+    low_risk = low_risk and not any(r["state"] == "DISMISSED" and r["commit_id"] == head for r in own)
+    approved = None
+    for review in (r for r in own if r["state"] == "APPROVED"):
         if low_risk and review["commit_id"] == head and (review.get("body") or "").startswith(marker):
-            approved = True
+            approved = review
         else:
             api(f"{url}/reviews/{review['id']}/dismissals",
                 {"message": "현재 커밋과 검토 근거에 대한 저위험 조건을 다시 확인해야 합니다."},
                 method="PUT", token=token)
     if low_risk and not approved:
-        api(f"{url}/reviews", {"event": "APPROVE", "commit_id": head,
+        approved = api(f"{url}/reviews", {"event": "APPROVE", "commit_id": head,
             "body": marker + "\n최신 Codex 무지적, 필수 CI와 저위험 변경을 확인했습니다. 병합은 팀원이 직접 실행합니다."},
             token=token)
+    return approved
+
+
+def app_vote_counts(review, head):
+    if not review:
+        return False
+    query = """query($id:ID!){node(id:$id){... on PullRequestReview {
+        authorCanPushToRepository state commit{oid}
+    }}}"""
+    vote = api("graphql", {"query": query, "variables": {"id": review["node_id"]}})["data"]["node"]
+    return bool(vote and vote["authorCanPushToRepository"] is True and vote["state"] == "APPROVED"
+                and vote["commit"]["oid"] == head)
+
+
+def policy_active(root):
+    # 필수 검사 지정 전에는 앱 승인만으로 기본 요건을 채울 수 있다.
+    rules = api(f"{root}/rules/branches/development", paginate=True)
+    native = any(r["type"] == "pull_request" and r["parameters"].get("required_approving_review_count", 0) >= 1
+                 and r["parameters"].get("require_last_push_approval") is True for r in rules)
+    return native and any(c.get("context") == CHECK and c.get("integration_id") == APP_ID
+                          for r in rules if r["type"] == "required_status_checks" for c in r["parameters"]["required_status_checks"])
 
 
 def report(repo, number, *, token=None):
     root = f"repos/{repo}"
     url = f"{root}/pulls/{number}"
     pr = api(url)
+    if pr.get("mergeable") is None and pr["state"] == "open" and pr["base"]["ref"] == "development":
+        time.sleep(2)
+        pr = api(url)
     if pr["state"] != "open" or pr["base"]["ref"] != "development":
         return
     head, base = pr["head"]["sha"], pr["base"]["sha"]
@@ -210,11 +237,19 @@ def report(repo, number, *, token=None):
         title = "Draft · 검토 준비 대기" if pr.get("draft") else "GitHub 병합 상태 확인 · 충돌 여부 확인"
         print(f"PR #{number} · {title}")
         if token:
+            advisory = existing_check(root, head, info)
+            # 병합 ref가 사라져도 마지막으로 발행했던 필수 검사를 닫는다.
+            old = re.search(r"test merge `([a-f0-9]{40})`", (advisory or {}).get("output", {}).get("summary") or "")
+            for previous in {target, old[1] if old else None} - {None}:
+                check = existing_check(root, previous, CHECK)
+                if check and check.get("external_id") == identity:
+                    publish(root, previous, CHECK, identity, "action_required", title, summary, check, token)
             publish(root, head, info, identity, "action_required", title, summary,
-                    existing_check(root, head, info), token)
+                    advisory, token)
             reconcile_app_approval(url, head, identity, False, token)
         return
     # 동일한 head를 쓰는 다른 PR이나 이전 base에 성공 판정을 발행하지 않는다.
+    summary += f" · test merge `{target}`"
     ref = f"{root}/git/ref/pull/{number}/merge"
     if (api(ref)["object"]["sha"] != target or
             [p["sha"] for p in api(f"{root}/git/commits/{target}")["parents"]] != [base, head]):
@@ -260,13 +295,21 @@ def report(repo, number, *, token=None):
         return
     try:
         low_risk = bool(decision and result == "success" and decision[0] == "low")
-        reconcile_app_approval(url, head, identity, low_risk, token)
+        if result == "success" and not policy_active(root):
+            low_risk = False
+            result, title = "action_required", "전용 앱 필수 검사와 GitHub 기본 승인 요건 확인 필요"
+        vote = reconcile_app_approval(url, head, identity, low_risk, token)
         if low_risk:
             # 리뷰 등록 성공과 브랜치 규칙의 실제 승인 집계는 다를 수 있다.
             current = pull_reviews(repo, number)
-            if not (current and current["reviewDecision"] == "APPROVED" and current["headRefOid"] == head
-                    and current["baseRefOid"] == base and not current.get("autoMergeRequest")):
+            if not (current and current["headRefOid"] == head and current["baseRefOid"] == base
+                    and not current.get("autoMergeRequest") and current["reviewDecision"] in {None, "APPROVED"}):
                 result, title = "action_required", "GitHub 기본 승인 집계와 현재 리뷰 상태 확인 필요"
+            elif not (current["reviewDecision"] == "APPROVED" and app_vote_counts(vote, head)):
+                if team_approved(repo, latest, token, latest_opinions(repo, number)):
+                    title = "독립된 팀원 승인 확인 · 수동 병합 가능"
+                else:
+                    result, title = "action_required", "앱 승인 미집계 또는 철회 · 독립된 backend 팀원 승인 필요"
     except (RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
         result, title = "action_required", "전용 앱 승인 상태 재확인 필요"
     publish(root, target, CHECK, identity, result, title, summary, prior, token)

@@ -164,6 +164,7 @@ class ManualReviewTests(unittest.TestCase):
             review = {"headRefOid": SHA, "baseRefOid": BASE_SHA, "reviewDecision": "APPROVED" if counted else "REVIEW_REQUIRED"}
             with self.subTest(parents=parents, base=base, counted=counted, shared=shared), patch.object(merge, "api", side_effect=api) as calls, \
                     patch.object(merge, "pull_reviews", return_value=review), \
+                    patch.object(merge, "app_vote_counts", return_value=counted), patch.object(merge, "policy_active", return_value=True), \
                     patch.object(merge, "evaluate", return_value=(("low", SHA, BASE_SHA), "허용")):
                 merge.report(REPO, 12, token="checks-only")
                 writes = [c for c in calls.call_args_list if len(c.args) > 1]
@@ -217,3 +218,37 @@ class ManualReviewTests(unittest.TestCase):
             self.assertIsNone(decision)
             self.assertIn("내부 브랜치", reason)
             paid.assert_not_called()
+
+    def test_dismissed_app_review_stays_dismissed_for_same_commit(self):
+        own = {"state": "DISMISSED", "commit_id": SHA, "user": {"id": merge.APP_BOT_ID, "type": "Bot"}}
+        with patch.object(merge, "api", return_value=[own]) as api:
+            self.assertIsNone(merge.reconcile_app_approval("pull", SHA, "proof", True, "app"))
+            api.assert_called_once()
+
+    def test_specific_app_vote_requires_push_access_and_current_head(self):
+        row = {"state": "APPROVED", "commit": {"oid": SHA}, "authorCanPushToRepository": True}
+        for changes, expected in (({}, True), ({"authorCanPushToRepository": False}, False),
+                                  ({"state": "DISMISSED"}, False), ({"commit": {"oid": BASE_SHA}}, False)):
+            with patch.object(merge, "api", return_value={"data": {"node": row | changes}}):
+                self.assertEqual(merge.app_vote_counts({"node_id": "review"}, SHA), expected)
+
+    def test_rollout_requires_source_bound_check_and_native_approval(self):
+        def rules(app, native):
+            return [{"type": "pull_request", "parameters": {"required_approving_review_count": 1, "require_last_push_approval": native}},
+                    {"type": "required_status_checks", "parameters": {
+                "required_status_checks": [{"context": merge.CHECK, "integration_id": app}]}}]
+        for source, native, expected in ((0, True, False), (merge.APP_ID, False, False), (merge.APP_ID, True, True)):
+            with patch.object(merge, "api", return_value=rules(source, native)):
+                self.assertEqual(merge.policy_active("repo"), expected)
+
+    def test_unknown_merge_state_invalidates_previous_required_check(self):
+        target = "c" * 40
+        prior = {"id": 4, "conclusion": "success", "output": {"title": "통과"},
+                 "external_id": f"manual-review:12:{BASE_SHA}:{SHA}"}
+        info = prior | {"id": 5, "output": {"title": "통과", "summary": f"test merge `{target}`"}}
+        with patch.object(merge, "api", return_value=PR | {"mergeable": None, "merge_commit_sha": None}), \
+                patch.object(merge.time, "sleep"), patch.object(merge, "existing_check", side_effect=[info, prior]), \
+                patch.object(merge, "reconcile_app_approval") as reconcile, patch.object(merge, "publish") as publish:
+            merge.report(REPO, 12, token="app")
+            self.assertEqual(publish.call_args_list[0].args[1:5], (target, merge.CHECK, prior["external_id"], "action_required"))
+            self.assertFalse(reconcile.call_args.args[3])
