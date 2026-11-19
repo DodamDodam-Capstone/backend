@@ -28,6 +28,12 @@ public final class EmailVerificationException extends RuntimeException {
         return new EmailVerificationException(field);
     }
 
+    /** 번호나 토큰이 유효하지 않은 이유를 외부에서 구분할 수 없게 한다. */
+    public static EmailVerificationException invalid() {
+        return new EmailVerificationException(400, "VERIFICATION_INVALID",
+            "이메일 인증 정보를 다시 확인해 주세요.", List.of());
+    }
+
     /** HTTP 오류 연결에 사용할 고정 검증 코드를 반환한다. */
     public String code() {
         return code;

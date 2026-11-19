@@ -60,6 +60,18 @@ public final class AuthRateLimitKeyHasher {
         return List.of(subjectKey, hash(Action.EMAIL_SEND_IP, addressScope(clientAddress)), resendKey);
     }
 
+    /** challenge의 존재 여부와 무관하게 검증 전에 실제 연결 IP를 예약한다. */
+    public AuthRateLimitKey emailVerifyIp(InetAddress address) {
+        return hash(Action.EMAIL_VERIFY_IP, addressScope(address));
+    }
+
+    /** 재발급·세션 교체 뒤에도 목적별 이메일 또는 계정에 같은 검증 예산을 적용한다. */
+    public AuthRateLimitKey emailVerifySubject(Purpose purpose, String email, UUID accountId) {
+        String subject = accountId == null ? email : accountId.toString();
+
+        return hash(Action.EMAIL_VERIFY_SUBJECT, purpose.name(), subject);
+    }
+
     /** 같은 IP의 축약 표기가 달라도 주소 바이트가 같으면 같은 예산을 사용한다. */
     private String addressScope(InetAddress address) {
         if (address == null) {
