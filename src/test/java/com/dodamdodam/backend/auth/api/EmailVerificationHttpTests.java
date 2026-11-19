@@ -515,6 +515,179 @@ class EmailVerificationHttpTests {
                 Boolean.class, id)).isTrue();
     }
 
+    private static final String PIN_SETUP_PATH = "/api/v1/guardian/pin";
+
+    @Test void guardianPinSetupConsumesWinnerAndClearsOnlyThisAccountsPendingPinProofs() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var winner = pinChallenge(owner, "PIN_SETUP");
+        String token = issuedToken(winner, csrf);
+        var secondContext = UUID.randomUUID();
+        jdbc.update("INSERT INTO session_security(id,account_id,session_version) VALUES(?,?,0)", secondContext, owner.account());
+        var sibling = pinChallenge(new Fixture(owner.account(), secondContext, ""), "PIN_SETUP");
+        var reset = pinChallenge(owner, "PIN_SETUP");
+        jdbc.update("UPDATE email_verifications SET purpose='PIN_RESET', pin_version_snapshot=1 WHERE id=?", reset);
+        var unrelated = pinChallenge(fixture(false), "PIN_SETUP");
+        var publicId = publicChallenge(true, false);
+
+        var response = send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf));
+        assertThat(response.statusCode()).isEqualTo(204);
+        assertThat(response.body()).isEmpty();
+        String hash = jdbc.queryForObject("SELECT pin_hash FROM guardian_pins WHERE account_id=?", String.class, owner.account());
+        assertThat(hash).startsWith("$argon2id$v=19$m=19456,t=2,p=1$");
+        var encoder = new org.springframework.security.crypto.argon2.Argon2PasswordEncoder(16, 32, 1, 19456, 2);
+        assertThat(encoder.matches("0012", hash)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT pin_version FROM guardian_pins WHERE account_id=?", Long.class,
+                owner.account())).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("""
+                SELECT guardian_unlocked_until IS NULL AND guardian_pin_version IS NULL FROM session_security WHERE id=?
+                """, Boolean.class, owner.context())).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT token_consumed_at IS NOT NULL AND invalidated_at IS NULL FROM email_verifications WHERE id=?
+                """, Boolean.class, winner)).isTrue();
+        assertThat(jdbc.queryForList("SELECT id FROM email_verifications WHERE invalidated_at IS NOT NULL", UUID.class))
+                .containsExactlyInAnyOrder(sibling, reset);
+        assertThat(jdbc.queryForList("SELECT id FROM email_verifications WHERE token_consumed_at IS NULL AND invalidated_at IS NULL",
+                UUID.class)).contains(unrelated, publicId);
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf)), 409, "PIN_ALREADY_SET");
+    }
+
+    @Test void guardianPinSetupDistinguishesMissingProofFromMalformedInput() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        assertError(send(post(PIN_SETUP_PATH, "{\"pin\":\"0012\"}", csrf)), 403, "PIN_SETUP_AUTHORIZATION_REQUIRED");
+        for (String body : List.of("{\"pin\":\"0012\",\"verificationToken\":null}", "{\"pin\":12}",
+                "{\"pin\":\"１２３４\"}", "{\"pin\":\"0123\\n\"}", "{\"pin\":\"1234\",\"extra\":true}",
+                "{\"pin\":\"1234\",\"pin\":\"0000\"}", "{\"pin\":\"0000\",\"verificationToken\":\"bad\"}")) {
+            assertError(send(post(PIN_SETUP_PATH, body, csrf)), 400, "VALIDATION_FAILED");
+        }
+        String wrong = UUID.randomUUID() + "." + "A".repeat(43);
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(wrong), csrf)), 400, "VERIFICATION_INVALID");
+        var existing = fixture(true);
+        assertError(send(post(PIN_SETUP_PATH, "{\"pin\":\"0012\"}", csrf(existing.cookie()))), 409, "PIN_ALREADY_SET");
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(wrong), csrf(existing.cookie()))), 409, "PIN_ALREADY_SET");
+        assertError(send(post(PIN_SETUP_PATH, "{\"pin\":\"0012\",\"verificationToken\":null}", csrf(existing.cookie()))),
+                400, "VALIDATION_FAILED");
+    }
+
+    @Test void guardianPinSetupKeepsTransportCsrfAndAuthenticationOrder() throws Exception {
+        assertError(send(HttpRequest.newBuilder(uri(PIN_SETUP_PATH)).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(" ".repeat(16385))).build()), 413, "REQUEST_TOO_LARGE");
+        assertError(send(HttpRequest.newBuilder(uri(PIN_SETUP_PATH)).header("Content-Type", "text/plain")
+                .POST(HttpRequest.BodyPublishers.ofString("x")).build()), 415, "UNSUPPORTED_MEDIA_TYPE");
+        assertError(send(HttpRequest.newBuilder(uri(PIN_SETUP_PATH)).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{}")).build()), 403, "CSRF_INVALID");
+        assertError(send(post(PIN_SETUP_PATH, "{", csrf(""))), 401, "AUTHENTICATION_REQUIRED");
+    }
+
+    @Test void guardianPinSetupRejectsWrongPurposeAndLostAuthority() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        String signup = issuedToken(publicChallenge(true, false), csrf);
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(signup), csrf)), 400, "VERIFICATION_INVALID");
+        var id = pinChallenge(owner, "PIN_SETUP");
+        String token = issuedToken(id, csrf);
+        var other = fixture(false);
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf(other.cookie()))), 403, "PIN_SETUP_AUTHORIZATION_REQUIRED");
+        jdbc.update("UPDATE session_security SET setup_generation=setup_generation+1 WHERE id=?", owner.context());
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf)), 403, "PIN_SETUP_AUTHORIZATION_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM guardian_pins", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT token_consumed_at IS NULL FROM email_verifications WHERE id=?", Boolean.class, id)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"expired", "consumed", "invalidated"})
+    void guardianPinSetupChecksBindingBeforeExpiryOrConsumption(String state) throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var id = pinChallenge(owner, "PIN_SETUP");
+        String token = issuedToken(id, csrf);
+        switch (state) {
+            case "expired" -> jdbc.update("""
+                    UPDATE email_verifications SET created_at=clock_timestamp()-interval '12 minutes',
+                        verified_at=clock_timestamp()-interval '11 minutes', token_expires_at=clock_timestamp()-interval '1 minute'
+                    WHERE id=?
+                    """, id);
+            case "consumed" -> jdbc.update("UPDATE email_verifications SET token_consumed_at=clock_timestamp() WHERE id=?", id);
+            case "invalidated" -> jdbc.update("UPDATE email_verifications SET invalidated_at=clock_timestamp() WHERE id=?", id);
+            default -> throw new AssertionError(state);
+        }
+        var anotherContext = UUID.randomUUID();
+        jdbc.update("INSERT INTO session_security(id,account_id,session_version) VALUES(?,?,0)", anotherContext, owner.account());
+        var otherSession = sessionFixture(owner.account(), anotherContext);
+        assertError(send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf(otherSession.cookie()))),
+                403, "PIN_SETUP_AUTHORIZATION_REQUIRED");
+        var response = send(post(PIN_SETUP_PATH, pinSetupBody(token), csrf));
+        if (state.equals("invalidated")) {
+            assertError(response, 403, "PIN_SETUP_AUTHORIZATION_REQUIRED");
+        } else {
+            assertError(response, 400, "VERIFICATION_INVALID");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM guardian_pins", Long.class)).isZero();
+    }
+
+    @Test void guardianPinSetupWithConcurrentRequestsCreatesOnePin() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var request = post(PIN_SETUP_PATH, pinSetupBody(issuedToken(pinChallenge(owner, "PIN_SETUP"), csrf)), csrf);
+        var first = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        var second = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        var responses = List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+        assertThat(responses).extracting(java.net.http.HttpResponse::statusCode).containsExactlyInAnyOrder(204, 409);
+        assertError(responses.stream().filter(r -> r.statusCode() == 409).findFirst().orElseThrow(), 409, "PIN_ALREADY_SET");
+    }
+
+    @Test void guardianPinSetupChecksTokenExpiryAfterWaitingForSiblingProofLock() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var winner = pinChallenge(owner, "PIN_SETUP");
+        var sibling = pinChallenge(owner, "PIN_SETUP");
+        var request = post(PIN_SETUP_PATH, pinSetupBody(issuedToken(winner, csrf)), csrf);
+        jdbc.update("UPDATE email_verifications SET token_expires_at=clock_timestamp()+interval '4 seconds' WHERE id=?", winner);
+
+        var pending = new TransactionTemplate(transactions).execute(tx -> {
+            jdbc.queryForObject("SELECT id FROM email_verifications WHERE id=? FOR UPDATE", UUID.class, sibling);
+            int blocker = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+            var response = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            // 실제 잠금 대기를 확인한 뒤 DB 시각이 토큰 만료선을 넘을 때까지 형제 행을 잡는다.
+            var wait = org.awaitility.Awaitility.await().atMost(Duration.ofSeconds(8));
+            wait.until(() -> jdbc.queryForObject("""
+                    SELECT EXISTS (SELECT FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))
+                    """, Boolean.class, blocker));
+            wait.until(() -> jdbc.queryForObject("""
+                    SELECT clock_timestamp() >= token_expires_at FROM email_verifications WHERE id=?
+                    """, Boolean.class, winner));
+            return response;
+        });
+        assertError(pending.get(10, TimeUnit.SECONDS), 400, "VERIFICATION_INVALID");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM guardian_pins", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT token_consumed_at IS NULL FROM email_verifications WHERE id=?", Boolean.class, winner)).isTrue();
+    }
+
+    @Test void guardianPinSetupRollsBackAllWritesAndAllowsRetry() throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var id = pinChallenge(owner, "PIN_SETUP");
+        String token = issuedToken(id, csrf);
+        pinChallenge(owner, "PIN_SETUP");
+        var request = post(PIN_SETUP_PATH, pinSetupBody(token), csrf);
+        // 형제 증명 폐기에서 DB 오류가 나면 먼저 쓴 PIN과 승자 소비도 롤백되어야 한다.
+        jdbc.execute("ALTER TABLE email_verifications ADD CONSTRAINT test_pin_invalidation CHECK (invalidated_at IS NULL) NOT VALID");
+        try {
+            assertError(send(request), 503, "AUTH_STATE_UNAVAILABLE");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM guardian_pins", Long.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT token_consumed_at IS NULL FROM email_verifications WHERE id=?", Boolean.class, id)).isTrue();
+        }
+        finally {
+            jdbc.execute("ALTER TABLE email_verifications DROP CONSTRAINT test_pin_invalidation");
+        }
+        assertThat(send(request).statusCode()).isEqualTo(204);
+    }
+
+    private String pinSetupBody(String token) {
+        return "{\"pin\":\"0012\",\"verificationToken\":\"" + token + "\"}";
+    }
+
     private void assertConsumeError(String token, Purpose purpose, AuthenticatedSession current, int status, String code) {
         assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(tx ->
                 verification.consume(token, purpose, current)))
@@ -562,6 +735,10 @@ class EmailVerificationHttpTests {
         jdbc.update("INSERT INTO accounts(id,email) VALUES(?,?)",account,account+"@example.invalid");
         jdbc.update("INSERT INTO session_security(id,account_id,session_version) VALUES(?,?,0)",contextId,account);
         if(pin) { jdbc.update("INSERT INTO guardian_pins(account_id,pin_hash) VALUES(?,'synthetic-hash')",account); }
+        return sessionFixture(account, contextId);
+    }
+
+    private Fixture sessionFixture(UUID account, UUID contextId) {
         Session session=sessions.createSession(); session.setMaxInactiveInterval(Duration.ofSeconds(-1));
         var security=SecurityContextHolder.createEmptyContext();
         security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(account.toString(),null,List.of(new SimpleGrantedAuthority("ROLE_USER"))));

@@ -124,6 +124,17 @@ public class EmailVerificationRepository {
         return readChallenge(id, false);
     }
 
+    /** 최초 PIN 설정에서 소비하거나 폐기할 행을 ID 순서로 잠근 뒤 기한을 판정한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockPinSetupProofs(UUID accountId, UUID presentedId) {
+        jdbc.queryForList("""
+                SELECT id FROM email_verifications
+                WHERE setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                  AND (id = ? OR (token_consumed_at IS NULL AND invalidated_at IS NULL))
+                ORDER BY id FOR UPDATE
+                """, UUID.class, accountId, presentedId);
+    }
+
     /** 같은 번호 검증·토큰 소비를 직렬화하며 PIN의 상위 잠금 뒤에 호출한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<Challenge> lockChallenge(UUID id) {

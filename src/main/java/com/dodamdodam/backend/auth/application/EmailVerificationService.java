@@ -246,6 +246,11 @@ public class EmailVerificationService {
         }
     }
 
+    /** 기존 PIN 유무를 확인하기 전에 요청 토큰의 구조만 검증한다. */
+    public static boolean isTokenFormatValid(String token) {
+        return token != null && TOKEN.matcher(token).matches();
+    }
+
     /** 가입·비밀번호·PIN 업무의 기존 트랜잭션에서만 해당 목적의 토큰을 소비한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public ConsumedVerification consume(String token, Purpose expectedPurpose, AuthenticatedSession current) {
@@ -265,6 +270,9 @@ public class EmailVerificationService {
             }
             requirePinBinding(initial, current);
             lockPinContext(current);
+            if (expectedPurpose == Purpose.PIN_SETUP) {
+                repository.lockPinSetupProofs(current.accountId(), id);
+            }
         }
         // 비밀번호 재설정과 경합해도 계정 잠금을 challenge보다 먼저 얻는다.
         var reset = expectedPurpose == Purpose.RESET_PASSWORD
