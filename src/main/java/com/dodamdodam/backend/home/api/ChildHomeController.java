@@ -34,6 +34,7 @@ public class ChildHomeController {
         var parsedChildId = StartConversationRequest.parseChildId(childId);
         children.requireChildAccess(current.accountId(), parsedChildId);
         var home = homes.getHome(current, parsedChildId);
+        ChildHomeResponseFilter.protect(request, current, parsedChildId);
         return ResponseEntity.ok(Map.of("data", home));
     }
 }

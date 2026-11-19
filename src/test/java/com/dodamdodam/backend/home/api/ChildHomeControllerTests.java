@@ -15,6 +15,7 @@ import com.dodamdodam.backend.child.dto.ChildContext;
 import com.dodamdodam.backend.child.dto.ChildView;
 import com.dodamdodam.backend.child.exception.ChildException;
 import com.dodamdodam.backend.conversation.application.ConversationService;
+import com.dodamdodam.backend.conversation.api.ConversationStartResponseFilter;
 import com.dodamdodam.backend.global.auth.CsrfAccessDeniedHandler;
 import com.dodamdodam.backend.global.config.SecurityConfig;
 import com.dodamdodam.backend.global.config.SessionConfig;
@@ -28,17 +29,28 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
@@ -47,17 +59,23 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.calls;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -69,7 +87,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @EnableConfigurationProperties(ServerProperties.class)
 @Import({SecurityConfig.class, SessionConfig.class, AuthStateErrorHandler.class,
-        CsrfAccessDeniedHandler.class, EmailVerificationKeys.class})
+        CsrfAccessDeniedHandler.class, EmailVerificationKeys.class, ChildHomeControllerTests.ResponseGate.class})
 class ChildHomeControllerTests {
 
     private static final UUID CHILD = UUID.fromString("22222222-2222-4222-8222-222222222222");
@@ -79,6 +97,8 @@ class ChildHomeControllerTests {
     private static final ChildContext CHILD_CONTEXT = new ChildContext(CHILD, "가나", "별이", LocalDate.of(2020, 5, 12),
             List.of("공룡"), "test-character", OffsetDateTime.parse("2026-10-01T06:00:00+09:00"));
     @Autowired private MockMvc mvc;
+    @Autowired private ApplicationContext context;
+    @Autowired private ResponseGate responseGate;
     @MockitoBean private AuthenticatedSessionService authentication;
     @MockitoBean private ChildService children;
     @MockitoBean private ChildHomeService homes;
@@ -94,6 +114,7 @@ class ChildHomeControllerTests {
 
     @BeforeEach
     void prepare() {
+        responseGate.reset();
         // 실제 인증·소유권·DB 서비스 검증은 별도 계약 테스트에서 수행한다.
         when(authentication.requireAuthenticatedSession(any())).thenAnswer(invocation -> {
             HttpServletRequest request = invocation.getArgument(0);
@@ -144,9 +165,76 @@ class ChildHomeControllerTests {
         mvc.perform(get(path(CHILD.toString())).session(browser())).andExpect(status().isOk());
 
         var order = inOrder(authentication, children, homes);
-        order.verify(authentication, atLeastOnce()).requireAuthenticatedSession(any());
+        // 처음의 Security·Controller 검증과 응답 필터의 후속 검증을 구분한다.
+        order.verify(authentication, calls(2)).requireAuthenticatedSession(any());
         order.verify(children).requireChildAccess(CURRENT.accountId(), CHILD);
+        order.verify(homes, calls(1)).getHome(CURRENT, CHILD);
+        order.verify(authentication).requireAuthenticatedSession(any());
         order.verify(homes).getHome(CURRENT, CHILD);
+    }
+
+    @Test
+    void registersHomeFilterOnceBelowSecurityWithoutMovingTheStartFilter() {
+        var order = context.getBean(SecurityFilterProperties.class).getOrder();
+        assertThat(context.getBeansOfType(ChildHomeResponseFilter.class)).hasSize(1);
+        assertThat(context.getBean(ChildHomeResponseFilter.class).getOrder()).isEqualTo(order + 2);
+        assertThat(context.getBean(ConversationStartResponseFilter.class).getOrder()).isEqualTo(order + 1);
+        var security = context.getBean("springSecurityFilterChain", FilterChainProxy.class);
+        assertThat(security.getFilterChains().stream().flatMap(chain -> chain.getFilters().stream()))
+                .noneMatch(ChildHomeResponseFilter.class::isInstance);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MIDNIGHT", "CLOSING", "ENDED", "LINK_REMOVED"})
+    void replacesTheMvcBodyAfterTheControllerSnapshotBecomesStale(String change) throws Exception {
+        var latest = ChildHome.from(CHILD_CONTEXT, change.equals("MIDNIGHT") ? NOW.plusDays(1).withHour(0) : NOW,
+                null, change.equals("CLOSING"));
+        responseGate.afterHome(() -> when(homes.getHome(CURRENT, CHILD)).thenReturn(latest));
+
+        var response = mvc.perform(get(path(CHILD.toString())).session(browser())
+                        .header("Origin", "http://localhost:5173"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+
+        assertThat(object(response, "$.data")).containsEntry("activeConversationId", null);
+        assertThat(object(response, "$.data.availability"))
+                .containsEntry("canEnter", latest.availability().canEnter())
+                .containsEntry("reason", latest.availability().reason())
+                .containsEntry("serviceDate", latest.availability().serviceDate().toString());
+        assertThat(response.getContentAsString()).doesNotContain(ACTIVE.toString());
+        assertThat(response.getContentLength()).isEqualTo(response.getContentAsByteArray().length);
+        assertThat(response.getHeaders("Set-Cookie")).contains("JSESSIONID=synthetic-renewal; Path=/; HttpOnly");
+        assertThat(response.getHeader("Access-Control-Allow-Origin")).isEqualTo("http://localhost:5173");
+        assertHeaders(response);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"REVOKED", "REPLACED", "STORE_FAILED"})
+    void lateAuthenticationFailureRemovesTheMvcSuccessBodyAndRenewalCookie(String kind) throws Exception {
+        responseGate.afterHome(() -> {
+            if (kind.equals("REPLACED")) {
+                doReturn(new AuthenticatedSession(CURRENT.accountId(), UUID.randomUUID()))
+                        .when(authentication).requireAuthenticatedSession(any());
+            } else if (kind.equals("STORE_FAILED")) {
+                doThrow(new AuthStateUnavailableException()).when(authentication).requireAuthenticatedSession(any());
+            } else {
+                doThrow(new InsufficientAuthenticationException("로그인이 필요합니다."))
+                        .when(authentication).requireAuthenticatedSession(any());
+            }
+        });
+
+        var response = mvc.perform(get(path(CHILD.toString())).session(browser())
+                        .header("Origin", "http://localhost:5173"))
+                .andExpect(status().is(kind.equals("STORE_FAILED") ? 503 : 401)).andReturn().getResponse();
+
+        assertError(response, kind.equals("STORE_FAILED") ? "AUTH_STATE_UNAVAILABLE" : "AUTHENTICATION_REQUIRED");
+        assertThat(response.getContentAsString()).doesNotContain("\"data\"", ACTIVE.toString());
+        assertThat(response.getHeaders("Set-Cookie")).noneMatch(value -> value.startsWith("JSESSIONID="));
+        assertThat(response.getHeaders("Set-Cookie")).contains("XSRF-TOKEN=preserved; Path=/");
+        assertThat(response.getHeader("Access-Control-Allow-Origin")).isEqualTo("http://localhost:5173");
+        if (response.getHeader("Content-Length") != null) {
+            assertThat(response.getContentLength()).isEqualTo(response.getContentAsByteArray().length);
+        }
+        verify(homes).getHome(CURRENT, CHILD);
     }
 
     @ParameterizedTest
@@ -267,5 +355,44 @@ class ChildHomeControllerTests {
         assertThat(object(response, "$.error")).containsOnlyKeys("code", "message", "requestId", "fields")
                 .containsEntry("code", code).containsEntry("requestId", response.getHeader("X-Request-ID"));
         assertHeaders(response);
+    }
+
+    /** Controller 반환과 MVC 직렬화 사이에 변경을 삽입하며 실제 endpoint는 추가하지 않는다. */
+    @TestConfiguration(proxyBeanMethods = false)
+    @ControllerAdvice
+    @NullMarked
+    static class ResponseGate implements ResponseBodyAdvice<Object> {
+        private final AtomicReference<@Nullable Runnable> next = new AtomicReference<>();
+        private final JsonMapper json;
+
+        ResponseGate(JsonMapper json) {
+            this.json = json;
+        }
+
+        void afterHome(Runnable change) {
+            assertThat(next.compareAndSet(null, change)).isTrue();
+        }
+
+        void reset() {
+            next.set(null);
+        }
+
+        @Override
+        public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+            return returnType.getContainingClass() == ChildHomeController.class;
+        }
+
+        @Override
+        public @Nullable Object beforeBodyWrite(@Nullable Object body, MethodParameter returnType, MediaType contentType,
+                Class<? extends HttpMessageConverter<?>> converterType, ServerHttpRequest request, ServerHttpResponse response) {
+            var change = next.getAndSet(null);
+            if (change != null) {
+                response.getHeaders().setContentLength(json.writeValueAsBytes(body).length);
+                response.getHeaders().add("Set-Cookie", "JSESSIONID=synthetic-renewal; Path=/; HttpOnly");
+                response.getHeaders().add("Set-Cookie", "XSRF-TOKEN=preserved; Path=/");
+                change.run();
+            }
+            return body;
+        }
     }
 }
