@@ -29,11 +29,12 @@ jobs:
       numbers: ${{ steps.list.outputs.numbers }}
     steps:
       - id: list
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 대기 실행이 새 요청으로 합쳐져도 모든 열린 PR을 다시 확인한다.
-          numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | .number]')
+          # 대상 브랜치가 바뀐 PR의 앱 승인도 회수하도록 모든 열린 PR을 확인한다.
+          numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" | jq -c '[.[][] | .number]')
           echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
 
   review:

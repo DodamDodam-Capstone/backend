@@ -1,6 +1,9 @@
 """수동 병합 검사의 승인 조건과 발행 대상을 검증한다."""
 
 import json
+import os
+import subprocess
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
@@ -322,8 +325,8 @@ class ManualReviewTests(unittest.TestCase):
                 (merge.APP_ID, True, [], {("backend-quality", 9): ok}, head, False),
                 (merge.APP_ID, True, [], {("backend-quality", 15368): ok | {"conclusion": "failure"}}, head, False)):
             with patch.object(merge, "api", return_value=rules(source, native, extra)), \
-                    patch.object(merge, "ci_on_commit", side_effect=[target, head_ci]):
-                self.assertEqual(merge.policy_active("repo", SHA, "merge-sha"), expected)
+                    patch.object(merge, "required_workflow_job", return_value=True), patch.object(merge, "ci_on_commit", side_effect=[target, head_ci]):
+                self.assertEqual(merge.policy_active("repo", SHA, "merge-sha", 12, BASE_SHA), expected)
 
     def test_unknown_merge_state_invalidates_previous_required_check(self):
         target = "c" * 40
@@ -352,3 +355,94 @@ class ManualReviewTests(unittest.TestCase):
         with patch.object(merge, "api", return_value={"check_runs": [
                 row, row | {"id": 2, "conclusion": "success"}, row | {"id": 4, "head_sha": BASE_SHA}]}):
             self.assertEqual(merge.ci_on_commit("repo", SHA), {("backend-quality", 15368): row})
+
+    def test_candidate_step_collects_every_page_and_base_in_one_matrix(self):
+        workflows = Path(merge.__file__).resolve().parents[1] / "workflows"
+        workflow = (workflows / "development-auto-merge.yml").read_text()
+        step = workflow.split("        run: |\n", 1)[1].split("\n\n", 1)[0]
+        # API의 두 페이지와 실제 jq·GITHUB_OUTPUT 형식으로 matrix 입력을 검증한다.
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output"
+            fixture = """gh() {
+                case "$*" in *--jq*|*base=development*) return 1 ;; esac
+                echo '[[{"number":12}],[{"number":24}]]'
+            }
+"""
+            result = subprocess.run(["bash", "-eo", "pipefail", "-c", fixture + step], capture_output=True,
+                                    env=os.environ | {"GITHUB_REPOSITORY": REPO, "GITHUB_OUTPUT": str(output)})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(output.read_text().splitlines(), ["numbers=[12,24]"])
+        signal = (workflows / "review-state-changed.yml").read_text()
+        self.assertNotIn("branches: [development]", signal)
+        self.assertIn("github.event.changes.base.ref.from", signal)
+
+    def test_retargeted_open_pr_dismisses_only_the_apps_vote(self):
+        vote = {"id": 7, "user": {"id": merge.APP_BOT_ID, "type": "Bot"}, "state": "APPROVED",
+                "commit_id": SHA, "body": "<!-- manual-review:12 -->"}
+        human = vote | {"id": 8, "user": {"id": 3, "type": "User"}}
+        retargeted = PR | {"base": {"ref": "main", "sha": BASE_SHA}}
+        with patch.object(merge, "api", side_effect=[retargeted, [human, vote], {}]) as api:
+            merge.report(REPO, 12, token="app")
+            writes = [c for c in api.call_args_list if c.kwargs.get("method") == "PUT"]
+            self.assertEqual([c.args[0] for c in writes], ["repos/org/backend/pulls/12/reviews/7/dismissals"])
+
+    def test_required_job_belongs_to_the_expected_workflow_run(self):
+        root = "repos/org/backend"
+        name = "backend-quality"
+        expected_path = ".github/workflows/ci.yml"
+        canonical = {"backend-quality": "ci", "gitmoji-conventional-title": "pr-title", "jira-issue-key": "jira-key"}
+        checks = {(key, 15368): {"id": i, "head_sha": SHA, "name": key, "status": "completed", "conclusion": "success"}
+                  for i, key in enumerate(canonical, 10)}
+        rules = [{"type": "pull_request", "parameters": {"required_approving_review_count": 1, "require_last_push_approval": True}},
+                 {"type": "required_status_checks", "parameters": {"required_status_checks":
+                    [{"context": merge.CHECK, "integration_id": merge.APP_ID}] + [{"context": key} for key in canonical]}}]
+        for path, attempt, pr_number, job_check, passed in (
+                (expected_path, 1, 12, 10, True), (".github/workflows/other.yml", 1, 12, 10, False),
+                (expected_path, 2, 12, 10, False), (expected_path, 1, 13, 10, False), (expected_path, 1, 12, 99, False)):
+            def read(url, **kwargs):
+                if "/rules/" in url:
+                    return rules
+                ident = int(url.rsplit("/", 1)[1])
+                key = list(canonical)[ident - 10]
+                if "/actions/jobs/" in url:
+                    check = job_check if key == name else ident
+                    return {"id": ident, "run_id": ident, "run_attempt": 1, "head_sha": SHA, "name": key,
+                            "status": "completed", "conclusion": "success",
+                            "check_run_url": f"https://api.github.com/{root}/check-runs/{check}"}
+                return {"id": ident, "run_attempt": attempt if key == name else 1, "event": "pull_request",
+                        "path": path if key == name else f".github/workflows/{canonical[key]}.yml",
+                        "head_sha": SHA, "status": "completed", "conclusion": "success",
+                        "repository": {"full_name": REPO}, "pull_requests": [{"number": pr_number,
+                            "head": {"sha": SHA}, "base": {"ref": "development", "sha": BASE_SHA}}]}
+            with self.subTest(path=path, attempt=attempt, pr=pr_number, job=job_check), \
+                    patch.object(merge, "ci_on_commit", side_effect=[{}, checks]), patch.object(merge, "api", side_effect=read):
+                self.assertEqual(merge.policy_active(root, SHA, "target", 12, BASE_SHA), passed)
+
+    def test_final_changes_and_publication_failure_revoke_the_app_vote(self):
+        target = "c" * 40
+        pr = PR | {"merge_commit_sha": target}
+        def read(url, **kwargs):
+            if "/git/ref/pull/" in url:
+                return {"object": {"sha": target}}
+            if "/git/commits/" in url:
+                return {"parents": [{"sha": BASE_SHA}, {"sha": SHA}]}
+            if "/git/ref/heads/" in url:
+                return {"object": {"sha": BASE_SHA}}
+            return pr
+        view = {"headRefOid": SHA, "baseRefOid": BASE_SHA, "reviewDecision": "APPROVED", "autoMergeAllowed": False}
+        for update, publish_error in [({"reviewDecision": "CHANGES_REQUESTED"}, False),
+                                      ({"autoMergeRequest": {"enabledAt": "now"}}, False),
+                                      ({"autoMergeAllowed": True}, True), ({}, True)]:
+            with self.subTest(update=update, error=publish_error), patch.object(merge, "api", side_effect=read), \
+                    patch.object(merge, "shares_head", return_value=False), patch.object(merge, "existing_check", return_value=None), \
+                    patch.object(merge, "evaluate", return_value=(("low", SHA, BASE_SHA), "허용")), \
+                    patch.object(merge, "policy_active", return_value=True), patch.object(merge, "app_vote_counts", return_value=True), \
+                    patch.object(merge, "pull_reviews", return_value=view | update), patch.object(merge, "reconcile_app_approval") as vote, \
+                    patch.object(merge, "publish", side_effect=RuntimeError("check unavailable") if publish_error else None) as publish:
+                if publish_error:
+                    with self.assertRaisesRegex(RuntimeError, "check unavailable"):
+                        merge.report(REPO, 12, token="app")
+                else:
+                    merge.report(REPO, 12, token="app")
+                    self.assertEqual(publish.call_args_list[0].args[4], "action_required")
+                self.assertEqual([call.args[3] for call in vote.call_args_list], [True, False])
