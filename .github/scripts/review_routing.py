@@ -62,7 +62,56 @@ def protected_reason(path):
     return None
 
 
-def route(*, task, head, paths, ci, review, criteria, only_known_changes):
+def high_risk_reason(current, files):
+    paths = [path for file in files for path in (file["filename"], file.get("previous_filename")) if path]
+    protected = next((f"{rule} · {path}" for path in paths if (rule := protected_reason(path))), None)
+    if protected or current["base"]["ref"] == "main":
+        return protected or "main 릴리스 승인 대상"
+    for file in files:
+        path = file["filename"]
+        if path.startswith("src/main/java/") and path.endswith(".java") and reordered_calls(file.get("patch") or ""):
+            return f"기존 메서드 호출 순서 변경 · {path}"
+    return None
+
+
+def change_risk(pr, files):
+    if high_risk_reason(pr, files):
+        return "high"
+    for row in files:
+        path, patch = row["filename"], row.get("patch") or ""
+        added = [line[1:] for line in patch.splitlines() if line.startswith("+")]
+        removed = [line[1:] for line in patch.splitlines() if line.startswith("-")]
+        if (not patch or row.get("status") not in {"added", "modified"} or row.get("previous_filename")
+                or (len(added), len(removed)) != (row.get("additions"), row.get("deletions"))):
+            return "medium"
+        if path == "README.md" or path.startswith("docs/") and path.endswith(".md"):
+            continue
+        if path.startswith("src/test/java/") and path.endswith(".java"):
+            # 기존 테스트의 설정·데이터·실행 자체를 약화하는 추가 한 줄도 사람이 검토한다.
+            source = "\n".join(added)
+            annotations = set(re.findall(r"@([\w.]+)", source))
+            declaration = re.findall(r"\b(?:class|interface|enum|record)\s+(\w+)", source)
+            if (row["status"] == "added" and path.endswith(("Test.java", "Tests.java"))
+                    and declaration == [path.rsplit("/", 1)[-1][:-5]]
+                    and "Test" in annotations and annotations <= {"Test", "DisplayName"}
+                    and not re.search(r"\b(?:extends|implements|static\s*\{|System|Runtime|assume\w*)\b", source)):
+                continue
+            return "medium"
+        if not (path.startswith(BASE) and path.endswith(".java")):
+            return "medium"
+        # Java 호출·분기·범위의 의미를 단순 문자열만으로 확정할 수 없는 변경은 팀원에게 보낸다.
+        simple_field = r"(?:private |protected |public |static |final )*(?:String|boolean|int|long|double|Integer|Long|Boolean)\s+\w+;"
+        field_edits = all(re.fullmatch(simple_field, line.strip()) for line in added + removed if line.strip())
+        # 호출이 없는 기존 단일 반환식의 리터럴·연산자 변경은 호출 순서를 바꾸지 않는다.
+        simple_return = r"return (?:[\w .+*/<>=!&|%-]+);"
+        return_edit = (len(added) == len(removed) == 1 and patch.count("@@") == 2 and
+                       all(re.fullmatch(simple_return, line.strip()) for line in added + removed))
+        if not (field_edits or return_edit):
+            return "medium"
+    return "low"
+
+
+def route(*, task, head, paths, ci, review, only_known_changes):
     """신호가 누락되면 담당자에게 보낸다. 확정된 결함을 먼저 수정한 뒤 위험도를 다시 판정한다."""
     current = bool(task and head and review and (review.task, review.head) == (task, head))
     if ci == "failed" or (current and review.outcome == "changes" and any(v.strip() for v in review.evidence.values())):
@@ -71,7 +120,7 @@ def route(*, task, head, paths, ci, review, criteria, only_known_changes):
         return "CI 대기"
     if not current or not paths or only_known_changes is not True:
         return "팀원 판단"
-    if review.outcome != "pass" or not criteria or any(not review.evidence.get(key, "").strip() for key in criteria):
+    if review.outcome != "pass":
         return "팀원 판단"
     if review.changed_flow is not False or review.tests_weakened is not False:
         return "팀원 판단"

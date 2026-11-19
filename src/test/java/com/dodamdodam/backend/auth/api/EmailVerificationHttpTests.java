@@ -63,6 +63,8 @@ class EmailVerificationHttpTests {
     @Autowired CookieSerializer cookies;
     @MockitoBean SmtpEmailVerificationSender sender;
     @MockitoSpyBean EmailVerificationKeys keys;
+    @MockitoSpyBean EmailVerificationRepository challenges;
+    @MockitoSpyBean EmailVerificationAccountRepository accounts;
     final HttpClient client=HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
     Fixture fixture;
 
@@ -233,6 +235,36 @@ class EmailVerificationHttpTests {
     }
 
 
+    @ParameterizedTest
+    @ValueSource(strings = {"PIN_SETUP", "PIN_RESET"})
+    void exhaustedPinChallengeRequiresNewAuthorization(String purpose) throws Exception {
+        var owner = fixture(purpose.equals("PIN_RESET"));
+        var id = pinChallenge(owner, purpose);
+        var csrf = csrf(owner.cookie());
+        // 대상 예산의 마지막 요청과 다섯 번째 오답이 겹치도록 준비한다.
+        var key = keys.rateHasher().emailVerifySubject(Purpose.valueOf(purpose), owner.account() + "@example.invalid", owner.account());
+        jdbc.update("""
+                INSERT INTO auth_rate_limits(action,key_hash,window_started_at,attempt_count,expires_at)
+                VALUES(?,?,clock_timestamp(),?,clock_timestamp()+interval '900 seconds')
+                """, key.action().name(), key.keyHash(), key.action().capacity() - 1);
+        jdbc.update("UPDATE email_verifications SET attempt_count=4 WHERE id=?", id);
+        assertError(send(verifyPost(id, "012346", csrf)), 429, "RATE_LIMITED");
+        assertError(send(verifyPost(id, "012345", csrf)), 403, purpose + "_AUTHORIZATION_REQUIRED");
+    }
+
+    @Test void exhaustedVerificationIpStopsBeforeChallengeLookup() throws Exception {
+        var id = publicChallenge(true, false);
+        var request = verifyPost(id, "012346", csrf(""));
+        assertError(send(request), 400, "VERIFICATION_INVALID");
+        jdbc.update("UPDATE auth_rate_limits SET attempt_count=? WHERE action='EMAIL_VERIFY_IP'",
+                Action.EMAIL_VERIFY_IP.capacity());
+        clearInvocations(challenges);
+        assertError(send(request), 429, "RATE_LIMITED");
+        verify(challenges, never()).findChallenge(any());
+        assertThat(jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action='EMAIL_VERIFY_SUBJECT'",
+                Long.class)).isEqualTo(1);
+    }
+
     @Test void fifthWrongCodeReportsTheLongerSubjectWindow() throws Exception {
         var id = publicChallenge(true, false);
         var key = keys.rateHasher().emailVerifySubject(Purpose.SIGNUP, "verify@example.invalid", null);
@@ -320,6 +352,18 @@ class EmailVerificationHttpTests {
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM auth_rate_limits WHERE action='EMAIL_VERIFY_SUBJECT'
                 """, Long.class)).isZero();
+    }
+
+    @Test void unacceptableResponseLeavesTheCodeAvailableForJson() throws Exception {
+        var id = publicChallenge(true, false);
+        var csrf = csrf("");
+        var request = verifyPost(id, "012345", csrf);
+        var plain = HttpRequest.newBuilder(request, (name, value) -> true).header("Accept", "text/plain").build();
+        assertThat(send(plain).statusCode()).isEqualTo(406);
+        assertThat(jdbc.queryForObject("""
+                SELECT verified_at IS NULL AND token_hash IS NULL FROM email_verifications WHERE id=?
+                """, Boolean.class, id)).isTrue();
+        assertThat(issuedToken(id, csrf)).startsWith(id + ".");
     }
 
     @ParameterizedTest
@@ -501,13 +545,8 @@ class EmailVerificationHttpTests {
     }
 
     @Test void passwordResetGrantStopsWorkingWhenAccountVersionChanges() throws Exception {
-        var id = UUID.randomUUID();
         var accountId = UUID.randomUUID();
-        jdbc.update("INSERT INTO accounts(id,email,session_version) VALUES(?,'reset@example.invalid',2)", accountId);
-        jdbc.update("""
-                INSERT INTO email_verifications(id,email,purpose,eligible,code_hash,expires_at,reset_account_id,reset_session_version)
-                VALUES(?,'reset@example.invalid','RESET_PASSWORD',true,?,clock_timestamp()+interval '600 seconds',?,2)
-                """, id, keys.codeHasher().hash("012345"), accountId);
+        var id = resetChallenge(accountId);
         String token = issuedToken(id, csrf(""));
         jdbc.update("UPDATE accounts SET session_version=3 WHERE id=?", accountId);
         assertConsumeError(token, Purpose.RESET_PASSWORD, null, 400, "VERIFICATION_INVALID");
@@ -686,6 +725,59 @@ class EmailVerificationHttpTests {
 
     private String pinSetupBody(String token) {
         return "{\"pin\":\"0012\",\"verificationToken\":\"" + token + "\"}";
+    }
+
+    @Test void changedResetAccountVersionPreventsIssuingToken() throws Exception {
+        var account = UUID.randomUUID();
+        var id = resetChallenge(account);
+        jdbc.update("UPDATE accounts SET session_version=3 WHERE id=?", account);
+        assertError(send(verifyPost(id, "012345", csrf(""))), 400, "VERIFICATION_INVALID");
+        assertThat(jdbc.queryForObject("SELECT verified_at IS NULL AND token_hash IS NULL FROM email_verifications WHERE id=?",
+                Boolean.class, id)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void wrongResetCodeUsesOnlyChallengeState(boolean eligible) throws Exception {
+        UUID id;
+        if (eligible) {
+            var account = UUID.randomUUID();
+            id = resetChallenge(account);
+            jdbc.update("UPDATE accounts SET session_version=session_version+1 WHERE id=?", account);
+        } else {
+            id = publicChallenge(false, false);
+            jdbc.update("UPDATE email_verifications SET purpose='RESET_PASSWORD' WHERE id=?", id);
+        }
+        jdbc.update("UPDATE email_verifications SET attempt_count=3 WHERE id=?", id);
+        var request = verifyPost(id, "012346", csrf(""));
+        assertError(send(request), 400, "VERIFICATION_INVALID");
+        assertError(send(request), 429, "RATE_LIMITED");
+        verify(accounts, never()).findForUpdate(anyString());
+        assertThat(jdbc.queryForObject("""
+                SELECT attempt_count=5 AND invalidated_at IS NOT NULL AND token_hash IS NULL
+                FROM email_verifications WHERE id=?
+                """, Boolean.class, id)).isTrue();
+    }
+
+    @Test void finalGrantCheckRejectsChangedResetAccountVersion() {
+        var account = UUID.randomUUID();
+        var id = resetChallenge(account);
+        var request = new MockHttpServletRequest();
+        verification.verify(request, id, () -> "012345", InetAddress.ofLiteral("192.0.2.10"));
+        jdbc.update("UPDATE accounts SET session_version=3 WHERE id=?", account);
+        assertThatThrownBy(() -> verification.verifyResponseAccess(request))
+                .isInstanceOfSatisfying(EmailVerificationException.class, error ->
+                        assertThat(error.code()).isEqualTo("VERIFICATION_INVALID"));
+    }
+
+    private UUID resetChallenge(UUID accountId) {
+        var id = UUID.randomUUID();
+        jdbc.update("INSERT INTO accounts(id,email,session_version) VALUES(?,'reset@example.invalid',2)", accountId);
+        jdbc.update("""
+                INSERT INTO email_verifications(id,email,purpose,eligible,code_hash,expires_at,reset_account_id,reset_session_version)
+                VALUES(?,'reset@example.invalid','RESET_PASSWORD',true,?,clock_timestamp()+interval '600 seconds',?,2)
+                """, id, keys.codeHasher().hash("012345"), accountId);
+        return id;
     }
 
     private void assertConsumeError(String token, Purpose purpose, AuthenticatedSession current, int status, String code) {

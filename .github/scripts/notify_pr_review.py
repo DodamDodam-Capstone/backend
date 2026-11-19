@@ -5,10 +5,10 @@ import os
 import re
 from pathlib import Path
 
-from review_routing import protected_reason, reordered_calls
+from review_routing import change_risk, high_risk_reason
 
 
-PENDING = ("미판정", "리뷰 대기", "최신 커밋의 SCRUM 완료 조건과 호출 흐름 확인이 필요합니다.",
+PENDING = ("미판정", "리뷰 대기", "최신 커밋의 공식 리뷰와 필수 CI를 기다립니다.",
            "수정 커밋이면 PR 댓글에 @codex review를 남기세요.")
 CODEX_APP_ID = 1144995
 CODEX_BOT_ID = 199175422
@@ -27,18 +27,6 @@ def review_state(body):
             return state
     except (ValueError, KeyError, TypeError):
         pass
-    return None
-
-
-def high_risk_reason(current, files):
-    paths = [path for file in files for path in (file["filename"], file.get("previous_filename")) if path]
-    protected = next((f"{rule} · {path}" for path in paths if (rule := protected_reason(path))), None)
-    if protected or current["base"]["ref"] == "main":
-        return protected or "main 릴리스 승인 대상"
-    for file in files:
-        path = file["filename"]
-        if path.startswith("src/main/java/") and path.endswith(".java") and reordered_calls(file.get("patch") or ""):
-            return f"기존 메서드 호출 순서 변경 · {path}"
     return None
 
 
@@ -73,9 +61,15 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
             action = "리뷰 링크에서 지적을 확인하고 변경 후 수동 재리뷰를 요청하세요."
         elif risk == "높음":
             reason += ". 최신 Codex 리뷰에 미해결 지적이 없습니다."
+        elif codex.get("has_any_findings") is not False:
+            decision, reason, action = ("리뷰 확인", "최신 공식 리뷰의 무지적 판정을 확인할 수 없습니다.",
+                                       "최신 커밋에서 공식 재리뷰를 요청하세요.")
+        elif change_risk(current, files) == "low":
+            risk, decision, reason, action = ("낮음", "필수 검사 확인", "공식 리뷰 무지적이며 보호 경로·호출 순서·테스트 약화 징후가 없습니다.",
+                                              "필수 CI와 대화 해결 후 자동 병합 대상입니다.")
         else:
-            decision, reason, action = ("명세 확인 대기", "최신 Codex 리뷰에 미해결 지적이 없습니다.",
-                                       "SCRUM 완료 조건별 근거와 필수 CI를 확인하세요.")
+            risk, decision, reason, action = ("중간", "팀원 확인", "변경된 호출 흐름 또는 테스트 강도를 자동으로 확인하기 어렵습니다.",
+                                              "독립된 backend 팀원이 최신 커밋을 승인해야 합니다.")
 
     # 체크 이름만 같은 다른 앱이나 같은 SHA를 공유하는 다른 PR의 판정을 제외한다.
     # 같은 커밋도 다시 리뷰할 수 있다. CI 단독 알림이나 미해결 최신 리뷰는 이전 성공으로 덮지 않는다.
@@ -92,7 +86,7 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
                 reason, action = "검증 체크에서 SCRUM 완료 조건 위반을 확인했습니다.", "PR의 지적을 수정한 뒤 재리뷰를 요청하세요."
             elif codex and check.get("conclusion") == "success" and title == "통과" and risk != "높음":
                 risk, decision = "낮음", "리뷰 통과"
-                reason, action = "최신 커밋에서 SCRUM 완료 조건별 근거를 확인했습니다.", "필수 CI와 GitHub 병합 조건을 확인하세요."
+                reason, action = "최신 커밋에 신뢰된 검증 체크의 통과 기록이 있습니다.", "필수 CI와 GitHub 병합 조건을 확인하세요."
             elif title == "팀원 판단" and check.get("conclusion") == "action_required":
                 decision = "팀원 확인"
                 reason, action = "검증 체크에서 팀원 판단을 요청했습니다.", "PR에서 호출 흐름과 검증 근거를 확인하고 승인하세요."
