@@ -13,11 +13,6 @@ on:
 
 permissions: {}
 
-# 같은 테스트 병합 SHA를 공유하는 PR도 한 번에 하나씩만 처리한다.
-concurrency:
-  group: backend-manual-review-publisher
-  cancel-in-progress: false
-
 jobs:
   candidates:
     if: >-
@@ -44,6 +39,10 @@ jobs:
   review:
     needs: candidates
     if: needs.candidates.outputs.numbers != '[]'
+    # 후보를 확인한 작업만 직렬화하고 이미 대기하는 다른 PR 작업을 보존한다.
+    concurrency:
+      group: backend-manual-review-publisher
+      queue: max
     strategy:
       fail-fast: false
       max-parallel: 1
