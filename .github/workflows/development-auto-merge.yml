@@ -1,0 +1,85 @@
+name: Development Review Merge
+
+on:
+  workflow_run:
+    workflows: [Slack Notification]
+    types: [completed]
+  schedule:
+    # 승인·대화 해결 뒤의 재평가와 GitHub 이벤트 누락을 보완한다.
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      number:
+        description: 점검할 development 작업 PR 번호
+        required: true
+        type: number
+
+permissions: {}
+
+jobs:
+  candidates:
+    if: github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' && vars.DEVELOPMENT_REVIEW_MERGE == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      numbers: ${{ steps.list.outputs.numbers }}
+    steps:
+      - id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ inputs.number }}
+        run: |
+          if [[ "$NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "numbers=[$NUMBER]" >> "$GITHUB_OUTPUT"
+          else
+            numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | select(.draft == false and .head.repo.full_name == .base.repo.full_name) | .number]')
+            echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
+          fi
+
+  merge:
+    needs: candidates
+    if: needs.candidates.outputs.numbers != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        number: ${{ fromJSON(needs.candidates.outputs.numbers) }}
+    concurrency:
+      group: development-review-merge-${{ matrix.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: development-review-merge
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      actions: read
+      issues: write
+      statuses: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: DodamDodam-Capstone/integration
+          ref: 37f994f5fbdf18ea1b68ba058d7ab97f5a1c806d
+          path: .automation
+          persist-credentials: false
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.LOW_RISK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LOW_RISK_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: backend
+          permission-contents: write
+          permission-members: read
+      - name: 리뷰 증거와 필수 검사 재확인 후 해당 커밋만 병합
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOW_RISK_TOKEN: ${{ steps.app.outputs.token }}
+          PR_NUMBER: ${{ matrix.number }}
+        run: python3 .github/scripts/auto_merge.py "$PR_NUMBER" --apply

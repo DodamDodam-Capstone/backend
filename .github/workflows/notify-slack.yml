@@ -59,6 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       review_check: ${{ steps.review.outputs.review_check }}
+      clear_proof: ${{ steps.review.outputs.clear_proof }}
     environment: sol-max-review
     timeout-minutes: 35
     permissions:
@@ -90,6 +91,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  attest-clear:
+    needs: deep-review
+    if: needs.deep-review.outputs.clear_proof != ''
+    name: sol-max-clear ${{ needs.deep-review.outputs.clear_proof }}
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '유료 리뷰 통과 확인'
 
   publish-review:
     name: Sol Max 수정 지적을 PR에 게시

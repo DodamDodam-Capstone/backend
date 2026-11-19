@@ -58,6 +58,17 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIsNone(self.run_review())
         self.paid.assert_called_once()
 
+    def test_attests_only_fresh_success_for_this_head_and_base(self):
+        proof = Mock()
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once_with(f"62 {self.sha} {self.pr['base']['sha']} 711")
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once()
+        self.checks.clear()
+        self.paid.return_value = ("action_required", "확인 필요", "근거", [])
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once()
+
     def test_changes_can_retry_publication_without_repeating_payment(self):
         self.paid.return_value = ("failure", "수정 필요", "근거", [{"path": self.file["filename"], "anchor": "R1", "body": "수정"}])
         queue = Mock()
