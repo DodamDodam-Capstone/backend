@@ -87,6 +87,11 @@ class AutoMergeTests(unittest.TestCase):
             with patch.object(merge, "api", data):
                 return merge.paid_clear(REPO, PR)
         self.assertTrue(check_result(check))
+        development = run | {"event": "workflow_dispatch", "head_branch": "development", "head_sha": BASE_SHA}
+        self.assertTrue(check_result(check, development))
+        for bad in ({"head_branch": "feature/test"}, {"head_sha": SHA}, {"event": "pull_request"},
+                    {"path": ".github/workflows/ci.yml"}):
+            self.assertFalse(check_result(check, development | bad))
         for edit in ({"conclusion": "failure"}, {"id": 819}, {"head_sha": BASE_SHA}, {"external_id": "pr-13"}):
             self.assertFalse(check_result(check | edit))
         self.assertFalse(check_result(check, run | {"event": "pull_request"}))

@@ -3,9 +3,11 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 from review_routing import change_risk, high_risk_reason
+from release import api
 
 
 PENDING = ("미판정", "리뷰 대기", "최신 커밋의 공식 리뷰와 필수 CI를 기다립니다.",
@@ -28,6 +30,41 @@ def review_state(body):
     except (ValueError, KeyError, TypeError):
         pass
     return None
+
+
+def latest_codex_summary(comments):
+    """공식 앱이 게시한 요약 중 마지막 기록만 사용한다."""
+    summaries = (row for row in comments if row["user"]["id"] == CODEX_BOT_ID
+                 and (row.get("performed_via_github_app") or {}).get("id") == CODEX_APP_ID
+                 and row["body"].startswith("<!-- codex-pull-request-review-summary -->"))
+    return max(summaries, key=lambda row: (row["updated_at"], row["id"]), default=None)
+
+
+def development_event(repo, number, sha):
+    """보호 브랜치에서 PR을 다시 조회하고 고위험 변경의 최신 공식 완료 기록을 기다린다."""
+    if not re.fullmatch(r"[1-9][0-9]*", number) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("PR 번호와 전체 head SHA가 필요합니다.")
+    root = f"repos/{repo}"
+    pull = f"{root}/pulls/{number}"
+    for attempt in range(40):
+        pr = api(pull)
+        if (pr["state"] != "open" or pr["draft"] or pr["base"]["ref"] != "development"
+                or pr["head"]["sha"] != sha or (pr["head"].get("repo") or {}).get("full_name") != repo):
+            return None
+        if attempt == 0:
+            files = api(f"{pull}/files?per_page=100", paginate=True)
+            if not files or len(files) != pr["changed_files"]:
+                raise RuntimeError("PR 전체 변경 파일을 확인할 수 없습니다.")
+            if not high_risk_reason(pr, files):
+                return None
+        comment = latest_codex_summary(api(f"{root}/issues/{number}/comments?per_page=100", paginate=True))
+        if comment and (review_state(comment["body"]) or {}).get("commit_sha") == sha:
+            # build_payload가 앱·댓글 원문과 현재 PR을 다시 확인한다.
+            return {"repository": {"full_name": repo}, "issue": {"number": int(number), "pull_request": {"url": pr["url"]}},
+                    "comment": comment, "sender": comment["user"]}
+        if attempt < 39:
+            time.sleep(30)
+    raise RuntimeError("최신 커밋의 공식 리뷰가 아직 없습니다. @codex review 완료 후 같은 번호와 SHA로 재실행하세요.")
 
 
 def risk_for_pr(run, pr, get, app_id, codex=None):
@@ -179,6 +216,10 @@ if __name__ == "__main__":
     import notify_workflow_run_to_slack as shared
 
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        event = development_event(os.environ["GITHUB_REPOSITORY"], event["inputs"]["number"], event["inputs"]["sha"])
+        if event is None:
+            raise SystemExit(0)
     def queue_review(sha):
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             print(f"deep_sha={sha}", file=output)

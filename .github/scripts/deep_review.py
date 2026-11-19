@@ -92,7 +92,7 @@ def model_review(data, key):
 
 
 def eligible(pr, repo, sha):
-    return (pr["state"] == "open" and pr["base"]["ref"] == "development"
+    return (pr["state"] == "open" and not pr["draft"] and pr["base"]["ref"] == "development"
             and pr["head"]["sha"] == sha and (pr["head"].get("repo") or {}).get("full_name") == repo)
 
 
