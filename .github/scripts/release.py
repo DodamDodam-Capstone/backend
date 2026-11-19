@@ -31,11 +31,11 @@ def validate_notes(body):
     return body
 
 
-def api(endpoint, payload=None, *, paginate=False):
+def api(endpoint, payload=None, *, paginate=False, method="POST"):
     """인증은 기존 GH_TOKEN에 맡기고 API 실패를 '없음'으로 바꾸지 않는다."""
     command = ["gh", "api", endpoint]
     if payload is not None:
-        command += ["--method", "POST", "--input", "-"]
+        command += ["--method", method, "--input", "-"]
     if paginate:
         command += ["--paginate", "--slurp"]
     result = subprocess.run(command, input=json.dumps(payload) if payload is not None else None,

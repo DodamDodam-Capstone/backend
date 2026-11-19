@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import Path
 
-from review_routing import protected_reason
+from review_routing import protected_reason, reordered_calls
 
 
 PENDING = ("미판정", "리뷰 대기", "최신 커밋의 SCRUM 완료 조건과 호출 흐름 확인이 필요합니다.",
@@ -30,6 +30,18 @@ def review_state(body):
     return None
 
 
+def high_risk_reason(current, files):
+    paths = [path for file in files for path in (file["filename"], file.get("previous_filename")) if path]
+    protected = next((f"{rule} · {path}" for path in paths if (rule := protected_reason(path))), None)
+    if protected or current["base"]["ref"] == "main":
+        return protected or "main 릴리스 승인 대상"
+    for file in files:
+        path = file["filename"]
+        if path.startswith("src/main/java/") and path.endswith(".java") and reordered_calls(file.get("patch") or ""):
+            return f"기존 메서드 호출 순서 변경 · {path}"
+    return None
+
+
 def risk_for_pr(run, pr, get, app_id, codex=None):
     sha = run["head_sha"]
     api = f"https://api.github.com/repos/{run['repository']['full_name']}"
@@ -47,12 +59,11 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
         files.extend(get(f"{url}/files?per_page=100&page={page}"))
     if len(files) != count:
         return "미판정", "팀원 확인", "변경 파일 조회 결과가 불완전합니다.", "팀원이 최신 변경을 확인하세요."
-    paths = [path for file in files for path in (file["filename"], file.get("previous_filename")) if path]
-    protected = next((f"{rule} · {path}" for path in paths if (rule := protected_reason(path))), None)
+    protected = high_risk_reason(current, files)
     risk, decision, reason, action = PENDING
-    if protected or current["base"]["ref"] == "main":
+    if protected:
         risk, decision = "높음", "팀원 확인"
-        reason = protected or "main 릴리스 승인 대상입니다."
+        reason = protected
         action = "작성자와 마지막 푸시자를 제외한 팀원 1명의 승인을 받으세요."
     if codex:
         if codex["has_unresolved_findings"]:
@@ -98,7 +109,7 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
     return risk, decision, reason, action
 
 
-def build_payload(event, token, helper, app_id=""):
+def build_payload(event, token, helper, app_id="", on_high_risk=None):
     codex = None
     if "comment" in event:
         comment, issue = event["comment"], event["issue"]
@@ -141,6 +152,12 @@ def build_payload(event, token, helper, app_id=""):
     else:
         risk, decision, reason, action = "미판정", "PR 확인", "실행과 연결된 PR을 하나로 특정할 수 없습니다.", "실행 링크에서 대상 PR을 확인하세요."
 
+    # 유료 작업에는 공식 완료 이벤트에서 재확인한 내부 PR의 SHA만 전달한다.
+    if (codex and risk == "높음" and on_high_risk and pr.get("state") == "open"
+            and pr["base"]["ref"] in {"main", "development"}
+            and (pr["head"].get("repo") or {}).get("full_name") == repo):
+        on_high_risk(sha)
+
     label = f"PR #{pr['number']}" if pr else "PR"
     key = re.search(r"\bSCRUM-[0-9]{1,10}\b", run["head_branch"])
     header = f"{label} · 위험도 {risk} · {decision}"
@@ -168,6 +185,10 @@ if __name__ == "__main__":
     import notify_workflow_run_to_slack as shared
 
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-    payload = build_payload(event, os.environ["GITHUB_API_TOKEN"], shared, os.getenv("REVIEW_RISK_APP_ID", ""))
+    def queue_review(sha):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            print(f"deep_sha={sha}", file=output)
+
+    payload = build_payload(event, os.environ["GITHUB_API_TOKEN"], shared, os.getenv("REVIEW_RISK_APP_ID", ""), queue_review)
     if payload is not None:
         shared.post_slack(os.environ["SLACK_WEBHOOK_URL"], payload)

@@ -123,6 +123,22 @@ class SlackReviewTests(unittest.TestCase):
         result = build_payload(self.codex_event(), "token", self.helper)
         self.assertIn("높음 · 팀원 확인", result["text"])
 
+    def test_only_official_current_internal_high_risk_review_queues_payment(self):
+        queue = Mock()
+        self.pr.update(state="open", head=self.pr["head"] | {"repo": {"full_name": "org/backend"}})
+        self.files = [{"filename": ".github/workflows/ci.yml"}]
+        event = self.codex_event()
+        build_payload({"workflow_run": self.run}, "token", self.helper, on_high_risk=queue)
+        build_payload(event | {"sender": {"id": 1}}, "token", self.helper, on_high_risk=queue)
+        with unittest.mock.patch.dict(self.pr["head"]["repo"], {"full_name": "fork/backend"}):
+            build_payload(event, "token", self.helper, on_high_risk=queue)
+        queue.assert_not_called()
+        build_payload(event, "token", self.helper, on_high_risk=queue)
+        queue.assert_called_once_with(self.sha)
+        self.files = [{"filename": "README.md"}]
+        build_payload(event, "token", self.helper, on_high_risk=queue)
+        queue.assert_called_once()
+
     def test_official_unresolved_findings_are_actionable(self):
         result = build_payload(self.codex_event(findings=True), "token", self.helper)
         self.assertIn("중간 · 리뷰 지적 확인", result["text"])

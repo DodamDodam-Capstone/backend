@@ -1,6 +1,8 @@
 """SCRUM 리뷰 증거로 다음 담당자를 정한다. 병합 권한이나 GitHub 승인을 발급하지 않는다."""
 
+from collections import Counter
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,28 @@ class Review:
 BASE = "src/main/java/com/dodamdodam/backend/"
 BUILD_FILES = {"build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "compose.yaml"}
 
+FLOW_SERVICES = {BASE + "conversation/application/" + name + ".java" for name in (
+    "TurnAcceptanceService", "TurnResultService", "ConversationClosureCoordinator",
+)}
+
+
+def reordered_calls(patch):
+    """같은 Java 변경 구간에서 양쪽에 한 번씩 등장하는 호출들의 상대 순서를 비교한다."""
+    for hunk in re.split(r"(?m)^@@[^\n]*@@[^\n]*$", patch):
+        before, after = [], []
+        for line in hunk.splitlines():
+            call = re.match(r"^([ +\-])\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*\(", line)
+            if call:
+                if call[1] != "+":
+                    before.append(call[2])
+                if call[1] != "-":
+                    after.append(call[2])
+        old, new = Counter(before), Counter(after)
+        shared = {name for name in old if old[name] == new[name] == 1}
+        if [n for n in before if n in shared] != [n for n in after if n in shared]:
+            return True
+    return False
+
 
 def protected_reason(path):
     parts = path.split("/")
@@ -27,6 +51,8 @@ def protected_reason(path):
         return "CI·리뷰 정책 변경"
     if path.startswith((BASE + "auth/", BASE + "guardian/")):
         return "인증·보호자 권한 처리 변경"
+    if path in FLOW_SERVICES:
+        return "대화 턴 접수·결과 확정·종료 순서 변경"
     if "infrastructure" in parts or path.startswith("src/main/resources/db/"):
         return "영속화·외부 연동 변경"
     if path.startswith(BASE + "global/"):
