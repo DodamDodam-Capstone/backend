@@ -126,7 +126,7 @@ class DeepReviewTests(unittest.TestCase):
         self.file.update(filename="docs/guide.md", previous_filename="AGENTS.md")
         self.assertIn("CI·리뷰", deep.high_risk_reason(self.pr, [self.file]))
 
-    def test_workflow_serializes_each_paid_head_and_only_executes_default_branch_code(self):
+    def test_workflow_serializes_each_paid_head_and_only_executes_trusted_workflow_code(self):
         workflow = (Path(__file__).resolve().parents[1] / "workflows/notify-slack.yml").read_text()
         paid_job, publisher = workflow.split("\n  deep-review:", 1)[1].split("\n  publish-review:", 1)
         self.assertIn("pull-requests: write", publisher)
@@ -134,12 +134,19 @@ class DeepReviewTests(unittest.TestCase):
         self.assertNotIn("checks: write", publisher)
         self.assertIn("ref: ${{ github.workflow_sha }}", publisher)
         for guard in ("needs.notify.outputs.deep_sha != ''", "environment: sol-max-review",
-                      "group: sol-max-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}",
+                      "group: sol-max-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}",
                       "cancel-in-progress: false", "ref: ${{ github.workflow_sha }}", "checks: write"):
             self.assertIn(guard, paid_job)
         self.assertIn("timeout-minutes: 35", paid_job)
         self.assertNotIn("pull-requests: write", paid_job)
         self.assertNotIn("pull_request_target", workflow)
+        self.assertIn("github.ref == 'refs/heads/development' && github.ref_protected", workflow)
+        ci = (Path(__file__).resolve().parents[1] / "workflows/ci.yml").read_text()
+        relay = ci.split("  request-development-review:", 1)[1].split("  quality:", 1)[0]
+        self.assertIn("pull_request.head.repo.full_name == github.repository", relay)
+        self.assertIn("--ref development", relay)
+        self.assertNotIn("actions/checkout", relay)
+        self.assertNotIn("secrets.", relay)
 
     def test_reordered_calls_outside_protected_paths(self):
         diff = "@@ -1,2 +1,2 @@\n-    ledger.reserve();\n     ledger.commit();\n+    ledger.reserve();"

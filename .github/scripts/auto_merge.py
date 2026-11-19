@@ -8,7 +8,7 @@ import re
 import subprocess
 from urllib.parse import quote
 
-from notify_pr_review import CODEX_APP_ID, CODEX_BOT_ID, review_state
+from notify_pr_review import latest_codex_summary, review_state
 from release import api
 from review_routing import change_risk, independent_approval
 
@@ -23,12 +23,9 @@ def eligible(pr, repo):
 
 def codex_clear(comments, sha):
     # 재리뷰 중이거나 새 요약을 해석할 수 없으면 과거 완료 결과를 쓰지 않는다.
-    summaries = [row for row in comments if row["user"]["id"] == CODEX_BOT_ID
-                 and (row.get("performed_via_github_app") or {}).get("id") == CODEX_APP_ID
-                 and row["body"].startswith("<!-- codex-pull-request-review-summary -->")]
-    if not summaries:
+    latest = latest_codex_summary(comments)
+    if not latest:
         return False
-    latest = max(summaries, key=lambda row: (row["updated_at"], row["id"]))
     state = review_state(latest["body"]) or {}
     return (state.get("commit_sha") == sha and state.get("has_any_findings") is False
             and state.get("has_unresolved_findings") is False)
@@ -59,8 +56,11 @@ def paid_clear(repo, pr):
         return False
     run_url = f"repos/{repo}/actions/runs/{marker[len(prefix):]}"
     run = api(run_url)
-    if not (run["path"] == ".github/workflows/notify-slack.yml" and run["event"] == "issue_comment"
-            and run["head_branch"] == "main" and run["head_repository"]["full_name"] == repo
+    # development 수동 실행은 검토한 base와 동일한 보호 브랜치 코드여야 한다.
+    trusted = ((run["event"] == "issue_comment" and run["head_branch"] == "main")
+               or (run["event"] == "workflow_dispatch" and run["head_branch"] == "development"
+                   and run.get("head_sha") == pr["base"]["sha"]))
+    if not (run["path"] == ".github/workflows/notify-slack.yml" and trusted and run["head_repository"]["full_name"] == repo
             and run["conclusion"] == "success"):
         return False
     # 같은 Actions 앱이 발행한 다른 체크가 유료 리뷰 실행을 가리켜도 성공으로 오인하지 않는다.

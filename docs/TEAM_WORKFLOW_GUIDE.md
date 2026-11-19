@@ -183,7 +183,9 @@ backend의 [Codex 저장소 설정](https://chatgpt.com/settings/code-review/rep
 
 2차 리뷰에는 PR 제목·본문과 변경 파일의 텍스트 패치를 전달합니다. 체크와 Slack에 위험 근거, 모델, 추론 강도, 커밋, 결과를 표시합니다. 지적이 없어도 고위험 PR은 팀원의 독립 승인이 필요합니다. 추가 push 후에는 PR에 `@codex review`를 남기면 1차 완료 후 같은 기준으로 다시 선별합니다.
 
-설정은 기본 브랜치 `main`에 워크플로를 배포하고, `main`만 허용하는 GitHub Environment `sol-max-review`에 팀 프로젝트의 `OPENAI_API_KEY`를 등록합니다. 같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API 응답은 최대 30분 대기하며 전체 2차 리뷰 작업의 기한은 35분입니다. 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
+GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브랜치를 허용하고 팀 프로젝트의 `OPENAI_API_KEY`를 등록합니다. 저장소 변수 `DEVELOPMENT_SOL_REVIEW=true`를 설정하면 내부의 일반 development PR을 열거나 갱신할 때 PR 번호와 head SHA를 보호된 development 워크플로에 전달합니다. 이 실행은 고위험 변경의 공식 앱 리뷰가 해당 SHA에서 완료되기를 약 20분 기다립니다. 시간 초과 후에는 공식 리뷰 완료를 확인하고 Actions의 **Slack Notification**을 development에서 같은 PR 번호와 전체 SHA로 다시 실행합니다.
+
+같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API 응답은 최대 30분 대기하며 전체 2차 리뷰 작업의 기한은 35분입니다. 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
 
 ### development 작업 PR 자동 병합
 
