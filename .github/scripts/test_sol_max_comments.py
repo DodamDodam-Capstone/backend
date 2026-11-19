@@ -21,7 +21,7 @@ class CommentTests(unittest.TestCase):
         self.findings = [{"path": self.file["filename"], "anchor": a, "body": b}
                          for a, b in [("L5", "삭제 줄"), ("R9", "문맥 줄"), ("R60", "추가 줄"), ("R30", "모호한 줄")]]
         self.findings.append({"path": "outside.java", "anchor": "R60", "body": "@everyone\n# title"})
-        self.check = {"id": 88, "status": "completed", "conclusion": "failure", "external_id": "pr-60",
+        self.check = {"id": 88, "status": "completed", "conclusion": "failure", "external_id": "pr-60@run/123",
                       "app": {"id": 15368}, "name": deep.CHECK, "head_sha": self.sha, "details_url": "run/123",
                       "output": {"title": "수정 필요", "text": comments.receipt(self.base, "요약", self.findings)}}
         self.reviews = []
@@ -63,15 +63,23 @@ class CommentTests(unittest.TestCase):
         self.assertEqual(len(self.posts), 1)
 
     def test_wrong_pr_sha_app_run_or_verdict_cannot_post(self):
-        for edit in ({"external_id": "pr-61"}, {"head_sha": "c"*40}, {"details_url": "run/99"}, {"app": {"id": 9}},
+        for edit in ({"external_id": "pr-61"}, {"head_sha": "c"*40}, {"app": {"id": 9}},
                      {"conclusion": "success"}, {"conclusion": "action_required"}, {"status": "in_progress"}):
-            with self.subTest(edit=edit), patch.dict(self.check, edit):
+            with self.subTest(edit=edit), patch.dict(self.check, edit), self.assertRaises(ValueError):
                 self.publish()
         for edit in ({"state": "closed"}, {"head": self.pr["head"] | {"sha": "c"*40}},
                      {"base": {"ref": "main", "sha": self.base}}, {"base": {"ref": "development", "sha": "c"*40}}):
             with self.subTest(edit=edit), patch.dict(self.pr, edit):
                 self.publish()
         self.assertEqual(self.posts, [])
+
+    def test_run_binding_survives_github_check_link_and_rejects_another_run(self):
+        self.check["details_url"] = "https://github.com/org/backend/runs/88"
+        with self.assertRaisesRegex(ValueError, "실행"):
+            comments.publish(self.repo, 60, self.sha, 88, "run/99")
+        self.assertEqual(self.posts, [])
+        self.publish()
+        self.assertEqual(len(self.posts), 1)
 
     def test_untrusted_marker_does_not_suppress_review(self):
         self.reviews.append({"user": {"id": 7}, "commit_id": self.sha, "state": "COMMENTED",

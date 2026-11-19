@@ -60,6 +60,12 @@ def review_payload(sha, check_id, check_url, report, files):
     return {"event": "COMMENT", "commit_id": sha, "body": "\n\n".join(body), "comments": comments}
 
 
+def same_review_run(check, marker, run_url):
+    # Actions는 details_url을 자체 체크 링크로 바꿀 수 있어 새 체크는 external_id로 실행을 식별한다.
+    return bool(run_url) and (check.get("external_id") == f"{marker}@{run_url}" or
+                              (check.get("external_id") == marker and check.get("details_url") == run_url))
+
+
 def publish(repo, number, sha, check_id, run_url):
     number, check_id = int(number), int(check_id)
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
@@ -68,10 +74,10 @@ def publish(repo, number, sha, check_id, run_url):
     pull = f"{root}/pulls/{number}"
     check = api(f"{root}/check-runs/{check_id}")
     if not (check["app"]["id"] == 15368 and check["name"] == "sol-max-review"
-            and check["external_id"] == f"pr-{number}" and check["head_sha"] == sha
-            and check["details_url"] == run_url and check["status"] == "completed"
+            and same_review_run(check, f"pr-{number}", run_url) and check["head_sha"] == sha
+            and check["status"] == "completed"
             and check["conclusion"] == "failure" and check["output"]["title"] == "수정 필요"):
-        return
+        raise ValueError("게시 요청의 실행·PR·커밋과 완료된 수정 필요 체크가 일치하지 않습니다.")
     data = check["output"]["text"]
     if not (data.startswith(FORMAT_START) and data.endswith(FORMAT_END)):
         raise ValueError("줄별 지적 자료를 확인할 수 없습니다.")
