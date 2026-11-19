@@ -1,9 +1,8 @@
-"""신뢰된 main 실행에서만 최신 development 작업 PR을 squash 병합한다."""
+"""보호된 워크플로에서 수동 병합을 위한 PR별 필수 검사를 발행한다."""
 
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 from urllib.parse import quote
@@ -12,6 +11,8 @@ from notify_pr_review import latest_codex_summary, review_state
 from release import api
 from review_routing import change_risk, independent_approval
 
+CHECK = "backend-review-policy"
+APP_ID = 5832717
 REQUIRED = {"backend-quality", "gitmoji-conventional-title", "jira-issue-key"}
 
 
@@ -32,7 +33,9 @@ def codex_clear(comments, sha):
 
 
 def ci_clear(checks):
-    return REQUIRED <= {row["name"] for row in checks} and all(row["state"] == "SUCCESS" for row in checks)
+    # 이 검사의 이전 판정을 필수 CI에 포함하면 스스로의 완료를 기다리게 된다.
+    ci = [row for row in checks if row["name"] != CHECK]
+    return REQUIRED <= {row["name"] for row in ci} and all(row["state"] == "SUCCESS" for row in ci)
 
 
 def paid_clear(repo, pr):
@@ -69,10 +72,6 @@ def paid_clear(repo, pr):
                for job in api(run_url + "/jobs?per_page=100")["jobs"])
 
 
-def allowed(level, human, paid):
-    return level == "low" or (human and (level == "medium" or level == "high" and paid))
-
-
 def latest_opinions(repo, number):
     reviews = api(f"repos/{repo}/pulls/{number}/reviews?per_page=100", paginate=True)
     latest = {}
@@ -85,7 +84,10 @@ def latest_opinions(repo, number):
 def team_approved(repo, pr, app_token, latest):
     owner = repo.split("/")[0]
     ref = quote("refs/heads/" + pr["head"]["ref"], safe="")
-    activity = api(f"repos/{repo}/activity?ref={ref}&per_page=1")
+    source = (pr["head"].get("repo") or {}).get("full_name")
+    if not source:
+        return False
+    activity = api(f"repos/{source}/activity?ref={ref}&per_page=1")
     if not activity or activity[0].get("after") != pr["head"]["sha"]:
         return False
     pusher = (activity[0].get("actor") or {}).get("login")
@@ -118,8 +120,8 @@ def pull_reviews(repo, number):
 def evaluate(repo, number, app_token):
     root = f"repos/{repo}"
     pr = api(f"{root}/pulls/{number}")
-    if not eligible(pr, repo):
-        return None, "대상 외 PR"
+    if pr["state"] != "open" or pr["base"]["ref"] != "development" or pr.get("draft") is not False:
+        return None, "열린 development 일반 PR 필요"
     sha = pr["head"]["sha"]
     comments = api(f"{root}/issues/{number}/comments?per_page=100", paginate=True)
     if not codex_clear(comments, sha):
@@ -130,12 +132,11 @@ def evaluate(repo, number, app_token):
     if len(files) != pr["changed_files"]:
         return None, "전체 변경 목록 확인 필요"
     level = change_risk(pr, files)
-    paid = level == "high" and paid_clear(repo, pr)
-    if level == "high" and not paid:
-        return None, "고위험 · 현재 변경에 대한 Sol Max 통과 근거 없음"
+    if level == "low" and not eligible(pr, repo):
+        level = "medium"  # 내부 작업 브랜치에서만 사람 승인을 생략한다.
     result = subprocess.run(["gh", "pr", "checks", str(number), "-R", repo, "--required", "--json", "name,state"],
                             capture_output=True, text=True, timeout=60)
-    if result.returncode or not ci_clear(json.loads(result.stdout)):
+    if result.returncode not in {0, 1, 8} or not result.stdout.strip() or not ci_clear(json.loads(result.stdout)):
         return None, "필수 CI 통과 대기"
     reviews = pull_reviews(repo, number)
     if (not reviews or reviews["headRefOid"] != sha or reviews["baseRefOid"] != pr["base"]["sha"]
@@ -146,50 +147,93 @@ def evaluate(repo, number, app_token):
     if any(row["state"] == "CHANGES_REQUESTED" for row in opinions.values()):
         return None, "유효한 변경 요청"
     human = level != "low" and team_approved(repo, pr, app_token, opinions)
-    if not allowed(level, human, paid):
-        return None, f"{level} · 최신 커밋에 독립된 backend 팀원 승인 필요"
+    if level != "low" and not human:
+        return None, "독립된 backend 팀원 승인 필요"
+    if level == "high" and not paid_clear(repo, pr):
+        return None, "고위험 · 현재 PR과 커밋의 Sol Max 통과 필요"
     return (level, sha, pr["base"]["sha"]), "병합 조건 충족"
 
 
-def close_issues(repo, pr):
-    # GITHUB_TOKEN 병합은 closed 워크플로를 트리거하지 않아 같은 이슈 종료 helper를 실행한다.
-    helper = Path(".automation/.github/scripts/close_linked_issues.py")
-    subprocess.run(["python3", str(helper)], check=True, env=os.environ | {
-        "GITHUB_TOKEN": os.environ["GH_TOKEN"], "PR_BODY": pr.get("body") or "", "GITHUB_REPOSITORY": repo})
+def existing_check(root, sha, name):
+    path = f"{root}/commits/{sha}/check-runs?check_name={quote(name, safe='')}&app_id={APP_ID}&filter=latest"
+    return next((c for c in api(path)["check_runs"] if c["name"] == name and c["app"]["id"] == APP_ID), None)
 
 
-def reconcile(repo, number, apply):
-    app_token = os.getenv("LOW_RISK_TOKEN")
-    decision, reason = evaluate(repo, number, app_token)
-    print(f"PR #{number} · {reason}")
-    if not decision or not apply:
-        if apply and reason == "대상 외 PR":
-            pr = api(f"repos/{repo}/pulls/{number}")
-            if (pr.get("merged") and pr["base"]["ref"] == "development"
-                    and (pr.get("merged_by") or {}).get("login") == "github-actions[bot]"):
-                close_issues(repo, pr)
+def publish(root, sha, name, identity, result, title, summary, prior, token):
+    if prior and prior["conclusion"] == result and prior["output"]["title"] == title and prior.get("external_id") == identity:
         return
-    level, sha, base = decision
-    pr = api(f"repos/{repo}/pulls/{number}")
-    if (not eligible(pr, repo) or pr["head"]["sha"] != sha or pr["base"]["sha"] != base
-            or pr.get("mergeable") is not True or pr.get("mergeable_state") not in {"blocked", "clean"}
-            or api(f"repos/{repo}/git/ref/heads/development")["object"]["sha"] != base):
+    payload = {"name": name, "status": "completed", "conclusion": result, "external_id": identity,
+               "output": {"title": title, "summary": summary}}
+    if prior:
+        api(f"{root}/check-runs/{prior['id']}", payload, method="PATCH", token=token)
+    else:
+        api(f"{root}/check-runs", payload | {"head_sha": sha}, token=token)
+
+
+def report(repo, number, *, token=None):
+    root = f"repos/{repo}"
+    url = f"{root}/pulls/{number}"
+    pr = api(url)
+    if pr["state"] != "open" or pr["base"]["ref"] != "development":
         return
-    if level == "low" and not app_token:
-        raise ValueError("저위험 PR 전용 앱 토큰이 필요합니다.")
-    # 일반 토큰에는 승인 예외가 없다. 보호 규칙과 최종 head 비교는 GitHub도 다시 수행한다.
-    result = api(f"repos/{repo}/pulls/{number}/merge", {"sha": sha, "merge_method": "squash",
-                 "commit_title": f"{pr['title']} (#{number})"}, method="PUT",
-                 token=app_token if level == "low" else None)
-    if not result["merged"]:
-        raise RuntimeError(f"PR #{number} 병합 보류")
-    if level != "low":
-        close_issues(repo, pr)
+    head, base = pr["head"]["sha"], pr["base"]["sha"]
+    target = pr.get("merge_commit_sha")
+    info = f"PR #{number} · 수동 병합 안내"
+    identity = f"manual-review:{number}:{base}:{head}"
+    summary = f"PR #{number} · head `{head}` · base `{base}`"
+    if not target or pr.get("mergeable") is not True:
+        title = "Draft · 검토 준비 대기" if pr.get("draft") else "GitHub 병합 상태 확인 · 충돌 여부 확인"
+        print(f"PR #{number} · {title}")
+        if token:
+            publish(root, head, info, identity, "action_required", title, summary,
+                    existing_check(root, head, info), token)
+        return
+    # 동일한 head를 쓰는 다른 PR이나 이전 base에 성공 판정을 발행하지 않는다.
+    ref = f"{root}/git/ref/pull/{number}/merge"
+    if (api(ref)["object"]["sha"] != target or
+            [p["sha"] for p in api(f"{root}/git/commits/{target}")["parents"]] != [base, head]):
+        return
+    prior = None
+    shared = False
+    if token:
+        prior = existing_check(root, target, CHECK)
+        shared = prior is not None and prior.get("external_id") != identity
+        if prior and prior["conclusion"] == "success":
+            # 승인 철회나 조회 장애 중에 이전 성공이 남지 않게 먼저 닫는다.
+            api(f"{root}/check-runs/{prior['id']}", {"status": "completed", "conclusion": "action_required",
+                "output": {"title": "최신 리뷰 재확인 중", "summary": f"PR #{number}"}}, method="PATCH", token=token)
+            prior = prior | {"conclusion": "action_required", "output": {"title": "최신 리뷰 재확인 중"}}
+    result = "action_required"
+    try:
+        decision, title = evaluate(repo, number, token)
+        if decision and decision[1:] == (head, base):
+            result = "success"
+            title = ("팀원 승인 생략 · 수동 병합 가능" if decision[0] == "low"
+                     else "독립된 팀원 승인 확인 · 수동 병합 가능")
+    except (RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
+        title = "리뷰 근거 조회 실패 · 재확인 필요"
+    latest = api(url)
+    if (latest["state"] != "open" or latest["base"]["ref"] != "development"
+            or latest["head"]["sha"] != head or latest["base"]["sha"] != base
+            or api(ref)["object"]["sha"] != target):
+        return
+    if latest.get("draft") is not False or api(f"{root}/git/ref/heads/development")["object"]["sha"] != base:
+        result, title = "action_required", "Draft 또는 대상 브랜치 변경 · 재확인 필요"
+    if shared:
+        identity = "shared-merge-commit"
+        result, title = "action_required", "동일한 검사 커밋을 공유하는 PR · 별도 커밋 필요"
+    print(f"PR #{number} · {title}")
+    if not token:
+        return
+    publish(root, target, CHECK, identity, result, title, summary, prior, token)
+    # PR의 Checks 탭은 head 검사를 보여 준다. 안내 이름은 필수 검사와 분리한다.
+    publish(root, head, info, identity, result, title, summary, existing_check(root, head, info), token)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("number", type=int)
-    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--publish", action="store_true")
     args = parser.parse_args()
-    reconcile(os.environ["GITHUB_REPOSITORY"], args.number, args.apply)
+    report(os.environ["GITHUB_REPOSITORY"], args.number,
+           token=os.environ["REVIEW_APP_TOKEN"] if args.publish else None)

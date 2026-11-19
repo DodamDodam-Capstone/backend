@@ -103,7 +103,7 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
                                        "최신 커밋에서 공식 재리뷰를 요청하세요.")
         elif change_risk(current, files) == "low":
             risk, decision, reason, action = ("낮음", "필수 검사 확인", "공식 리뷰 무지적이며 보호 경로·호출 순서·테스트 약화 징후가 없습니다.",
-                                              "필수 CI와 대화 해결 후 자동 병합 대상입니다.")
+                                              "필수 CI와 리뷰 검사가 통과하면 PR에서 직접 병합하세요.")
         else:
             risk, decision, reason, action = ("중간", "팀원 확인", "변경된 호출 흐름 또는 테스트 강도를 자동으로 확인하기 어렵습니다.",
                                               "독립된 backend 팀원이 최신 커밋을 승인해야 합니다.")

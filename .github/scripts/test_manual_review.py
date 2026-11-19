@@ -1,10 +1,10 @@
-"""실제 자동 병합 입력의 경계와 커밋 고정을 검증한다."""
+"""수동 병합 검사의 승인 조건과 발행 대상을 검증한다."""
 
 import json
 import unittest
 from unittest.mock import Mock, patch
 
-import auto_merge as merge
+import manual_review as merge
 from notify_pr_review import CODEX_APP_ID, CODEX_BOT_ID
 from review_routing import BASE, change_risk
 
@@ -28,7 +28,7 @@ def summary(**updates):
                     + json.dumps({"code_review": state}) + " -->"}
 
 
-class AutoMergeTests(unittest.TestCase):
+class ManualReviewTests(unittest.TestCase):
     def test_latest_authenticated_codex_must_have_no_findings(self):
         self.assertTrue(merge.codex_clear([summary()], SHA))
         for updates in (dict(commit_sha=BASE_SHA), dict(status="running"), dict(has_any_findings=True),
@@ -69,12 +69,6 @@ class AutoMergeTests(unittest.TestCase):
         for state in ("PENDING", "SKIPPED", "NEUTRAL", "FAILURE"):
             self.assertFalse(merge.ci_clear(checks + [{"name": "extra", "state": state}]))
 
-    def test_high_requires_current_human_and_proven_paid_success(self):
-        for risk, human, paid, expected in (("low", False, False, True), ("medium", False, True, False),
-                                            ("medium", True, False, True), ("high", False, True, False),
-                                            ("high", True, False, False), ("high", True, True, True)):
-            self.assertEqual(merge.allowed(risk, human, paid), expected)
-
     def test_paid_proof_must_come_from_trusted_workflow_for_this_check_and_base(self):
         check = {"id": 818, "app": {"id": 15368}, "head_sha": SHA, "name": "sol-max-review",
                  "status": "completed", "conclusion": "success", "output": {"title": "추가 지적 없음"},
@@ -96,18 +90,6 @@ class AutoMergeTests(unittest.TestCase):
             self.assertFalse(check_result(check | edit))
         self.assertFalse(check_result(check, run | {"event": "pull_request"}))
         self.assertFalse(check_result(check, jobs=[]))
-
-    def test_dispatch_rechecks_head_and_does_not_queue_future_heads(self):
-        for apply, head in ((False, SHA), (True, BASE_SHA), (True, SHA)):
-            with self.subTest(apply=apply, head=head), patch.object(merge, "evaluate", return_value=(
-                    ("low", SHA, BASE_SHA), "확인")), patch.dict("os.environ", LOW_RISK_TOKEN="low-token"), patch.object(
-                        merge, "api", side_effect=[PR | {"head": PR["head"] | {"sha": head}}, {"object": {"sha": BASE_SHA}}, {"merged": True}]) as api:
-                merge.reconcile(REPO, 12, apply)
-                writes = [call for call in api.call_args_list if call.kwargs.get("method") == "PUT"]
-                self.assertEqual(len(writes), int(apply and head == SHA))
-                if writes:
-                    self.assertEqual(writes[0].args[1]["sha"], SHA)
-                    self.assertEqual(writes[0].kwargs["token"], "low-token")
 
     def test_ordinary_work_pr_can_merge_with_no_human_or_jira_evidence(self):
         def get(path, *args, **kwargs):
@@ -147,12 +129,56 @@ class AutoMergeTests(unittest.TestCase):
                 opinions = merge.latest_opinions(REPO, 12)
                 self.assertEqual(merge.team_approved(REPO, PR, "app-token", opinions), valid)
 
-    def test_medium_and_high_use_non_exempt_token_and_preserve_linked_issue_closure(self):
-        for level in ("medium", "high"):
-            with self.subTest(level=level), patch.object(merge, "evaluate", return_value=((level, SHA, BASE_SHA), "확인")), \
-                    patch.object(merge, "api", side_effect=[PR, {"object": {"sha": BASE_SHA}}, {"merged": True}]) as api, \
-                    patch.dict("os.environ", GH_TOKEN="ordinary", LOW_RISK_TOKEN="low-token"), \
-                    patch.object(merge.subprocess, "run") as close:
-                merge.reconcile(REPO, 12, True)
-                self.assertIsNone(api.call_args.kwargs["token"])
-                self.assertEqual(close.call_args.kwargs["env"]["GITHUB_TOKEN"], "ordinary")
+
+    def test_own_pending_check_never_blocks_the_other_required_ci(self):
+        checks = [{"name": n, "state": "SUCCESS"} for n in merge.REQUIRED]
+        gate = {"name": merge.CHECK, "state": "ACTION_REQUIRED"}
+        self.assertTrue(merge.ci_clear(checks + [gate]))
+        self.assertFalse(merge.ci_clear(checks[1:] + [gate]))
+
+    def test_only_verified_merge_parents_and_current_base_may_receive_success(self):
+        target = "c" * 40
+        pr = PR | {"merge_commit_sha": target}
+        for parents, base, written, passed in (([BASE_SHA, SHA], BASE_SHA, True, True),
+                                               ([SHA, BASE_SHA], BASE_SHA, False, False),
+                                               ([BASE_SHA, SHA], SHA, True, False)):
+            def api(endpoint, data=None, **kwargs):
+                if data:
+                    return {}
+                if "/git/ref/pull/" in endpoint:
+                    return {"object": {"sha": target}}
+                if "/git/commits/" in endpoint:
+                    return {"parents": [{"sha": p} for p in parents]}
+                if "/git/ref/heads/" in endpoint:
+                    return {"object": {"sha": base}}
+                if "/check-runs?" in endpoint:
+                    return {"check_runs": []}
+                return pr
+            with self.subTest(parents=parents, base=base), patch.object(merge, "api", side_effect=api) as calls, \
+                    patch.object(merge, "evaluate", return_value=(("low", SHA, BASE_SHA), "허용")):
+                merge.report(REPO, 12, token="checks-only")
+                writes = [c for c in calls.call_args_list if len(c.args) > 1]
+                self.assertEqual(len(writes), 2 if written else 0)
+                if written:
+                    call, info = writes
+                    self.assertNotEqual(info.args[1]["name"], merge.CHECK)
+                    self.assertEqual(info.args[1]["head_sha"], SHA)
+                    self.assertEqual(call.args[0], "repos/org/backend/check-runs")
+                    self.assertEqual(call.args[1]["head_sha"], target)
+                    self.assertEqual(call.args[1]["conclusion"] == "success", passed)
+
+    def test_dynamic_risk_needs_independent_approval_and_high_needs_paid_review(self):
+        checks = Mock(returncode=0, stdout=json.dumps([{"name": n, "state": "SUCCESS"} for n in merge.REQUIRED]))
+        view = {"headRefOid": SHA, "baseRefOid": BASE_SHA, "reviewDecision": None}
+        for level, human, paid, allowed in (("medium", False, False, False), ("medium", True, False, True),
+                                            ("high", False, True, False), ("high", True, False, False),
+                                            ("high", True, True, True)):
+            data = [PR, [summary()], [FILE]]
+            with self.subTest(level=level, human=human, paid=paid), patch.object(merge, "api", side_effect=data), \
+                    patch.object(merge, "change_risk", return_value=level), patch.object(merge, "pull_reviews", return_value=view), \
+                    patch.object(merge, "latest_opinions", return_value={}), patch.object(merge.subprocess, "run", return_value=checks), \
+                    patch.object(merge, "team_approved", return_value=human), patch.object(merge, "paid_clear", return_value=paid):
+                decision, reason = merge.evaluate(REPO, 12, None)
+                self.assertEqual(decision is not None, allowed)
+                if not human:
+                    self.assertIn("팀원 승인 필요", reason)

@@ -1,24 +1,43 @@
-name: Development Review Merge
+name: Development Manual Review
 
 on:
   workflow_run:
     workflows: [Slack Notification]
     types: [completed]
+  pull_request_review:
+    types: [submitted, dismissed, edited]
+  pull_request_review_thread:
+    types: [resolved, unresolved]
   schedule:
     # 승인·대화 해결 뒤의 재평가와 GitHub 이벤트 누락을 보완한다.
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       number:
-        description: 점검할 development 작업 PR 번호
+        description: 다시 판정할 development PR 번호
         required: true
         type: number
 
 permissions: {}
 
 jobs:
+  signal:
+    if: >-
+      (github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_thread') &&
+      github.event.pull_request.base.ref == 'development' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # 비밀이나 PR 코드에 접근하지 않고 보호된 main에 PR 번호만 보낸다.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: gh workflow run development-auto-merge.yml --repo "$GITHUB_REPOSITORY" --ref main -f "number=$NUMBER"
+
   candidates:
-    if: github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' && vars.DEVELOPMENT_REVIEW_MERGE == 'true'
+    if: github.repository == 'DodamDodam-Capstone/backend' && github.ref == 'refs/heads/main' && vars.DEVELOPMENT_MANUAL_REVIEW == 'true'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -33,11 +52,11 @@ jobs:
           if [[ "$NUMBER" =~ ^[1-9][0-9]*$ ]]; then
             echo "numbers=[$NUMBER]" >> "$GITHUB_OUTPUT"
           else
-            numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | select(.draft == false and .head.repo.full_name == .base.repo.full_name) | .number]')
+            numbers=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls?state=open&base=development&per_page=100" --jq '[.[][] | .number]')
             echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
           fi
 
-  merge:
+  review:
     needs: candidates
     if: needs.candidates.outputs.numbers != '[]'
     strategy:
@@ -45,28 +64,24 @@ jobs:
       matrix:
         number: ${{ fromJSON(needs.candidates.outputs.numbers) }}
     concurrency:
-      group: development-review-merge-${{ matrix.number }}
+      group: development-manual-review-${{ matrix.number }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    environment: development-review-merge
+    environment:
+      name: development-review-merge
+      deployment: false
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
       checks: read
       actions: read
-      issues: write
+      issues: read
       statuses: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: DodamDodam-Capstone/integration
-          ref: 37f994f5fbdf18ea1b68ba058d7ab97f5a1c806d
-          path: .automation
           persist-credentials: false
       - id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -75,11 +90,11 @@ jobs:
           private-key: ${{ secrets.LOW_RISK_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: backend
-          permission-contents: write
+          permission-checks: write
           permission-members: read
-      - name: 리뷰 증거와 필수 검사 재확인 후 해당 커밋만 병합
+      - name: 최신 리뷰와 CI를 재확인해 수동 병합 검사 발행
         env:
           GH_TOKEN: ${{ github.token }}
-          LOW_RISK_TOKEN: ${{ steps.app.outputs.token }}
+          REVIEW_APP_TOKEN: ${{ steps.app.outputs.token }}
           PR_NUMBER: ${{ matrix.number }}
-        run: python3 .github/scripts/auto_merge.py "$PR_NUMBER" --apply
+        run: python3 .github/scripts/manual_review.py "$PR_NUMBER" --publish

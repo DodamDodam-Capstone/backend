@@ -171,7 +171,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 <a id="review-policy"></a>
 ### SCRUM PR 리뷰어 조건 시범안
 
-현재 모든 PR은 독립된 팀원 한 명의 승인이 필요합니다. `development`에서 인증·권한, DB·영속화, CI·정책 등 [보호 경로](https://github.com/DodamDodam-Capstone/backend/rules/27601021)를 변경하면 backend 팀원의 승인이 필요합니다. 시범 기간에는 CI가 판정 로직의 회귀 테스트를 실행합니다.
+수동 병합 검사 전환 전에는 모든 PR에 독립된 팀원 한 명의 승인이 필요합니다. 전환 후에는 아래 위험도별 조건을 적용합니다. `development`에서 인증·권한, DB·영속화, CI·정책 등 [보호 경로](https://github.com/DodamDodam-Capstone/backend/rules/27601021)를 변경하면 backend 팀원의 승인이 필요합니다. 시범 기간에는 CI가 판정 로직의 회귀 테스트를 실행합니다.
 
 backend의 [Codex 저장소 설정](https://chatgpt.com/settings/code-review/repositories/github-1340757090)은 모든 PR을 열 때 자동 리뷰를 요청합니다. 수정 커밋을 올린 뒤 다시 검토받으려면 해당 PR의 일반 댓글에 `@codex review`를 남깁니다. 이전 커밋의 결과는 새 커밋의 검증 근거로 쓸 수 없습니다.
 
@@ -187,25 +187,26 @@ GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브�
 
 같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API 응답은 최대 30분 대기하며 전체 2차 리뷰 작업의 기한은 35분입니다. 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
 
-### development 작업 PR 자동 병합
+<a id="development-작업-pr-자동-병합"></a>
+### development 작업 PR 수동 병합
 
-정기 릴리스에서 워크플로와 승인 예외를 활성화하면 내부 작업 브랜치의 열린 일반 PR을 대상으로 합니다. 모든 위험도에서 최신 커밋의 공식 Codex 무지적 판정, 필수 CI 성공, 리뷰 대화 해결, GitHub 병합 가능 상태가 필요합니다. 병합 직전에 head와 base를 확인하고, 검토한 head SHA를 지정해 squash 병합합니다.
+PR에서 `backend-review-policy` 검사 결과를 확인합니다. 내부 저위험 변경은 최신 커밋의 공식 Codex 무지적 판정, 필수 CI 세 개의 성공, 리뷰 대화 해결 후 병합 권한이 있는 사람이 **Squash and merge**를 누릅니다. 새 커밋에서는 새 판정이 필요합니다.
 
-| 위험도 | 추가 조건 |
-| --- | --- |
-| 낮음 | 보호 경로 변경, 호출 순서 변경, 테스트 약화가 없음을 전체 패치에서 확인합니다. 팀원 승인과 추가 모델 호출을 생략합니다. 문서, 단순 필드·반환식, 독립적인 신규 테스트가 대표 사례입니다. |
-| 중간 | 변경이 복잡하거나 기존 테스트의 강도를 확인하기 어려우면 작성자·마지막 푸시자와 다른 backend 팀원이 최신 커밋을 승인해야 합니다. |
-| 높음 | 중간의 팀원 승인 조건과 해당 PR·head·base에 대한 운영 Sol Max 통과 기록이 모두 필요합니다. |
-| 대기 | 현재 리뷰 지적, CI 실패·미완료, 확인할 수 없는 리뷰 결과, 미해결 대화, Draft, 포크는 자동 병합 대상에서 제외합니다. |
+| PR 상태 | 수동 병합 조건 |
+|---|---|
+| 내부 저위험 작업 | 팀원 승인을 생략합니다. |
+| 중간 위험 또는 저위험 예외 범위 밖의 변경 | 작성자 및 마지막 푸시자와 다른 backend 팀원 한 명이 최신 커밋을 승인해야 합니다. |
+| 고위험 변경 | 독립 팀원 승인과 동일 PR·head·base의 운영 Sol Max 통과가 필요합니다. 보호 경로는 GitHub 팀 승인 규칙도 적용합니다. |
+| Draft, 충돌, 리뷰 지적, CI 미완료, 근거 조회 실패 | 원인을 해결한 뒤 다시 판정합니다. |
 
-공식 리뷰·CI 알림 이후와 15분 간격의 재확인에서 판정합니다. 수정 커밋은 공식 재리뷰를 요청해야 합니다. PR 번호를 지정해 Actions의 `Development Review Merge`를 직접 재실행할 수 있습니다. 로컬에서 `GITHUB_REPOSITORY=DodamDodam-Capstone/backend python3 .github/scripts/auto_merge.py 60`을 실행하면 쓰기 없이 판정합니다.
+승인·대화 변경이나 공식 리뷰 알림 뒤에 보호된 기본 브랜치가 증거를 다시 조회합니다. 정기 재확인과 Actions의 **Development Manual Review** 수동 실행도 지원합니다. 검사는 해당 PR의 head와 base를 부모로 갖는 GitHub 테스트 병합 커밋에 기록합니다.
 
 **운영 전환 순서**
 
-1. 정기 릴리스로 워크플로를 `main`에 배포합니다. 비활성 상태에서는 기존 팀원 승인 1건이 계속 필요합니다.
-2. backend 저장소에만 전용 GitHub App을 설치하고 Contents 쓰기와 조직 Members 읽기 권한을 줍니다. `main`만 허용하는 환경 `development-review-merge`에 앱의 `LOW_RISK_APP_CLIENT_ID` 변수와 `LOW_RISK_APP_PRIVATE_KEY` 비밀을 저장합니다.
-3. `development` 전용 Ruleset을 먼저 만들어 기존 승인 수 1명, 마지막 푸시자 외 승인, 오래된 승인 해제를 복제합니다. 이 **승인 전용 규칙**에서만 전용 앱을 Pull requests only 예외로 지정합니다. 이후 기존 `Protect development`에서 중복된 승인 수와 마지막 푸시 승인 조건을 옮깁니다. 필수 CI 3개, 최신 base, 대화 해결, squash, 선형 이력과 별도 보호 경로 backend 팀 리뷰 규칙은 계속 적용합니다. 일반 토큰과 사람에게 새 예외를 추가하지 않습니다.
-4. 승인 전용 예외와 기존 CI·대화 차단을 시험용 보호 브랜치에서 확인한 뒤 저장소 변수 `DEVELOPMENT_REVIEW_MERGE=true`로 활성화합니다. 운영에서 되돌릴 때는 먼저 이 변수를 끄고 승인 전용 규칙의 앱 예외를 제거합니다. `development → main` 릴리스는 기존 정책을 따릅니다.
+1. `main`만 허용하는 환경 `development-review-merge`의 기존 전용 앱에 backend의 Checks 쓰기와 조직 Members 읽기를 설정합니다. 코드는 읽기 권한만 부여합니다.
+2. 기본 브랜치에 워크플로를 배포하고 `DEVELOPMENT_MANUAL_REVIEW=true`를 설정합니다. 기존 전체 승인 규칙이 활성화된 상태에서 저위험 통과와 팀원 승인 대기를 검증합니다.
+3. `Protect development`에 전용 앱을 발행자로 지정한 `backend-review-policy`를 필수로 추가합니다. GitHub가 해당 출처와 결과를 실제로 요구하는지 확인한 뒤 전체 PR에 중복된 승인 수와 마지막 푸시 승인 요건을 옮깁니다. 기존 필수 CI, 최신 base, 대화 해결, 보호 경로 팀 승인과 main 릴리스 규칙은 계속 적용합니다.
+4. 되돌릴 때는 전체 PR의 독립 승인 1명과 마지막 푸시 승인 요건을 먼저 복원하고 필수 검사 지정 및 실행 변수를 해제합니다.
 
 ## 7. 완료 확인
 

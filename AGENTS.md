@@ -33,7 +33,7 @@
 - 기존 Jira Task는 `[BE]` 접두어를 사용하고 GitHub Task Form을 중복 생성하지 않는다. 착수 전에 담당자·Story point·계획 시작일·목표 종료일을 설정하고 `해야할 일 → 진행 중 → 검토중 → 완료` 기준으로 실제 Jira transition을 사용한다.
 - 브랜치는 최신 `development`에서 `feature/<Jira키>-<설명>`, `fix/...`, `hotfix/...`로 만든다. 보호 브랜치 직접 push·force push는 금지한다.
 - 작업 commit·PR은 Gitmoji + Conventional Commit에 같은 Jira 키와 `[BE]`를 넣고 squash 병합한다. `development → main`은 [릴리스 규칙](docs/RELEASE_GUIDE.md)의 버전 제목·merge commit을 사용한다.
-- 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 리뷰어 조건은 [팀 가이드](docs/TEAM_WORKFLOW_GUIDE.md#review-policy)를 따른다. 현재는 마지막 push를 하지 않은 다른 팀원의 승인과 모든 review conversation 해결이 필요하다.
+- 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 리뷰어 조건은 [팀 가이드](docs/TEAM_WORKFLOW_GUIDE.md#review-policy)를 따른다. 모든 review conversation을 해결하고, 수동 병합 검사 전환 후에는 위험도별 독립 팀원 승인 조건을 따른다.
 - PR 병합 후 Jira 자동 완료를 확인하고, GitHub-first이면 연결 GitHub Issue 종료도 확인한다. Sub-task·Epic 완료 기준은 실행 규칙을 따른다.
 
 ## Code Review Rules
