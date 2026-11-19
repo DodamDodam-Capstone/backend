@@ -1,6 +1,16 @@
 name: Slack Notification
 
 on:
+  workflow_dispatch:
+    inputs:
+      number:
+        description: 검토할 development PR 번호
+        type: string
+        required: true
+      sha:
+        description: 검토할 PR의 전체 head SHA
+        type: string
+        required: true
   issue_comment:
     types: [created, edited]
   workflow_run:
@@ -24,11 +34,14 @@ concurrency:
 jobs:
   notify:
     name: slack-notification
-    if: github.event_name == 'workflow_run' || (github.event.issue.pull_request && github.event.sender.id == 199175422 && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
+    if: >-
+      github.event_name == 'workflow_run' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/development' && github.ref_protected && vars.DEVELOPMENT_SOL_REVIEW == 'true') ||
+      (github.event.issue.pull_request && github.event.sender.id == 199175422 && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     runs-on: ubuntu-latest
     outputs:
       deep_sha: ${{ steps.report.outputs.deep_sha }}
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
       - name: 신뢰된 backend 알림 코드 체크아웃
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,6 +60,7 @@ jobs:
         id: report
         run: python3 .github/scripts/notify_pr_review.py
         env:
+          GH_TOKEN: ${{ github.token }}
           PYTHONPATH: .automation/.github/scripts
           REVIEW_RISK_APP_ID: ${{ vars.REVIEW_RISK_APP_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -67,7 +81,7 @@ jobs:
       pull-requests: read
       checks: write
     concurrency:
-      group: sol-max-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}
+      group: sol-max-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,7 +100,7 @@ jobs:
         env:
           PYTHONPATH: .automation/.github/scripts
           REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.number }}
           REVIEW_SHA: ${{ needs.notify.outputs.deep_sha }}
           GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -112,7 +126,7 @@ jobs:
       checks: read
       pull-requests: write
     concurrency:
-      group: sol-max-comments-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}
+      group: sol-max-comments-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,7 +137,7 @@ jobs:
         run: python3 .github/scripts/sol_max_comments.py
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.number }}
           REVIEW_SHA: ${{ needs.notify.outputs.deep_sha }}
           REVIEW_CHECK: ${{ needs.deep-review.outputs.review_check }}
           REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

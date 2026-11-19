@@ -88,11 +88,10 @@ public class EmailVerificationService {
             var input = new VerifyEmailCodeRequest(id, readCode.get());
             var initial = found.orElseThrow(EmailVerificationException::invalid);
             if (current != null) {
-                // 타인에게 속하거나 이미 폐기된 권한은 대상 예산을 예약하기 전에 거절한다.
-                requirePinBinding(initial, current);
-                if (initial.invalidatedAt() != null) {
-                    throw EmailVerificationException.authorizationRequired(initial.purpose());
-                }
+                // 대상 예산을 쓰기 전에 현재 권한을 확인하고, 잠금 대기 중 변경은 verifyLocked에서 다시 확인한다.
+                checkPinContext(initial, current);
+            } else if (initial.invalidatedAt() != null) {
+                throw EmailVerificationException.invalid();
             }
             var subjectKey = rateHasher.emailVerifySubject(initial.purpose(), initial.email(), initial.setupAccountId());
             reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey));

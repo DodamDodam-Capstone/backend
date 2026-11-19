@@ -2,9 +2,9 @@
 
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
-from notify_pr_review import CODEX_APP_ID, CODEX_BOT_ID, build_payload
+from notify_pr_review import CODEX_APP_ID, CODEX_BOT_ID, build_payload, development_event
 
 
 class SlackReviewTests(unittest.TestCase):
@@ -43,6 +43,25 @@ class SlackReviewTests(unittest.TestCase):
         self.assertIn("위험도 미판정", result["text"])
         self.assertIn("@codex review", result["blocks"][1]["text"]["text"])
         self.assertIn(self.sha[:7], result["blocks"][2]["elements"][1]["text"])
+
+    def test_dispatch_waits_for_authentic_current_review_and_rechecks_head(self):
+        repo = "org/backend"
+        pr = self.pr | {"state": "open", "draft": False, "url": "https://api.github.com/repos/org/backend/pulls/62",
+                        "head": self.pr["head"] | {"repo": {"full_name": repo}}, "changed_files": 1}
+        self.codex_event()
+        comment = self.comment | {"updated_at": "2026-11-19"}
+        files = [{"filename": ".github/workflows/ci.yml"}]
+        forged = comment | {"performed_via_github_app": {"id": 1}}
+        with patch("notify_pr_review.api", side_effect=[pr, files, [forged], pr, [comment]]), patch("notify_pr_review.time.sleep"):
+            event = development_event(repo, "62", self.sha)
+        self.assertEqual(event["comment"], comment)
+        self.assertEqual(event["issue"]["number"], 62)
+        for changed in ({"draft": True}, {"state": "closed"}, {"base": {"ref": "main"}},
+                        {"head": pr["head"] | {"sha": "f" * 40}}, {"head": pr["head"] | {"repo": None}}):
+            with patch("notify_pr_review.api", side_effect=[pr, files, [], pr | changed]), patch("notify_pr_review.time.sleep"):
+                self.assertIsNone(development_event(repo, "62", self.sha))
+        with patch("notify_pr_review.api", side_effect=[pr, [{"filename": "docs/guide.md"}]]):
+            self.assertIsNone(development_event(repo, "62", self.sha))
 
     def test_old_protected_path_on_second_page(self):
         self.files = [{"filename": f"docs/{i}"} for i in range(100)] + [
