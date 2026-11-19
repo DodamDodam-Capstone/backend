@@ -5,7 +5,7 @@ import os
 import re
 from urllib.request import Request, urlopen
 
-from notify_pr_review import high_risk_reason
+from review_routing import high_risk_reason
 from release import api
 from sol_max_comments import diff_lines, receipt, same_review_run
 
@@ -96,7 +96,7 @@ def eligible(pr, repo, sha):
             and pr["head"]["sha"] == sha and (pr["head"].get("repo") or {}).get("full_name") == repo)
 
 
-def run(repo, number, sha, key, *, run_url=None, queue_review=None):
+def run(repo, number, sha, key, *, run_url=None, queue_review=None, record_clear=None):
     number = int(number)
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("검토할 전체 SHA가 필요합니다.")
@@ -173,6 +173,8 @@ def run(repo, number, sha, key, *, run_url=None, queue_review=None):
         check = api(f"{root}/check-runs/{claim['id']}", final, method="PATCH")
     else:
         check = api(f"{root}/check-runs", fields | final)
+    if status == "success" and claim and record_clear:
+        record_clear(f"{number} {sha} {base[0]} {int(check['id'])}")
     if status == "failure" and queue_review:
         queue_review(check["id"])
     header = f"PR #{number} · 위험도 높음 · {title}"
@@ -193,7 +195,12 @@ if __name__ == "__main__":
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             print(f"review_check={int(check_id)}", file=output)
 
+    def record_clear(proof):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            print(f"clear_proof={proof}", file=output)
+
     payload = run(os.environ["GITHUB_REPOSITORY"], os.environ["PR_NUMBER"], os.environ["REVIEW_SHA"],
-                  os.getenv("OPENAI_API_KEY"), run_url=os.environ["REVIEW_RUN_URL"], queue_review=queue_review)
+                  os.getenv("OPENAI_API_KEY"), run_url=os.environ["REVIEW_RUN_URL"], queue_review=queue_review,
+                  record_clear=record_clear)
     if payload:
         post_slack(os.environ["SLACK_WEBHOOK_URL"], payload)
