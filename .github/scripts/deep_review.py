@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 from notify_pr_review import high_risk_reason
 from release import api
-from sol_max_comments import diff_lines, receipt
+from sol_max_comments import diff_lines, receipt, same_review_run
 
 MODEL = "gpt-6.2-sol"
 CHECK = "sol-max-review"
@@ -112,9 +112,10 @@ def run(repo, number, sha, key, *, run_url=None, queue_review=None):
     while True:
         rows = api(f"{checks}&page={page}")["check_runs"]
         for row in rows:
-            if row.get("external_id") == marker:
+            check_marker = row.get("external_id") or ""
+            if check_marker == marker or check_marker.startswith(marker + "@"):
                 # 같은 Actions 실행의 재시도는 완료된 체크로 댓글 게시만 복구한다.
-                if (queue_review and row.get("details_url") == run_url and row.get("conclusion") == "failure"
+                if (queue_review and same_review_run(row, marker, run_url) and row.get("conclusion") == "failure"
                         and (row.get("output") or {}).get("title") == "수정 필요"):
                     queue_review(row["id"])
                 return
@@ -150,7 +151,8 @@ def run(repo, number, sha, key, *, run_url=None, queue_review=None):
         status, title, evidence = "action_required", "2차 검증 미실행", str(error)
         claim = None
     else:
-        claim = api(f"{root}/check-runs", fields | {"external_id": marker, "status": "in_progress"})
+        claim = api(f"{root}/check-runs", fields | {"external_id": f"{marker}@{run_url}" if run_url else marker,
+                                                   "status": "in_progress"})
         try:
             status, title, evidence, findings = model_review(data, key)
         except (OSError, ValueError, KeyError, AttributeError, TypeError) as error:

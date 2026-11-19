@@ -66,12 +66,21 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIn("수정 필요", execute("run/42")["text"])
         self.assertIn("R1", self.writes[-1]["output"]["text"])
         queue.assert_called_once_with(711)
+        self.checks[0]["details_url"] = "https://github.com/org/backend/runs/711"
         execute("run/42")
         self.assertEqual(queue.call_count, 2)
         execute("run/43")
         self.assertEqual(queue.call_count, 2)
         self.paid.assert_called_once()
         self.assertEqual(len(self.checks), 1)
+
+    def test_legacy_paid_check_prevents_recharging_when_original_run_is_unknown(self):
+        self.checks.append({"id": 21, "external_id": "pr-62", "conclusion": "failure",
+                            "details_url": "https://github.com/org/backend/runs/21", "output": {"title": "수정 필요"}})
+        queue = Mock()
+        deep.run(self.repo, 62, self.sha, "test", run_url="run/42", queue_review=queue)
+        self.paid.assert_not_called()
+        queue.assert_not_called()
 
     def test_no_paid_call_for_other_targets(self):
         for change in ({"state": "closed"}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
