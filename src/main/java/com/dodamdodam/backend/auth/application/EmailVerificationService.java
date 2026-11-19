@@ -94,7 +94,8 @@ public class EmailVerificationService {
             var subjectKey = rateHasher.emailVerifySubject(initial.purpose(), initial.email(), initial.setupAccountId());
             reserveVerificationBudget(subjectKey, List.of(apiKey, ipKey));
 
-            var check = work.execute(status -> verifyLocked(input, current));
+            var pending = PendingGrant.from(id, initial, current);
+            var check = work.execute(status -> verifyLocked(input, pending));
             if (check == null) {
                 throw new AuthStateUnavailableException();
             }
@@ -108,7 +109,7 @@ public class EmailVerificationService {
             if (check.grant() == null) {
                 throw EmailVerificationException.invalid();
             }
-            request.setAttribute(PENDING_GRANT, new PendingGrant(input.challengeId(), current));
+            request.setAttribute(PENDING_GRANT, pending);
             return check.grant();
         }
         catch (DataAccessException | TransactionException | ConversionException failure) {
@@ -127,11 +128,9 @@ public class EmailVerificationService {
     }
 
     /** 상위 권한과 challenge를 순서대로 잠근 뒤 같은 행에서 번호 검증을 완료한다. */
-    private CodeCheck verifyLocked(VerifyEmailCodeRequest input, AuthenticatedSession current) {
-        if (current != null) {
-            lockPinContext(current);
-        }
-        var challenge = repository.lockChallenge(input.challengeId()).orElseThrow(EmailVerificationException::invalid);
+    private CodeCheck verifyLocked(VerifyEmailCodeRequest input, PendingGrant pending) {
+        var current = pending.current();
+        var challenge = lockChallenge(pending);
         var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
         if (challenge.invalidatedAt() != null || challenge.verifiedAt() != null
             || challenge.attemptCount() >= MAX_WRONG_CODES || !now.isBefore(challenge.expiresAt())) {
@@ -162,14 +161,25 @@ public class EmailVerificationService {
         }
         work.executeWithoutResult(status -> {
             var current = pending.current();
-            if (current != null) {
-                lockPinContext(current);
-            }
-            // 재발급이 challenge를 바꾸는 동안 이전 행을 근거로 성공을 내보내지 않는다.
-            var challenge = repository.lockChallenge(pending.id()).orElseThrow(EmailVerificationException::invalid);
+            var challenge = lockChallenge(pending);
             var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
             requireActiveToken(challenge, now);
         });
+    }
+
+    /** 발급·응답 재검사·소비 모두 계정을 먼저 잠그고 같은 reset 발급 시점의 버전을 확인한다. */
+    private Challenge lockChallenge(PendingGrant pending) {
+        if (pending.current() != null) {
+            lockPinContext(pending.current());
+        }
+        var reset = pending.resetEmail() == null ? null
+            : accounts.findForUpdate(pending.resetEmail()).orElseThrow(EmailVerificationException::invalid);
+        var challenge = repository.lockChallenge(pending.id()).orElseThrow(EmailVerificationException::invalid);
+        if (reset != null && (!reset.id().equals(challenge.resetAccountId())
+            || !Objects.equals(reset.sessionVersion(), challenge.resetSessionVersion()))) {
+            throw EmailVerificationException.invalid();
+        }
+        return challenge;
     }
 
     /** PIN 목적은 계정 → 문맥 → PIN 순서로 잠근 뒤 challenge에 접근한다. */
@@ -264,18 +274,10 @@ public class EmailVerificationService {
                 throw EmailVerificationException.authenticationRequired();
             }
             requirePinBinding(initial, current);
-            lockPinContext(current);
         }
-        // 비밀번호 재설정과 경합해도 계정 잠금을 challenge보다 먼저 얻는다.
-        var reset = expectedPurpose == Purpose.RESET_PASSWORD
-            ? accounts.findForUpdate(initial.email()).orElseThrow(EmailVerificationException::invalid) : null;
-        var challenge = repository.lockChallenge(id).orElseThrow(EmailVerificationException::invalid);
+        var challenge = lockChallenge(PendingGrant.from(id, initial, pin ? current : null));
         requireMatchingToken(challenge, expectedPurpose, hash);
         var now = pin ? checkPinContext(challenge, current) : repository.databaseNow();
-        if (reset != null && (!reset.id().equals(challenge.resetAccountId())
-            || !Objects.equals(reset.sessionVersion(), challenge.resetSessionVersion()))) {
-            throw EmailVerificationException.invalid();
-        }
         requireActiveToken(challenge, now);
 
         repository.markConsumed(id, now);
@@ -293,5 +295,11 @@ public class EmailVerificationService {
     public record ConsumedVerification(String email, UUID resetAccountId) { }
 
     private record CodeCheck(VerificationGrantResponse grant, long retryAfterSeconds) { }
-    private record PendingGrant(UUID id, AuthenticatedSession current) { }
+    private record PendingGrant(UUID id, AuthenticatedSession current, String resetEmail) {
+        /** 공개 decoy는 계정 잠금이나 존재 여부 검사 없이 일반 오답으로 처리한다. */
+        static PendingGrant from(UUID id, Challenge initial, AuthenticatedSession current) {
+            String resetEmail = initial.purpose() == Purpose.RESET_PASSWORD && initial.eligible() ? initial.email() : null;
+            return new PendingGrant(id, current, resetEmail);
+        }
+    }
 }
