@@ -391,7 +391,7 @@ class ManualReviewTests(unittest.TestCase):
         name = "backend-quality"
         expected_path = ".github/workflows/ci.yml"
         canonical = {"backend-quality": "ci", "gitmoji-conventional-title": "pr-title", "jira-issue-key": "jira-key"}
-        checks = {(key, 15368): {"id": i, "head_sha": SHA, "name": key, "status": "completed", "conclusion": "success"}
+        checks = {(key, 15368): {"id": i, "check_suite": {"id": i + 20}, "head_sha": SHA, "name": key, "status": "completed", "conclusion": "success"}
                   for i, key in enumerate(canonical, 10)}
         rules = [{"type": "pull_request", "parameters": {"required_approving_review_count": 1, "require_last_push_approval": True}},
                  {"type": "required_status_checks", "parameters": {"required_status_checks":
@@ -402,18 +402,27 @@ class ManualReviewTests(unittest.TestCase):
             def read(url, **kwargs):
                 if "/rules/" in url:
                     return rules
-                ident = int(url.rsplit("/", 1)[1])
-                key = list(canonical)[ident - 10]
+                # check-run 10, suite 30, run 40, job 50은 독립된 식별자다.
                 if "/actions/jobs/" in url:
+                    self.fail("check-run 번호로 Actions 잡을 직접 조회함")
+                if "/attempts/" in url:
+                    ident = int(url.split("/runs/")[1].split("/")[0]) - 30
+                    key = list(canonical)[ident - 10]
+                    if url.endswith("&page=1") and key == name:
+                        return {"jobs": [{"check_run_url": "another check"}] * 100}
                     check = job_check if key == name else ident
-                    return {"id": ident, "run_id": ident, "run_attempt": 1, "head_sha": SHA, "name": key,
-                            "status": "completed", "conclusion": "success",
-                            "check_run_url": f"https://api.github.com/{root}/check-runs/{check}"}
-                return {"id": ident, "run_attempt": attempt if key == name else 1, "event": "pull_request",
-                        "path": path if key == name else f".github/workflows/{canonical[key]}.yml",
-                        "head_sha": SHA, "status": "completed", "conclusion": "success",
-                        "repository": {"full_name": REPO}, "pull_requests": [{"number": pr_number,
-                            "head": {"sha": SHA}, "base": {"ref": "development", "sha": BASE_SHA}}]}
+                    return {"jobs": [{"id": ident + 40, "run_id": ident + 30, "run_attempt": 1, "head_sha": SHA, "name": key,
+                                     "status": "completed", "conclusion": "success",
+                                     "check_run_url": f"https://api.github.com/{root}/check-runs/{check}"}]}
+                suite = int(url.split("check_suite_id=")[1].split("&")[0])
+                ident = suite - 20
+                key = list(canonical)[ident - 10]
+                run = {"id": ident + 30, "check_suite_id": suite, "run_attempt": attempt if key == name else 1,
+                       "event": "pull_request", "path": path if key == name else f".github/workflows/{canonical[key]}.yml",
+                       "head_sha": SHA, "status": "completed", "conclusion": "success",
+                       "repository": {"full_name": REPO}, "pull_requests": [{"number": pr_number,
+                           "head": {"sha": SHA}, "base": {"ref": "development", "sha": BASE_SHA}}]}
+                return {"total_count": 1, "workflow_runs": [run]}
             with self.subTest(path=path, attempt=attempt, pr=pr_number, job=job_check), \
                     patch.object(merge, "ci_on_commit", side_effect=[{}, checks]), patch.object(merge, "api", side_effect=read):
                 self.assertEqual(merge.policy_active(root, SHA, "target", 12, BASE_SHA), passed)

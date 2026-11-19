@@ -240,20 +240,33 @@ def ci_on_commit(root, sha):
 
 
 def required_workflow_job(root, check, number, head, base):
-    # Actions 앱 ID는 모든 워크플로가 공유하므로 실제 잡과 최신 실행 시도까지 연결한다.
-    job = api(f"{root}/actions/jobs/{check['id']}")
-    if (job["id"] != check["id"] or job["check_run_url"] != f"https://api.github.com/{root}/check-runs/{check['id']}"
-            or job["name"] != check["name"] or job["head_sha"] != check["head_sha"]
-            or job["status"] != "completed" or job["conclusion"] != "success"):
+    # check-run과 Actions 잡 번호는 독립적이다. suite에서 실행을 찾고 잡의 공식 URL로 연결한다.
+    suite_id = (check.get("check_suite") or {}).get("id")
+    if not isinstance(suite_id, int) or suite_id <= 0:
         return False
-    run = api(f"{root}/actions/runs/{job['run_id']}")
-    return (run["id"] == job["run_id"] and run["run_attempt"] == job["run_attempt"]
-            and run["repository"]["full_name"] == root.removeprefix("repos/")
+    result = api(f"{root}/actions/runs?check_suite_id={suite_id}&per_page=2")
+    if result["total_count"] != 1 or len(result["workflow_runs"]) != 1:
+        return False
+    run = result["workflow_runs"][0]
+    if not (run["check_suite_id"] == suite_id and run["repository"]["full_name"] == root.removeprefix("repos/")
             and run["event"] == "pull_request" and run["head_sha"] == check["head_sha"]
             and run["path"] == ".github/workflows/" + CI_WORKFLOWS[check["name"]]
             and run["status"] == "completed" and run["conclusion"] == "success"
             and any(pr["number"] == number and pr["head"]["sha"] == head
-                    and pr["base"]["ref"] == "development" and pr["base"]["sha"] == base for pr in run["pull_requests"]))
+                    and pr["base"]["ref"] == "development" and pr["base"]["sha"] == base for pr in run["pull_requests"])):
+        return False
+    jobs = f"{root}/actions/runs/{run['id']}/attempts/{run['run_attempt']}/jobs"
+    page = 1
+    while True:
+        rows = api(f"{jobs}?per_page=100&page={page}")["jobs"]
+        for job in rows:
+            if job["check_run_url"] == f"https://api.github.com/{root}/check-runs/{check['id']}":
+                return (job["run_id"] == run["id"] and job["run_attempt"] == run["run_attempt"]
+                        and job["name"] == check["name"] and job["head_sha"] == check["head_sha"]
+                        and job["status"] == "completed" and job["conclusion"] == "success")
+        if len(rows) < 100:
+            return False
+        page += 1
 
 
 def policy_active(root, head, target, number, base):
