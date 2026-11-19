@@ -69,7 +69,8 @@ class SlackReviewTests(unittest.TestCase):
                 self.checks = [self.check_record(**changes)]
                 self.assertIn("미판정", self.message("7")["text"])
         self.checks = [self.check_record()]
-        self.assertIn("위험도 낮음 · 리뷰 통과", self.message("7")["text"])
+        self.assertIn("위험도 미판정", self.message("7")["text"])
+        self.assertIn("위험도 낮음 · 리뷰 통과", build_payload(self.codex_event(), "token", self.helper, "7")["text"])
         self.files = [{"filename": ".github/workflows/ci.yml"}]
         self.assertIn("위험도 높음 · 팀원 확인", self.message("7")["text"])
 
@@ -81,7 +82,7 @@ class SlackReviewTests(unittest.TestCase):
         self.checks = [self.check_record(conclusion="action_required", output={"title": "팀원 판단"})]
         self.assertIn("팀원 확인", self.message("7")["text"])
         self.checks = [self.check_record(output={"title": "팀원 승인"})]
-        self.assertIn("팀원 승인", self.message("7")["text"])
+        self.assertIn("팀원 승인", build_payload(self.codex_event(), "token", self.helper, "7")["text"])
 
     def test_shared_head_uses_workflow_base_filter(self):
         probe = self.pr | {"number": 63, "base": {"ref": "test/probe"}}
@@ -112,7 +113,7 @@ class SlackReviewTests(unittest.TestCase):
 
         self.helper.github_json.side_effect = lookup
         return {"repository": self.run["repository"], "issue": {"number": 62, "pull_request": {"url": "pull/62"}},
-                "comment": dict(self.comment)}
+                "comment": dict(self.comment), "sender": {"id": CODEX_BOT_ID}}
 
     def test_official_review_without_findings_still_needs_task_evidence(self):
         result = build_payload(self.codex_event(), "token", self.helper)
@@ -126,8 +127,18 @@ class SlackReviewTests(unittest.TestCase):
         result = build_payload(self.codex_event(findings=True), "token", self.helper)
         self.assertIn("중간 · 리뷰 지적 확인", result["text"])
 
+    def test_new_findings_override_older_success_on_the_same_commit(self):
+        for title in ("통과", "팀원 승인"):
+            with self.subTest(title=title):
+                self.checks = [self.check_record(output={"title": title})]
+                result = build_payload(self.codex_event(findings=True), "token", self.helper, "7")
+                self.assertIn("중간 · 리뷰 지적 확인", result["text"])
+
     def test_skips_unsigned_stale_repeated_and_running_comments(self):
         event = self.codex_event(status="running")
+        self.assertIsNone(build_payload(event, "token", self.helper))
+        event = self.codex_event()
+        event["sender"] = {"id": 42}
         self.assertIsNone(build_payload(event, "token", self.helper))
         event = self.codex_event()
         self.comment["performed_via_github_app"] = {"id": 99}

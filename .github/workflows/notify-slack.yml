@@ -24,7 +24,7 @@ concurrency:
 jobs:
   notify:
     name: slack-notification
-    if: github.event_name == 'workflow_run' || (github.event.issue.pull_request && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
+    if: github.event_name == 'workflow_run' || (github.event.issue.pull_request && github.event.sender.id == 199175422 && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

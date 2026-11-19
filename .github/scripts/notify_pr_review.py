@@ -67,7 +67,8 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
                                        "SCRUM 완료 조건별 근거와 필수 CI를 확인하세요.")
 
     # 체크 이름만 같은 다른 앱이나 같은 SHA를 공유하는 다른 PR의 판정을 제외한다.
-    if app_id and app_id.isascii() and app_id.isdigit():
+    # 같은 커밋도 다시 리뷰할 수 있다. CI 단독 알림이나 미해결 최신 리뷰는 이전 성공으로 덮지 않는다.
+    if app_id and app_id.isascii() and app_id.isdigit() and not (codex and codex["has_unresolved_findings"]):
         result = get(f"{api}/commits/{sha}/check-runs?check_name=review-risk&app_id={app_id}&filter=latest")
         runs = [check for check in result["check_runs"] if str(check["app"]["id"]) == app_id
                 and check["name"] == "review-risk" and check["head_sha"] == sha
@@ -78,13 +79,13 @@ def risk_for_pr(run, pr, get, app_id, codex=None):
             if check.get("conclusion") == "failure" and title == "수정 필요":
                 risk, decision = ("높음" if risk == "높음" else "중간"), "수정 필요"
                 reason, action = "검증 체크에서 SCRUM 완료 조건 위반을 확인했습니다.", "PR의 지적을 수정한 뒤 재리뷰를 요청하세요."
-            elif check.get("conclusion") == "success" and title == "통과" and risk != "높음":
+            elif codex and check.get("conclusion") == "success" and title == "통과" and risk != "높음":
                 risk, decision = "낮음", "리뷰 통과"
                 reason, action = "최신 커밋에서 SCRUM 완료 조건별 근거를 확인했습니다.", "필수 CI와 GitHub 병합 조건을 확인하세요."
             elif title == "팀원 판단" and check.get("conclusion") == "action_required":
                 decision = "팀원 확인"
                 reason, action = "검증 체크에서 팀원 판단을 요청했습니다.", "PR에서 호출 흐름과 검증 근거를 확인하고 승인하세요."
-            elif title == "팀원 승인" and check.get("conclusion") == "success":
+            elif codex and title == "팀원 승인" and check.get("conclusion") == "success":
                 decision = "팀원 승인"
                 reason, action = "검증 체크가 최신 커밋의 독립된 팀원 승인을 확인했습니다.", "나머지 필수 CI와 리뷰 대화를 확인하세요."
 
@@ -101,7 +102,8 @@ def build_payload(event, token, helper, app_id=""):
     codex = None
     if "comment" in event:
         comment, issue = event["comment"], event["issue"]
-        if not issue.get("pull_request") or comment.get("user", {}).get("id") != CODEX_BOT_ID:
+        if (not issue.get("pull_request") or event.get("sender", {}).get("id") != CODEX_BOT_ID
+                or comment.get("user", {}).get("id") != CODEX_BOT_ID):
             return None
         codex = review_state(comment.get("body"))
         previous = review_state(event.get("changes", {}).get("body", {}).get("from"))
