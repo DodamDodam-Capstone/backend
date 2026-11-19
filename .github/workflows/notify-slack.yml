@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  checks: read
 
 concurrency:
   group: slack-notification-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
@@ -24,6 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: 신뢰된 backend 알림 코드 체크아웃
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
       - name: 검증된 Slack helper 체크아웃
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,7 +39,9 @@ jobs:
           persist-credentials: false
 
       - name: Backend Slack 채널에 결과 전송
-        run: python3 .automation/.github/scripts/notify_workflow_run_to_slack.py
+        run: python3 .github/scripts/notify_pr_review.py
         env:
+          PYTHONPATH: .automation/.github/scripts
+          REVIEW_RISK_APP_ID: ${{ vars.REVIEW_RISK_APP_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GITHUB_API_TOKEN: ${{ github.token }}

@@ -27,7 +27,9 @@ jobs:
       - name: Agent document and attribution checks
         run: python3 .github/scripts/check_agent_policy.py
       - name: SCRUM review routing policy regression checks
-        run: python3 .github/scripts/test_review_routing.py
+        run: |
+          python3 .github/scripts/test_review_routing.py
+          python3 .github/scripts/test_notify_pr_review.py
       - name: CI contract regression checks
         run: python3 .github/scripts/test_ci_contract.py
       - name: Release and PR contract regression checks

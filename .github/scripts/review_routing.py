@@ -16,15 +16,24 @@ class Review:
 
 
 BASE = "src/main/java/com/dodamdodam/backend/"
-HUMAN_PREFIXES = (
-    ".github/", "gradle/", "scripts/", "src/main/resources/",
-    BASE + "auth/", BASE + "guardian/", BASE + "global/",
-)
-HUMAN_FILES = {
-    "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "CODEOWNERS", "build.gradle.kts",
-    "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "compose.yaml",
-    "docs/AGENT_WORKFLOW.md", "docs/AGENT_DOCUMENTATION.md", "docs/TEAM_WORKFLOW_GUIDE.md",
-}
+BUILD_FILES = {"build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "compose.yaml"}
+
+
+def protected_reason(path):
+    parts = path.split("/")
+    if path.startswith(".github/") or parts[-1] in {"AGENTS.md", "CLAUDE.md", "CODEOWNERS"} or path in {
+        "CONTRIBUTING.md", "docs/AGENT_WORKFLOW.md", "docs/AGENT_DOCUMENTATION.md", "docs/TEAM_WORKFLOW_GUIDE.md",
+    }:
+        return "CI·리뷰 정책 변경"
+    if path.startswith((BASE + "auth/", BASE + "guardian/")):
+        return "인증·보호자 권한 처리 변경"
+    if "infrastructure" in parts or path.startswith("src/main/resources/db/"):
+        return "영속화·외부 연동 변경"
+    if path.startswith(BASE + "global/"):
+        return "여러 API에 적용되는 공통 처리 변경"
+    if path in BUILD_FILES or path.startswith(("gradle/", "scripts/", "src/main/resources/")):
+        return "빌드·런타임 설정 변경"
+    return None
 
 
 def route(*, task, head, paths, ci, review, criteria, only_known_changes):
@@ -40,11 +49,8 @@ def route(*, task, head, paths, ci, review, criteria, only_known_changes):
         return "팀원 판단"
     if review.changed_flow is not False or review.tests_weakened is not False:
         return "팀원 판단"
-    for path in paths:
-        parts = path.split("/")
-        if (path in HUMAN_FILES or parts[-1] in {"AGENTS.md", "CLAUDE.md", "CODEOWNERS"}
-                or path.startswith(HUMAN_PREFIXES) or "infrastructure" in parts):
-            return "팀원 판단"
+    if any(protected_reason(path) for path in paths):
+        return "팀원 판단"
     return "통과"
 
 
