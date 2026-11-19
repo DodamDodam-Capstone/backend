@@ -252,14 +252,41 @@ class EmailVerificationHttpTests {
         assertError(send(verifyPost(id, "012345", csrf)), 403, purpose + "_AUTHORIZATION_REQUIRED");
     }
 
+    @ParameterizedTest
+    @CsvSource({"PIN_SETUP,1", "PIN_SETUP,10", "PIN_RESET,1", "PIN_RESET,10"})
+    void stalePinAuthorityLeavesSubjectBudgetUntouched(Purpose purpose, int reserved) throws Exception {
+        var owner = fixture(purpose == Purpose.PIN_RESET);
+        var id = pinChallenge(owner, purpose.name());
+        var csrf = csrf(owner.cookie());
+        var key = keys.rateHasher().emailVerifySubject(purpose, owner.account() + "@example.invalid", owner.account());
+        jdbc.update("""
+                INSERT INTO auth_rate_limits(action,key_hash,window_started_at,attempt_count,expires_at)
+                VALUES(?,?,clock_timestamp(),?,clock_timestamp()+interval '900 seconds')
+                """, key.action().name(), key.keyHash(), reserved);
+        if (purpose == Purpose.PIN_RESET) {
+            jdbc.update("UPDATE guardian_pins SET pin_version=pin_version+1 WHERE account_id=?", owner.account());
+        } else {
+            jdbc.update("UPDATE session_security SET setup_generation=setup_generation+1 WHERE id=?", owner.context());
+        }
+        assertError(send(verifyPost(id, "012345", csrf)), 403, purpose + "_AUTHORIZATION_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action=? AND key_hash=?",
+                Integer.class, key.action().name(), key.keyHash())).isEqualTo(reserved);
+    }
+
     @Test void exhaustedVerificationIpStopsBeforeChallengeLookup() throws Exception {
         var id = publicChallenge(true, false);
         var request = verifyPost(id, "012346", csrf(""));
         assertError(send(request), 400, "VERIFICATION_INVALID");
-        jdbc.update("UPDATE auth_rate_limits SET attempt_count=? WHERE action='EMAIL_VERIFY_IP'",
-                Action.EMAIL_VERIFY_IP.capacity());
+        // IP 단계에서 거부되면 대상 창이 더 길어도 challenge나 대상 키를 조회하지 않는다.
+        jdbc.update("""
+                UPDATE auth_rate_limits SET attempt_count=?, window_started_at=clock_timestamp()-interval '870 seconds'
+                WHERE action='EMAIL_VERIFY_IP'
+                """, Action.EMAIL_VERIFY_IP.capacity());
+        jdbc.update("UPDATE auth_rate_limits SET blocked_until=clock_timestamp()+interval '800 seconds' WHERE action='EMAIL_VERIFY_SUBJECT'");
         clearInvocations(challenges);
-        assertError(send(request), 429, "RATE_LIMITED");
+        var rejected = send(request);
+        assertError(rejected, 429, "RATE_LIMITED");
+        assertThat(Long.parseLong(rejected.headers().firstValue("Retry-After").orElseThrow())).isBetween(1L, 30L);
         verify(challenges, never()).findChallenge(any());
         assertThat(jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action='EMAIL_VERIFY_SUBJECT'",
                 Long.class)).isEqualTo(1);
@@ -279,6 +306,7 @@ class EmailVerificationHttpTests {
         var rejected = send(verifyPost(id, "012346", csrf));
         assertError(rejected, 429, "RATE_LIMITED");
         assertThat(Long.parseLong(rejected.headers().firstValue("Retry-After").orElseThrow())).isBetween(800L, 900L);
+        assertError(send(verifyPost(id, "012345", csrf)), 400, "VERIFICATION_INVALID");
         assertThat(jdbc.queryForObject("SELECT attempt_count FROM auth_rate_limits WHERE action='EMAIL_VERIFY_SUBJECT'",
                 Long.class)).isEqualTo(10);
     }
