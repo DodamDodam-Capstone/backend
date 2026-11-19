@@ -15,7 +15,7 @@ class DeepReviewTests(unittest.TestCase):
         self.sha = "a" * 40
         self.repo = "org/backend"
         self.pr = {"head": {"sha": self.sha, "repo": {"full_name": self.repo}},
-                   "base": {"sha": "b" * 40, "ref": "development"}, "state": "open",
+                   "base": {"sha": "b" * 40, "ref": "development"}, "state": "open", "draft": False,
                    "title": "SCRUM-42", "changed_files": 1, "body": "완료 조건"}
         self.file = {"filename": ".github/workflows/ci.yml", "patch": "@@ -1 +1 @@\n-old\n+new",
                      "status": "modified", "additions": 1, "deletions": 1}
@@ -94,7 +94,7 @@ class DeepReviewTests(unittest.TestCase):
         queue.assert_not_called()
 
     def test_no_paid_call_for_other_targets(self):
-        for change in ({"state": "closed"}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
+        for change in ({"state": "closed"}, {"draft": True}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
                        {"head": self.pr["head"] | {"sha": "c"*40}}, {"base": {"ref": "test", "sha": "d"*40}}):
             with self.subTest(change=change), patch.dict(self.pr, change):
                 self.assertIsNone(self.run_review())
