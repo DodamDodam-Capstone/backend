@@ -13,6 +13,22 @@ concurrency:
   group: backend-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  request-development-review:
+    if: >-
+      github.event_name == 'pull_request' && vars.DEVELOPMENT_SOL_REVIEW == 'true' &&
+      github.event.pull_request.base.ref == 'development' && !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # PR 코드는 실행하지 않고 보호 브랜치에 대상 번호와 커밋만 전달한다.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh workflow run notify-slack.yml --repo "$GITHUB_REPOSITORY" --ref development -f "number=$PR_NUMBER" -f "sha=$REVIEW_SHA"
+
   quality:
     name: backend-quality
     runs-on: ubuntu-latest

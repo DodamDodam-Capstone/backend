@@ -15,7 +15,7 @@ class DeepReviewTests(unittest.TestCase):
         self.sha = "a" * 40
         self.repo = "org/backend"
         self.pr = {"head": {"sha": self.sha, "repo": {"full_name": self.repo}},
-                   "base": {"sha": "b" * 40, "ref": "development"}, "state": "open",
+                   "base": {"sha": "b" * 40, "ref": "development"}, "state": "open", "draft": False,
                    "title": "SCRUM-42", "changed_files": 1, "body": "완료 조건"}
         self.file = {"filename": ".github/workflows/ci.yml", "patch": "@@ -1 +1 @@\n-old\n+new",
                      "status": "modified", "additions": 1, "deletions": 1}
@@ -94,7 +94,7 @@ class DeepReviewTests(unittest.TestCase):
         queue.assert_not_called()
 
     def test_no_paid_call_for_other_targets(self):
-        for change in ({"state": "closed"}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
+        for change in ({"state": "closed"}, {"draft": True}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
                        {"head": self.pr["head"] | {"sha": "c"*40}}, {"base": {"ref": "test", "sha": "d"*40}}):
             with self.subTest(change=change), patch.dict(self.pr, change):
                 self.assertIsNone(self.run_review())
@@ -126,7 +126,7 @@ class DeepReviewTests(unittest.TestCase):
         self.file.update(filename="docs/guide.md", previous_filename="AGENTS.md")
         self.assertIn("CI·리뷰", deep.high_risk_reason(self.pr, [self.file]))
 
-    def test_workflow_serializes_each_paid_head_and_only_executes_default_branch_code(self):
+    def test_workflow_serializes_each_paid_head_and_only_executes_trusted_workflow_code(self):
         workflow = (Path(__file__).resolve().parents[1] / "workflows/notify-slack.yml").read_text()
         paid_job, publisher = workflow.split("\n  deep-review:", 1)[1].split("\n  publish-review:", 1)
         self.assertIn("pull-requests: write", publisher)
@@ -134,12 +134,19 @@ class DeepReviewTests(unittest.TestCase):
         self.assertNotIn("checks: write", publisher)
         self.assertIn("ref: ${{ github.workflow_sha }}", publisher)
         for guard in ("needs.notify.outputs.deep_sha != ''", "environment: sol-max-review",
-                      "group: sol-max-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}",
+                      "group: sol-max-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}",
                       "cancel-in-progress: false", "ref: ${{ github.workflow_sha }}", "checks: write"):
             self.assertIn(guard, paid_job)
         self.assertIn("timeout-minutes: 35", paid_job)
         self.assertNotIn("pull-requests: write", paid_job)
         self.assertNotIn("pull_request_target", workflow)
+        self.assertIn("github.ref == 'refs/heads/development' && github.ref_protected", workflow)
+        ci = (Path(__file__).resolve().parents[1] / "workflows/ci.yml").read_text()
+        relay = ci.split("  request-development-review:", 1)[1].split("  quality:", 1)[0]
+        self.assertIn("pull_request.head.repo.full_name == github.repository", relay)
+        self.assertIn("--ref development", relay)
+        self.assertNotIn("actions/checkout", relay)
+        self.assertNotIn("secrets.", relay)
 
     def test_reordered_calls_outside_protected_paths(self):
         diff = "@@ -1,2 +1,2 @@\n-    ledger.reserve();\n     ledger.commit();\n+    ledger.reserve();"
