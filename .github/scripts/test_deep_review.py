@@ -4,7 +4,7 @@ import io
 import json
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import deep_review as deep
 from review_routing import BASE, reordered_calls
@@ -21,7 +21,7 @@ class DeepReviewTests(unittest.TestCase):
                      "status": "modified", "additions": 1, "deletions": 1}
         self.checks = []
         self.writes = []
-        self.paid = self.enter_mock("model_review", return_value=("success", "추가 지적 없음", "판단 근거"))
+        self.paid = self.enter_mock("model_review", return_value=("success", "추가 지적 없음", "판단 근거", []))
         self.enter_mock("api", side_effect=self.api)
 
     def enter_mock(self, name, **kwargs):
@@ -58,6 +58,21 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIsNone(self.run_review())
         self.paid.assert_called_once()
 
+    def test_changes_can_retry_publication_without_repeating_payment(self):
+        self.paid.return_value = ("failure", "수정 필요", "근거", [{"path": self.file["filename"], "anchor": "R1", "body": "수정"}])
+        queue = Mock()
+        def execute(run_url):
+            return deep.run(self.repo, 62, self.sha, "test", run_url=run_url, queue_review=queue)
+        self.assertIn("수정 필요", execute("run/42")["text"])
+        self.assertIn("R1", self.writes[-1]["output"]["text"])
+        queue.assert_called_once_with(711)
+        execute("run/42")
+        self.assertEqual(queue.call_count, 2)
+        execute("run/43")
+        self.assertEqual(queue.call_count, 2)
+        self.paid.assert_called_once()
+        self.assertEqual(len(self.checks), 1)
+
     def test_no_paid_call_for_other_targets(self):
         for change in ({"state": "closed"}, {"head": {"sha": self.sha, "repo": {"full_name": "fork/backend"}}},
                        {"head": self.pr["head"] | {"sha": "c"*40}}, {"base": {"ref": "test", "sha": "d"*40}}):
@@ -93,7 +108,11 @@ class DeepReviewTests(unittest.TestCase):
 
     def test_workflow_serializes_each_paid_head_and_only_executes_default_branch_code(self):
         workflow = (Path(__file__).resolve().parents[1] / "workflows/notify-slack.yml").read_text()
-        paid_job = workflow.split("\n  deep-review:", 1)[1]
+        paid_job, publisher = workflow.split("\n  deep-review:", 1)[1].split("\n  publish-review:", 1)
+        self.assertIn("pull-requests: write", publisher)
+        self.assertNotIn("OPENAI_API_KEY", publisher)
+        self.assertNotIn("checks: write", publisher)
+        self.assertIn("ref: ${{ github.workflow_sha }}", publisher)
         for guard in ("needs.notify.outputs.deep_sha != ''", "environment: sol-max-review",
                       "group: sol-max-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}",
                       "cancel-in-progress: false", "ref: ${{ github.workflow_sha }}", "checks: write"):
@@ -128,7 +147,7 @@ class DeepReviewTests(unittest.TestCase):
     def test_push_during_paid_review_discards_verdict(self):
         def result(*args):
             self.pr["head"]["sha"] = "c"*40
-            return "success", "추가 지적 없음", "근거"
+            return "failure", "수정 필요", "근거", [{"path": "a", "anchor": "R1", "body": "지적"}]
         self.paid.side_effect = result
         self.assertIn("이전 변경 기준", self.run_review()["text"])
         self.assertEqual(self.writes[-1]["conclusion"], "neutral")
@@ -137,10 +156,12 @@ class DeepReviewTests(unittest.TestCase):
 class ResponsesTests(unittest.TestCase):
     @patch.object(deep, "urlopen")
     def test_reasoning_model_budget_and_structured_response(self, post):
-        part = {"type": "output_text", "text": json.dumps({"decision": "changes", "evidence": "파일 A 호출 순서"})}
+        findings = [{"path": "A.java", "anchor": "R3", "body": "호출 순서를 확인하세요."}]
+        report = {"evidence": "파일 A 호출 순서", "assessment": {"decision": "changes", "findings": findings}}
+        part = {"type": "output_text", "text": json.dumps(report)}
         post.return_value = io.BytesIO(json.dumps({"status": "completed", "output": [
             {"type": "reasoning"}, {"type": "message", "content": [part]}]}).encode())
-        self.assertEqual(deep.model_review("입력", "test"), ("failure", "수정 필요", "파일 A 호출 순서"))
+        self.assertEqual(deep.model_review("입력", "test"), ("failure", "수정 필요", "파일 A 호출 순서", findings))
         request = post.call_args.args[0]
         body = json.loads(request.data)
         self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
