@@ -174,7 +174,7 @@ class ResponsesTests(unittest.TestCase):
         request = post.call_args.args[0]
         body = json.loads(request.data)
         self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
-        self.assertEqual((body["model"], body["reasoning"], body["max_output_tokens"]), ("gpt-6.2-sol", {"effort": "max"}, 16000))
+        self.assertEqual((body["model"], body["reasoning"], body["max_output_tokens"]), ("gpt-6.2-sol", {"effort": "max"}, 48_000))
         self.assertFalse(body["store"])
         self.assertNotIn("tools", body)
 
