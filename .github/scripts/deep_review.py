@@ -65,7 +65,7 @@ def model_review(data, key):
     request = Request("https://api.openai.com/v1/responses", data=json.dumps(body).encode(),
                       headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
     # 응답 유실 시 이미 과금됐을 수 있어 유료 POST는 재시도하지 않는다.
-    with urlopen(request, timeout=720) as response:
+    with urlopen(request, timeout=30 * 60) as response:
         result = json.load(response)
     if result.get("status") != "completed":
         raise ValueError("응답이 완료되지 않았습니다.")

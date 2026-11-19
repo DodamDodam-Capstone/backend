@@ -60,7 +60,7 @@ jobs:
     outputs:
       review_check: ${{ steps.review.outputs.review_check }}
     environment: sol-max-review
-    timeout-minutes: 18
+    timeout-minutes: 35
     permissions:
       contents: read
       pull-requests: read
