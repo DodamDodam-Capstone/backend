@@ -58,6 +58,17 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIsNone(self.run_review())
         self.paid.assert_called_once()
 
+    def test_attests_only_fresh_success_for_this_head_and_base(self):
+        proof = Mock()
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once_with(f"62 {self.sha} {self.pr['base']['sha']} 711")
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once()
+        self.checks.clear()
+        self.paid.return_value = ("action_required", "확인 필요", "근거", [])
+        deep.run(self.repo, 62, self.sha, "test", record_clear=proof)
+        proof.assert_called_once()
+
     def test_changes_can_retry_publication_without_repeating_payment(self):
         self.paid.return_value = ("failure", "수정 필요", "근거", [{"path": self.file["filename"], "anchor": "R1", "body": "수정"}])
         queue = Mock()
@@ -126,6 +137,7 @@ class DeepReviewTests(unittest.TestCase):
                       "group: sol-max-${{ github.event.issue.number }}-${{ needs.notify.outputs.deep_sha }}",
                       "cancel-in-progress: false", "ref: ${{ github.workflow_sha }}", "checks: write"):
             self.assertIn(guard, paid_job)
+        self.assertIn("timeout-minutes: 35", paid_job)
         self.assertNotIn("pull-requests: write", paid_job)
         self.assertNotIn("pull_request_target", workflow)
 
@@ -171,10 +183,11 @@ class ResponsesTests(unittest.TestCase):
         post.return_value = io.BytesIO(json.dumps({"status": "completed", "output": [
             {"type": "reasoning"}, {"type": "message", "content": [part]}]}).encode())
         self.assertEqual(deep.model_review("입력", "test"), ("failure", "수정 필요", "파일 A 호출 순서", findings))
+        self.assertEqual(post.call_args.kwargs["timeout"], 30 * 60)
         request = post.call_args.args[0]
         body = json.loads(request.data)
         self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
-        self.assertEqual((body["model"], body["reasoning"], body["max_output_tokens"]), ("gpt-6.2-sol", {"effort": "max"}, 16000))
+        self.assertEqual((body["model"], body["reasoning"], body["max_output_tokens"]), ("gpt-6.2-sol", {"effort": "max"}, 48_000))
         self.assertFalse(body["store"])
         self.assertNotIn("tools", body)
 

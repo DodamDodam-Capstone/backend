@@ -97,7 +97,7 @@ class SlackReviewTests(unittest.TestCase):
         self.assertIs(self.message(), self.helper.build_payload.return_value)
 
     def codex_event(self, status="completed", findings=False):
-        state = {"code_review": {"status": status, "commit_sha": self.sha, "has_unresolved_findings": findings}}
+        state = {"code_review": {"status": status, "commit_sha": self.sha, "has_any_findings": findings, "has_unresolved_findings": findings}}
         body = "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 " + json.dumps(state) + " -->"
         self.comment = {"id": 88, "user": {"id": CODEX_BOT_ID}, "body": body,
                         "performed_via_github_app": {"id": CODEX_APP_ID},
@@ -115,9 +115,9 @@ class SlackReviewTests(unittest.TestCase):
         return {"repository": self.run["repository"], "issue": {"number": 62, "pull_request": {"url": "pull/62"}},
                 "comment": dict(self.comment), "sender": {"id": CODEX_BOT_ID}}
 
-    def test_official_review_without_findings_still_needs_task_evidence(self):
+    def test_official_clear_still_requires_verifiable_patch(self):
         result = build_payload(self.codex_event(), "token", self.helper)
-        self.assertIn("미판정 · 명세 확인 대기", result["text"])
+        self.assertIn("중간 · 팀원 확인", result["text"])
         self.assertIn("공식 리뷰", result["blocks"][2]["elements"][1]["text"])
         self.files = [{"filename": ".github/workflows/ci.yml"}]
         result = build_payload(self.codex_event(), "token", self.helper)

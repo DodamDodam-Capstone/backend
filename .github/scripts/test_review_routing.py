@@ -11,7 +11,7 @@ class ReviewRoutingTests(unittest.TestCase):
         self.review = Review("SCRUM-80", "new", "pass", {"nickname": "애칭 1~20자 경계 테스트"},
                              changed_flow=False, tests_weakened=False)
         self.request = dict(task="SCRUM-80", head="new", paths=[BASE + "child/dto/CreateChildRequest.java"],
-                            ci="passed", review=self.review, criteria={"nickname"}, only_known_changes=True)
+                            ci="passed", review=self.review, only_known_changes=True)
 
     def check(self, expected, **changes):
         self.assertEqual(route(**(self.request | changes)), expected)
@@ -22,9 +22,8 @@ class ReviewRoutingTests(unittest.TestCase):
     def test_feature_with_relevant_new_tests_can_pass(self):
         self.check("통과", paths=[*self.request["paths"], "src/test/java/child/CreateChildRequestTests.java"])
 
-    def test_missing_one_acceptance_criterion(self):
-        self.check("팀원 판단", criteria={"nickname", "limits"})
-        self.check("팀원 판단", criteria=set())
+    def test_no_separate_jira_evidence_for_low_risk(self):
+        self.check("통과", review=replace(self.review, evidence={}))
 
     def test_human_must_be_independent_current_and_still_approved(self):
         approval = dict(head="new", author=10, last_pusher=20, reviewer=30, reviewed_head="new",
@@ -65,7 +64,6 @@ class ReviewRoutingTests(unittest.TestCase):
 
     def test_missing_evidence_or_completion(self):
         self.check("팀원 판단", review=None)
-        self.check("팀원 판단", review=replace(self.review, evidence={"nickname": " "}))
         self.check("팀원 판단", review=replace(self.review, outcome="incomplete"))
 
     def test_unknown_files_or_incomplete_diff(self):
