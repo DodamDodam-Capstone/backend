@@ -35,8 +35,8 @@ API, domain, database, 인증·인가, 외부 시스템 연결과 Backend 테스
 
 - Jira 접두어는 `[BE]`다. 기존 Jira Task가 있으면 GitHub Task Form을 중복 생성하지 않는다.
 - 착수 전에 담당자·Story point·계획 시작일·목표 종료일을 설정한다. `해야할 일 → 진행 중 → 검토중 → 완료` 기준으로 실제 Jira transition을 사용한다.
-- 브랜치는 최신 `development`에서 `feature/<Jira키>-<설명>`, `fix/...`, `hotfix/...`로 만든다. 보호 브랜치 직접 push·force push는 금지한다.
-- 작업 commit·PR은 Gitmoji + Conventional Commit에 같은 Jira 키와 `[BE]`를 넣고 squash 병합한다. `development → main`은 [릴리스 규칙](docs/RELEASE_GUIDE.md)의 버전 제목·merge commit을 사용한다.
+- 일반 작업은 최신 `development`에서 시작한다. 운영 패치는 최신 `main`에서 `hotfix/<Jira키>-<설명>`으로 시작한다. 보호 브랜치 직접 push·force push는 금지한다.
+- 작업 commit·PR은 Gitmoji + Conventional Commit에 같은 Jira 키와 `[BE]`를 넣고 squash 병합한다. `main` 승격에는 [릴리스 규칙](docs/RELEASE_GUIDE.md)의 버전 제목·merge commit을 사용한다.
 - 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 마지막 push를 하지 않은 다른 팀원의 승인과 모든 review conversation 해결이 필요하다.
 - PR 병합 후 Jira 자동 완료를 확인하고, GitHub-first이면 연결 GitHub Issue 종료도 확인한다. Sub-task·Epic 완료 기준은 실행 규칙을 따른다.
 

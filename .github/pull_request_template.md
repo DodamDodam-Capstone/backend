@@ -33,5 +33,4 @@
 - [ ] 일반 작업 PR이라면 제목과 브랜치에 같은 `SCRUM-번호`가 있습니다.
 - [ ] main 승격이라면 제목 버전과 VERSION이 같고 실제 포함 Task의 `## 스프린트 작업` 섹션을 작성했습니다.
 - [ ] Backend 작업 PR 제목에 `[BE]`가 있습니다.
-- [ ] 일반 작업의 base는 `development`이며 `main` 승격의 source는
-      `development`입니다.
+- [ ] 일반 작업은 `development`를 대상으로 합니다. `main` 승격의 출발 브랜치는 같은 저장소의 `development` 또는 `hotfix/SCRUM-번호-설명`입니다.
