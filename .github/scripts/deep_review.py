@@ -65,6 +65,7 @@ def submit_review(data, key, identity):
     schema = {"type": "object", "properties": {"evidence": {"type": "string"},
               "assessment": {"anyOf": [changes, other]}},
               "required": ["evidence", "assessment"], "additionalProperties": False}
+    # 기본 background 창은 store=false에도 일시 보관하여 ID 조회를 지원한다.
     body = {"model": MODEL, "reasoning": {"effort": "max"}, "max_output_tokens": OUTPUT_TOKENS,
             "background": True, "store": False, "metadata": identity, "instructions": INSTRUCTIONS, "input": data,
             "text": {"format": {"type": "json_schema", "name": "review", "strict": True, "schema": schema}}}
@@ -89,28 +90,34 @@ def model_review(data, key, identity, save, *, response_id=None):
         result = None
 
     request = Request(f"{RESPONSES_URL}/{response_id}", headers={"Authorization": f"Bearer {key}"})
-    while result is None or result.get("status") in {"queued", "in_progress"}:
-        if time.monotonic() >= deadline:
+    def remaining():
+        seconds = deadline - time.monotonic()
+        if seconds <= 0:
             raise TimeoutError("백그라운드 결과 조회 기한이 지났습니다.")
-        if result is not None:
-            time.sleep(15)
+        return seconds
+
+    delay = 15 if result is not None else 0
+    while result is None or result.get("status") in {"queued", "in_progress"}:
+        if delay:
+            time.sleep(min(delay, remaining()))
+        delay = 15
+        timeout = min(45, remaining())
         try:
-            # 읽기 오류는 같은 응답 ID로만 재시도한다.
-            with urlopen(request, timeout=45) as response:
+            # 오류 또는 잘린 조회 응답은 같은 ID로 재시도한다.
+            with urlopen(request, timeout=timeout) as response:
                 result = json.load(response)
         except HTTPError as error:
             error.close()
             if error.code not in (408, 429) and not 500 <= error.code < 600:
                 raise
-            time.sleep(15)
             result = None
             continue
-        except (OSError, IncompleteRead):
-            time.sleep(15)
+        except (OSError, IncompleteRead, json.JSONDecodeError, UnicodeDecodeError):
             result = None
             continue
         if result.get("id") != response_id or result.get("metadata") != identity:
             raise ValueError("현재 PR과 검사에 연결된 응답이 아닙니다.")
+    remaining()
     if result.get("status") != "completed":
         raise ValueError("응답이 완료되지 않았습니다.")
     messages = [part for item in result["output"] if item["type"] == "message" for part in item["content"]]
@@ -177,15 +184,13 @@ def run(repo, number, sha, key, *, run_url=None, queue_review=None, record_clear
             break
         page += 1
 
-    files = api(f"{pull}/files?per_page=100", paginate=True)
-    if len(files) != pr["changed_files"] or not files:
-        reason = "고위험 판정 후 변경 파일 목록 재확인 필요"
-        incomplete = True
-    else:
-        reason = high_risk_reason(pr, files)
-        incomplete = False
-    if not reason:
-        return
+    reason = "접수된 고위험 리뷰 결과 재조회"
+    if not response_id:
+        files = api(f"{pull}/files?per_page=100", paginate=True)
+        incomplete = len(files) != pr["changed_files"] or not files
+        reason = "고위험 판정 후 변경 파일 목록 재확인 필요" if incomplete else high_risk_reason(pr, files)
+        if not reason:
+            return
     current = api(pull)
     if not eligible(current, repo, sha) or (current["base"]["sha"], current["base"]["ref"]) != base:
         return
@@ -195,13 +200,16 @@ def run(repo, number, sha, key, *, run_url=None, queue_review=None, record_clear
         fields["details_url"] = run_url
     findings = []
     try:
-        if incomplete:
-            raise ValueError("변경 파일 목록이 불완전합니다.")
         if not key:
             raise ValueError("sol-max-review 환경의 OPENAI_API_KEY 등록이 필요합니다.")
-        data = review_input(pr, files, reason)
+        data = None
+        if not response_id:
+            if incomplete:
+                raise ValueError("변경 파일 목록이 불완전합니다.")
+            data = review_input(pr, files, reason)
     except ValueError as error:
-        status, title, evidence = "action_required", "2차 검증 미실행", str(error)
+        title = "2차 검증 미완료" if response_id else "2차 검증 미실행"
+        status, evidence = "action_required", str(error)
     else:
         if claim is None:
             claim = api(f"{root}/check-runs", fields | {"external_id": f"{marker}@{run_url}" if run_url else marker,

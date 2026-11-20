@@ -189,6 +189,9 @@ class DeepReviewTests(unittest.TestCase):
         with patch.dict(self.pr["base"], sha="d" * 40):
             self.assertIsNone(deep.run(self.repo, 62, self.sha, "test", run_url=run_url))
         self.paid.assert_not_called()
+        self.file["patch"] = ""
+        deep.run(self.repo, 62, self.sha, "", run_url=run_url)
+        self.assertIn("resp_123", self.writes[-1]["output"]["text"])
         proof = Mock()
         deep.run(self.repo, 62, self.sha, "test", run_url=run_url, record_clear=proof)
         self.assertEqual(self.paid.call_args.kwargs["response_id"], "resp_123")
@@ -213,16 +216,19 @@ class ResponsesTests(unittest.TestCase):
     @patch.object(deep, "urlopen")
     def test_pending_and_lost_get_resume_the_same_paid_response(self, http):
         part = {"type": "output_text", "text": json.dumps({"evidence": "확인", "assessment": {"decision": "clear"}})}
-        http.side_effect = [self.response("queued"), TimeoutError(), HTTPError("", 503, "", {}, None),
+        http.side_effect = [self.response("queued"), TimeoutError(), HTTPError("", 503, "", {}, None), io.BytesIO(b'{"id":'),
                             self.response("in_progress"), self.response("completed", output=[{"type": "message", "content": [part]}])]
         saved = []
         # 30분을 넘긴 뒤에도 같은 응답이 완료되면 그 결과를 쓴다.
-        with patch("time.sleep"), patch("time.monotonic", side_effect=[0, 10, 1801, 1950, 2000]):
+        now = [0]
+        def tick(_):
+            now[0] += 400
+        with patch("time.sleep", side_effect=tick), patch("time.monotonic", side_effect=lambda: now[0]):
             answer = deep.model_review("입력", "key", self.identity, saved.append)
         self.assertEqual(answer[:2], ("success", "추가 지적 없음"))
         self.assertEqual(saved, ["resp_123"])
         requests = [call.args[0] for call in http.call_args_list]
-        self.assertEqual([r.get_method() for r in requests], ["POST"] + ["GET"] * 4)
+        self.assertEqual([r.get_method() for r in requests], ["POST"] + ["GET"] * 5)
         self.assertEqual({r.full_url for r in requests[1:]}, {"https://api.openai.com/v1/responses/resp_123"})
 
     @patch.object(deep, "urlopen")
@@ -253,6 +259,29 @@ class ResponsesTests(unittest.TestCase):
         with patch("time.monotonic", side_effect=[0, 3601]), self.assertRaises(TimeoutError):
             deep.model_review("입력", "key", self.identity, lambda _: None)
         self.assertEqual([c.args[0].get_method() for c in http.call_args_list], ["POST"])
+
+    @patch.object(deep, "urlopen")
+    def test_deadline_caps_sleep_and_io_and_rejects_late_completion(self, http):
+        part = {"type": "output_text", "text": json.dumps({"evidence": "확인", "assessment": {"decision": "clear"}})}
+        for start_remaining, expected_gets in [(1, 0), (20, 1)]:
+            now = [0]
+            def request(req, timeout):
+                if req.get_method() == "POST":
+                    now[0] = 3600 - start_remaining
+                    return self.response("queued")
+                self.assertLessEqual(timeout, 5)
+                now[0] = 3601
+                return self.response("completed", output=[{"type": "message", "content": [part]}])
+            def sleep(seconds):
+                self.assertLessEqual(seconds, 3600 - now[0])
+                now[0] += seconds
+            with self.subTest(remaining=start_remaining), patch("time.sleep", side_effect=sleep), \
+                    patch("time.monotonic", side_effect=lambda: now[0]):
+                http.reset_mock()
+                http.side_effect = request
+                with self.assertRaises(TimeoutError):
+                    deep.model_review("입력", "key", self.identity, lambda _: None)
+                self.assertEqual(http.call_count, 1 + expected_gets)
 
     @patch.object(deep, "urlopen")
     def test_reasoning_model_budget_and_structured_response(self, post):

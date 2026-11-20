@@ -185,7 +185,7 @@ backend의 [Codex 저장소 설정](https://chatgpt.com/settings/code-review/rep
 
 GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브랜치를 허용하고 팀 프로젝트의 `OPENAI_API_KEY`를 등록합니다. 저장소 변수 `DEVELOPMENT_SOL_REVIEW=true`를 설정하면 내부의 일반 development PR을 열거나 갱신할 때 PR 번호와 head SHA를 보호된 development 워크플로에 전달합니다. 이 실행은 고위험 변경의 공식 앱 리뷰가 해당 SHA에서 완료되기를 약 20분 기다립니다. 시간 초과 후에는 공식 리뷰 완료를 확인하고 Actions의 **Slack Notification**을 development에서 같은 PR 번호와 전체 SHA로 다시 실행합니다.
 
-같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API에 백그라운드 작업을 한 번 제출한 후 같은 응답 ID를 최대 60분 동안 조회합니다. 전체 작업 기한은 75분입니다. 보호된 원래 Actions 실행을 다시 실행하면 같은 PR·head·base·검사에 연결된 응답을 조회합니다. 접수 ID를 받기 전에 연결이 끊기거나 응답의 임시 보관 기간이 지나면 팀원이 확인합니다. `store: false`를 사용하며, 백그라운드 조회를 위해 제공자가 요청·응답을 일시 보관합니다. 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
+같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API에 백그라운드 작업을 한 번 제출한 후 같은 응답 ID를 최대 60분 동안 조회합니다. 전체 작업 기한은 75분입니다. 보호된 원래 Actions 실행을 다시 실행하면 같은 PR·head·base·검사에 연결된 응답을 조회합니다. 접수 ID를 받기 전에 연결이 끊기거나 응답의 임시 보관 기간이 지나면 팀원이 확인합니다. `store: false`를 사용하며, 백그라운드 조회를 위해 제공자가 요청·응답을 일시 보관합니다. [OpenAI 백그라운드 처리](https://developers.openai.com/api/docs/guides/background) · [데이터 보관 기준](https://developers.openai.com/api/docs/guides/your-data) 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
 
 ### development 작업 PR 자동 병합
 
