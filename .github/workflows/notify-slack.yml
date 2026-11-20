@@ -1,18 +1,6 @@
 name: Slack Notification
 
 on:
-  workflow_dispatch:
-    inputs:
-      number:
-        description: 검토할 development PR 번호
-        type: string
-        required: true
-      sha:
-        description: 검토할 PR의 전체 head SHA
-        type: string
-        required: true
-  issue_comment:
-    types: [created, edited]
   workflow_run:
     workflows:
       - Backend CI
@@ -25,29 +13,17 @@ on:
 permissions:
   contents: read
   pull-requests: read
-  checks: read
 
 concurrency:
-  group: slack-notification-${{ github.event.workflow_run.id || github.run_id }}-${{ github.event.workflow_run.run_attempt || github.run_attempt }}
+  group: slack-notification-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
   cancel-in-progress: false
 
 jobs:
   notify:
     name: slack-notification
-    if: >-
-      github.event_name == 'workflow_run' ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/development' && github.ref_protected && vars.DEVELOPMENT_SOL_REVIEW == 'true') ||
-      (github.event.issue.pull_request && github.event.sender.id == 199175422 && github.event.comment.user.id == 199175422 && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     runs-on: ubuntu-latest
-    outputs:
-      deep_sha: ${{ steps.report.outputs.deep_sha }}
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
-      - name: 신뢰된 backend 알림 코드 체크아웃
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
       - name: 검증된 Slack helper 체크아웃
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,87 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Backend Slack 채널에 결과 전송
-        id: report
-        run: python3 .github/scripts/notify_pr_review.py
+        run: python3 .automation/.github/scripts/notify_workflow_run_to_slack.py
         env:
-          GH_TOKEN: ${{ github.token }}
-          PYTHONPATH: .automation/.github/scripts
-          REVIEW_RISK_APP_ID: ${{ vars.REVIEW_RISK_APP_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GITHUB_API_TOKEN: ${{ github.token }}
-
-  deep-review:
-    name: 고위험 PR 2차 리뷰
-    needs: notify
-    if: ${{ !cancelled() && needs.notify.outputs.deep_sha != '' }}
-    runs-on: ubuntu-latest
-    outputs:
-      review_check: ${{ steps.review.outputs.review_check }}
-      clear_proof: ${{ steps.review.outputs.clear_proof }}
-    environment: sol-max-review
-    timeout-minutes: 35
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: write
-    concurrency:
-      group: sol-max-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: DodamDodam-Capstone/integration
-          ref: 37f994f5fbdf18ea1b68ba058d7ab97f5a1c806d
-          path: .automation
-          persist-credentials: false
-      - name: 최신 고위험 변경 검증 및 결과 알림
-        id: review
-        run: python3 .github/scripts/deep_review.py
-        env:
-          PYTHONPATH: .automation/.github/scripts
-          REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR_NUMBER: ${{ github.event.issue.number || inputs.number }}
-          REVIEW_SHA: ${{ needs.notify.outputs.deep_sha }}
-          GH_TOKEN: ${{ github.token }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  attest-clear:
-    needs: deep-review
-    if: needs.deep-review.outputs.clear_proof != ''
-    name: sol-max-clear ${{ needs.deep-review.outputs.clear_proof }}
-    permissions: {}
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo '유료 리뷰 통과 확인'
-
-  publish-review:
-    name: Sol Max 수정 지적을 PR에 게시
-    needs: [notify, deep-review]
-    if: ${{ !cancelled() && needs.deep-review.outputs.review_check != '' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      checks: read
-      pull-requests: write
-    concurrency:
-      group: sol-max-comments-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - name: 대화 요약과 줄별 코멘트를 일반 리뷰 한 건으로 게시
-        run: python3 .github/scripts/sol_max_comments.py
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number || inputs.number }}
-          REVIEW_SHA: ${{ needs.notify.outputs.deep_sha }}
-          REVIEW_CHECK: ${{ needs.deep-review.outputs.review_check }}
-          REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

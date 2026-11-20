@@ -68,6 +68,5 @@ docker compose stop
 - [개발환경 설치·실행 가이드](docs/DEVELOPMENT_SETUP.md)
 - [IntelliJ·JDK·Docker 상세 설정](docs/DEVELOPMENT_SETUP.md#5-intellij-idea-설정)
 - [Backend 팀 업무 실행 가이드](docs/TEAM_WORKFLOW_GUIDE.md)
-- [development PR의 위험도별 자동 병합 조건](docs/TEAM_WORKFLOW_GUIDE.md#development-작업-pr-자동-병합)
 - [기여 가이드](CONTRIBUTING.md)
 - [보안 정책](SECURITY.md)
