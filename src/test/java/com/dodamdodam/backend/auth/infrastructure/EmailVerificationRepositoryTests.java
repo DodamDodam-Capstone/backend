@@ -5,7 +5,6 @@ import com.dodamdodam.backend.auth.dto.IssueEmailVerificationRequest.Purpose;
 import com.dodamdodam.backend.auth.infrastructure.EmailVerificationRepository.IssuedChallenge;
 import com.dodamdodam.backend.auth.infrastructure.EmailVerificationRepository.NewChallenge;
 import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.Map;
@@ -76,7 +75,7 @@ class EmailVerificationRepositoryTests {
         assertThat((byte[]) stored.get("code_hash")).containsExactly(HASH);
         var createdAt = timestamp(issued.challengeId(), "created_at");
         assertThat(createdAt.toInstant()).isBetween(before.toInstant(), after.toInstant());
-        assertThat(Duration.between(createdAt, issued.expiresAt())).isEqualTo(Duration.ofSeconds(600));
+        assertThat(issued.expiresAt()).isEqualTo(createdAt.withNano(0).plusSeconds(600));
         assertThat(timestamp(issued.challengeId(), "expires_at")).isEqualTo(issued.expiresAt());
     }
 

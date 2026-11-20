@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import java.net.*;
 import java.net.http.*;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,7 +84,11 @@ class EmailVerificationHttpTests {
         var body=mapper.readTree(response.body());
         assertThat(body.size()).isEqualTo(1); assertThat(body.get("data").size()).isEqualTo(2);
         assertThat(body.get("data").get("challengeId").asText()).hasSize(36);
-        assertThat(body.get("data").get("expiresAt").asText()).matches(".*\\.[0-9]{6}\\+09:00");
+        String expiresAt = body.get("data").get("expiresAt").asText();
+        assertThat(expiresAt).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00");
+        var id = UUID.fromString(body.get("data").get("challengeId").asText());
+        assertThat(jdbc.queryForObject("SELECT expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
+                .isEqualTo(OffsetDateTime.parse(expiresAt));
         assertThat(response.body()).doesNotContain("eligible","code","email","account");
     }
 
@@ -207,9 +212,11 @@ class EmailVerificationHttpTests {
         assertThat(jdbc.queryForObject("SELECT token_hash FROM email_verifications WHERE id=?", byte[].class, id))
                 .containsExactly(expectedHash);
         assertThat(jdbc.queryForObject("""
-                SELECT token_expires_at - verified_at = interval '600 seconds' AND token_consumed_at IS NULL
+                SELECT token_expires_at = date_trunc('second', verified_at) + interval '600 seconds' AND token_consumed_at IS NULL
                 FROM email_verifications WHERE id=?
                 """, Boolean.class, id)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT token_expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
+                .isEqualTo(OffsetDateTime.parse(data.get("tokenExpiresAt").asText()));
         assertError(responses.stream().filter(response -> response.statusCode() == 400).findFirst().orElseThrow(),
                 400, "VERIFICATION_INVALID");
     }
@@ -644,6 +651,58 @@ class EmailVerificationHttpTests {
     }
 
     private static final String PIN_SETUP_PATH = "/api/v1/guardian/pin";
+
+    @ParameterizedTest
+    @CsvSource({"false,-1000,200", "false,0,400", "true,-1000,200", "true,0,400"})
+    void issuedCodeUsesPublishedDeadline(boolean previouslyIssued, long offsetNanos, int expectedStatus) throws Exception {
+        var csrf = csrf("");
+        var issue = send(post("{\"purpose\":\"SIGNUP\",\"email\":\"person@example.invalid\"}", csrf));
+        assertThat(issue.statusCode()).isEqualTo(200);
+        var data = mapper.readTree(issue.body()).get("data");
+        var id = UUID.fromString(data.get("challengeId").asText());
+        var deadline = OffsetDateTime.parse(data.get("expiresAt").asText());
+        if (previouslyIssued) {
+            // 이전 인증번호는 DB에 저장한 소수 초까지 사용자에게 표시했다.
+            deadline = deadline.withNano(800_000_000);
+            jdbc.update("UPDATE email_verifications SET expires_at=? WHERE id=?", deadline, id);
+        }
+        var code = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(sender).send(eq("person@example.invalid"), code.capture(), eq(true));
+        // 메일과 HTTP 사이의 실제 대기 시간에 의존하지 않고 DB 판정 시각을 고정한다.
+        doReturn(deadline.plusNanos(offsetNanos)).when(challenges).databaseNow();
+        var result = send(verifyPost(id, code.getValue(), csrf));
+        assertThat(result.statusCode()).isEqualTo(expectedStatus);
+        if (expectedStatus == 400) {
+            assertError(result, 400, "VERIFICATION_INVALID");
+            assertThat(jdbc.queryForObject("SELECT verified_at IS NULL FROM email_verifications WHERE id=?", Boolean.class, id)).isTrue();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"-1000,204", "0,400", "400000000,400"})
+    void guardianPinHonorsPublishedDeadlineForPreviouslyIssuedToken(long offsetNanos, int expectedStatus) throws Exception {
+        var owner = fixture(false);
+        var csrf = csrf(owner.cookie());
+        var id = pinChallenge(owner, "PIN_SETUP");
+        var verified = send(verifyPost(id, "012345", csrf));
+        assertThat(verified.statusCode()).isEqualTo(200);
+        var data = mapper.readTree(verified.body()).get("data");
+        var deadline = OffsetDateTime.parse(data.get("tokenExpiresAt").asText());
+        // 이전 버전은 응답에서 생략한 소수 초를 DB에 보관했다.
+        jdbc.update("UPDATE email_verifications SET token_expires_at=? WHERE id=?", deadline.plusNanos(800_000_000), id);
+        var state = accounts.findPinState(owner.account(), owner.context()).orElseThrow();
+        var atBoundary = new EmailVerificationAccountRepository.PinState(state.email(), state.accountVersion(),
+                state.contextVersion(), state.setupGeneration(), state.revokedAt(), state.expiresAt(), state.pinVersion(),
+                deadline.plusNanos(offsetNanos));
+        doReturn(Optional.of(atBoundary)).when(accounts).findPinState(owner.account(), owner.context());
+        var result = send(post(PIN_SETUP_PATH, pinSetupBody(data.get("verificationToken").asText()), csrf));
+        assertThat(result.statusCode()).isEqualTo(expectedStatus);
+        if (expectedStatus == 400) {
+            assertError(result, 400, "VERIFICATION_INVALID");
+            assertThat(jdbc.queryForObject("SELECT token_consumed_at IS NULL FROM email_verifications WHERE id=?", Boolean.class, id)).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM guardian_pins WHERE account_id=?", Long.class, owner.account())).isZero();
+        }
+    }
 
     @Test void guardianPinSetupConsumesWinnerAndClearsOnlyThisAccountsPendingPinProofs() throws Exception {
         var owner = fixture(false);

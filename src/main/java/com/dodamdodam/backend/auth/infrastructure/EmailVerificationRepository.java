@@ -44,7 +44,7 @@ public class EmailVerificationRepository {
             jdbc.queryForList("SELECT id FROM email_verifications WHERE " + unconsumedScope + " ORDER BY id FOR UPDATE",
                     UUID.class, scopeParameters.toArray());
             var issuedAt = databaseNow();
-            var expiresAt = issuedAt.plusSeconds(600);
+            var expiresAt = issuedAt.withNano(0).plusSeconds(600);
             var invalidationParameters = new ArrayList<>(scopeParameters);
             invalidationParameters.addFirst(issuedAt);
             jdbc.update("UPDATE email_verifications SET invalidated_at = ? WHERE " + unconsumedScope,
