@@ -8,6 +8,8 @@
 
 - 작업: `feature/SCRUM-번호-설명 → development`, 기존 Jira 키·[BE] 검사, squash merge.
 - 승격: 같은 저장소의 `development → main`, merge commit. 제목 예: `🚀 chore(release): [BE] v0.1.0 스프린트 릴리스`.
+- 긴급 패치: 최신 `main`에서 같은 저장소의 `hotfix/SCRUM-번호-설명` 브랜치를 만든다. 설명은 영문 소문자·숫자와 하이픈을 사용한다. `VERSION`은 현재 운영 버전의 패치 번호를 1 올린다. 정기 승격과 동일한 제목·본문, 필수 검사, 승인 및 merge commit으로 `main`에 반영한다.
+- 핫픽스 발행 후 수정과 버전을 `development` 대상 PR로 동기화한다. 이미 더 높은 개발 버전이 있다면 그 버전을 유지한다.
 - 승격 PR 제목의 버전은 PR에 포함된 VERSION과 같아야 합니다. 기존 필수 `jira-issue-key` 검사가 이 예외를 검사하며 검사 이름은 유지합니다.
 - 승격 본문에는 포함 Task·관련 Epic·검증 결과를 적고 Issue 자동 종료 키워드는 쓰지 않습니다. 매번 출시용 Epic·Task를 새로 만들지 않습니다.
 - 최초 자동화 구현만 별도 Task로 등록합니다. GitHub-first 연동이 건너뛰어졌으면 기존 Issue를 검토하고 `jira-sync`를 추가합니다. 같은 Jira Task를 수동으로 다시 만들지 않습니다.

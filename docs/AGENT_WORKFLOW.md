@@ -55,14 +55,14 @@ Jira 사이트는 `https://dodamdodam.atlassian.net`, 프로젝트 키는 `SCRUM
 ## 4. Git·PR·병합
 
 - backend 저장소의 Git 상태를 확인하고 기존 사용자 변경을 보존한다. 최신 `development`에서 작업 브랜치를 만든다.
-- 브랜치는 `feature/<Jira키>-<설명>`, `fix/<Jira키>-<설명>`, `hotfix/<Jira키>-<설명>` 형식이다. hotfix도 먼저 `development`에 반영한다.
+- 브랜치는 `feature/<Jira키>-<설명>`, `fix/<Jira키>-<설명>`, `hotfix/<Jira키>-<설명>` 형식이다. 운영 hotfix는 최신 `main`에서 시작하며 출시 후 `development`에 반영한다.
 - branch와 일반 작업 PR 제목에는 같은 Jira 키를 정확히 하나 넣는다. 작업 commit에도 같은 키를 넣는다. main 승격은 아래 릴리스 예외를 따른다.
 - commit·PR 제목은 `<gitmoji> <type>(optional-scope): SCRUM-번호 [BE] <설명>` 형식이다. 일반 PR에는 `[BE]`를 정확히 하나 넣는다.
 - Gitmoji는 의미에 맞게 선택한다. type은 `feat`, `fix`, `refactor`, `docs`, `test`, `ci`, `chore`, `perf`, `security`, `revert`, `style`, `build`, `deps`를 사용한다.
 - PR 본문에는 Jira 링크, 변경 내용, 검증 결과를 적는다. backend GitHub Issue가 실제로 있을 때만 `Resolves #번호`를 추가한다.
-- `main`·`development`에 직접 push, force push 또는 브랜치 삭제를 하지 않는다. `main` 대상 PR의 source는 항상 `development`다.
-- 작업 브랜치 → `development`는 squash merge, 같은 저장소의 `development` → `main` 승격은 merge commit이다. 승격 제목은 `🚀 chore(release): [BE] vX.Y.Z <설명>`이며 Jira 키를 필수로 요구하지 않는다. 버전은 루트 `VERSION`과 일치해야 한다. [릴리스 가이드](RELEASE_GUIDE.md)를 따른다.
-- 모든 필수 CI와 review conversation을 해결한다. 현재는 마지막 push를 하지 않은 다른 팀원의 승인을 받으며 새 commit 이후 승인을 다시 확인한다. development 조건부 승인 시범 절차는 [팀 가이드](TEAM_WORKFLOW_GUIDE.md#review-policy)를 따른다.
+- `main`·`development`에 직접 push, force push 또는 브랜치 삭제를 하지 않는다. `main` 대상 PR은 같은 저장소의 `development` 또는 운영 hotfix에서 생성한다.
+- 작업 브랜치 → `development`는 squash merge, `main` 승격은 merge commit이다. 승격 제목은 `🚀 chore(release): [BE] vX.Y.Z <설명>`이며 Jira 키를 필수로 요구하지 않는다. 버전은 루트 `VERSION`과 일치해야 한다. [릴리스 가이드](RELEASE_GUIDE.md)를 따른다.
+- 모든 필수 CI와 review conversation을 해결한다. 마지막 push를 하지 않은 다른 팀원의 승인을 받으며, 새 commit 이후 승인을 다시 확인한다.
 - 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 정확한 검사·승인 요구사항은 실제 Ruleset과 [팀 업무 가이드](TEAM_WORKFLOW_GUIDE.md)로 확인한다.
 - Dependabot 등 기존 정책에 명시된 Bot은 Jira 키 검사만 예외다. 에이전트가 자기 작업을 Bot 작업으로 분류해 검사를 우회하지 않는다.
 - 작업 브랜치 자동 삭제를 사용하지 않는다. sprint 정리 시 팀의 수동 삭제 절차를 따른다.
