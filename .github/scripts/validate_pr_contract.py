@@ -4,7 +4,7 @@ import os
 import re
 import sys
 
-from release import VERSION_PATTERN, read_version, validate_notes
+from release import VERSION_PATTERN, is_promotion_source, read_version, validate_notes, validate_patch_version
 
 
 def validate():
@@ -12,13 +12,14 @@ def validate():
     title, head, base = (os.environ[name] for name in ("PR_TITLE", "HEAD_REF", "BASE_REF"))
     prefixes = re.findall(r"\[(?:FE|BE|AI|INT)\]", title)
     if base == "main":
-        if head != "development" or os.environ["HEAD_REPOSITORY"] != os.environ["GITHUB_REPOSITORY"]:
-            raise ValueError("main 대상 PR은 같은 저장소의 development에서만 생성할 수 있습니다.")
+        if not is_promotion_source(head, os.environ["HEAD_REPOSITORY"], os.environ["GITHUB_REPOSITORY"]):
+            raise ValueError("main 승격에는 같은 저장소의 development 또는 hotfix/SCRUM-번호-설명 브랜치가 필요합니다.")
         match = re.fullmatch(r"\S+ chore\(release\): \[BE\] v(?P<version>" + VERSION_PATTERN + r") .+", title)
         if not match or prefixes != ["[BE]"] or len(re.findall(r"\bv\d+\.\d+\.\d+\b", title)) != 1:
             raise ValueError("승격 제목은 <gitmoji> chore(release): [BE] vX.Y.Z <설명> 형식이어야 합니다.")
         if match["version"] != read_version():
             raise ValueError("승격 PR 제목의 버전과 VERSION 파일이 일치해야 합니다.")
+        validate_patch_version(head, match["version"])
         validate_notes(os.environ.get("PR_BODY", ""))
         return f"Release version verified: {match['version']}"
 

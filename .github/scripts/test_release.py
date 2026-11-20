@@ -22,8 +22,19 @@ class PullRequestContractTests(unittest.TestCase):
     # 실제 CLI 경계에서 일반 작업과 승격 예외가 서로 섞이지 않는지 확인한다.
     def check_pr(self, *, title="🚀 chore(release): [BE] v0.1.0 스프린트 릴리스",
                  head="development", base="main", actor="yutakdv", version="0.1.0\n",
-                 head_repo=REPO, body=NOTES):
+                 head_repo=REPO, body=NOTES, base_version=None):
         with tempfile.TemporaryDirectory() as directory:
+            if base_version is not None:
+                # 검사 대상 checkout의 첫 부모에 운영 VERSION을 둔다.
+                def git(*args):
+                    subprocess.run(["git", "-c", "user.name=Release Test", "-c", "user.email=test@example.com",
+                                    *args], cwd=directory, capture_output=True, check=True)
+
+                git("init")
+                (Path(directory) / "VERSION").write_text(base_version)
+                git("add", "VERSION")
+                git("commit", "-m", "base version")
+                git("commit", "--allow-empty", "-m", "candidate")
             if version is not None:
                 (Path(directory) / "VERSION").write_text(version)
             return subprocess.run(
@@ -69,6 +80,16 @@ class PullRequestContractTests(unittest.TestCase):
     def test_existing_bot_exception_only_applies_to_development(self):
         self.assertEqual(self.check_pr(base="development", head="dependabot/gradle/update",
                                       actor="dependabot[bot]", title="⬆️ deps: update").returncode, 0)
+
+    def test_hotfix_requires_internal_jira_branch_and_next_patch(self):
+        options = dict(head="hotfix/SCRUM-185-review-rollback", version="0.1.2",
+                       title="🚀 chore(release): [BE] v0.1.2 리뷰 자동화 롤백", base_version="0.1.1")
+        result = self.check_pr(**options)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for changes in ({"head_repo": "other/backend"}, {"head": "hotfix/rollback"}, {"base_version": None},
+                        {"base_version": "0.0.1"}, {"base_version": "0.1.0"}, {"base_version": "0.1.2"}):
+            with self.subTest(changes=changes):
+                self.assertNotEqual(self.check_pr(**{**options, **changes}).returncode, 0)
 
     def test_main_pr_requires_nonempty_sprint_task_section(self):
         for body in ("", "설명만 있음", "## 스프린트 작업\n\n## 검증\n통과"):
@@ -159,6 +180,23 @@ class ReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.release.publish(REPO, SHA, "0.1.0")
                 self.assertEqual(self.github.writes, [])
+
+    def test_hotfix_publishes_only_next_patch_of_internal_branch(self):
+        head = self.github.pulls[0]["head"]
+        head["ref"] = "hotfix/SCRUM-185-review-rollback"
+        # 실제 main 부모를 읽는 git 경계만 대체한다.
+        with patch("subprocess.check_output", return_value="0.1.1\n"):
+            for branch, repo, version in ((head["ref"], "fork/backend", "0.1.2"),
+                                          ("hotfix/no-key", REPO, "0.1.2"),
+                                          (head["ref"], REPO, "0.2.0")):
+                with self.subTest(branch=branch, repo=repo, version=version):
+                    self.github.pulls[0]["head"] = {"ref": branch, "repo": {"full_name": repo}}
+                    with self.assertRaises(ValueError):
+                        self.release.publish(REPO, SHA, version)
+                    self.assertEqual(self.github.writes, [])
+            self.github.pulls[0]["head"] = head
+            self.release.publish(REPO, SHA, "0.1.2")
+            self.assertEqual(self.github.releases[0]["tag_name"], "v0.1.2")
 
     def test_conflicting_branch_or_tag_fails_before_any_write(self):
         for ref in ("refs/heads/release/v0.1.0", "refs/tags/v0.1.0"):

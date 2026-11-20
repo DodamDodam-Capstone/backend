@@ -160,52 +160,12 @@ database credential, 개인정보는 첨부하지 않습니다.
 - `development` → `main`은 merge commit으로 계보를 유지합니다. 기존 계보가 갈라졌다면 commit을 삭제하지 않고 보호된 동기화 PR로 연결합니다.
 - 자동 브랜치 삭제는 사용하지 않으며 작업 브랜치는 sprint 정리 시 수동 삭제합니다.
 - PR 제목 형식은 `<gitmoji> <type>(optional-scope): <description>`입니다.
-- `main` 대상 PR은 `development`에서만 만들며 긴급 수정도 같은 승격 경로를
-  사용합니다.
+- 정기 릴리스는 `development`에서, 운영 긴급 패치는 최신 `main`을 기준으로 만든 같은 저장소의 `hotfix/SCRUM-번호-설명`에서 승격합니다. 긴급 패치를 출시한 뒤 수정과 버전을 `development`에 반영합니다.
 - `main` 승격 제목은 `🚀 chore(release): [BE] v0.1.0 스프린트 릴리스`처럼
   VERSION과 같은 버전을 사용합니다. Jira 키는 필수가 아니며 Epic 완료와 무관합니다.
   생성물·보호 설정·재실행은 [Backend 릴리스 가이드](RELEASE_GUIDE.md)를 따릅니다.
 - `main` 승격 PR에는 `Resolves #번호`, `Closes #번호`, `Fixes #번호`를
   적지 않습니다. GitHub는 기본 브랜치 병합 시 이 키워드로 Issue를 닫습니다.
-
-<a id="review-policy"></a>
-### SCRUM PR 리뷰어 조건 시범안
-
-현재 모든 PR은 독립된 팀원 한 명의 승인이 필요합니다. `development`에서 인증·권한, DB·영속화, CI·정책 등 [보호 경로](https://github.com/DodamDodam-Capstone/backend/rules/27601021)를 변경하면 backend 팀원의 승인이 필요합니다. 시범 기간에는 CI가 판정 로직의 회귀 테스트를 실행합니다.
-
-backend의 [Codex 저장소 설정](https://chatgpt.com/settings/code-review/repositories/github-1340757090)은 모든 PR을 열 때 자동 리뷰를 요청합니다. 수정 커밋을 올린 뒤 다시 검토받으려면 해당 PR의 일반 댓글에 `@codex review`를 남깁니다. 이전 커밋의 결과는 새 커밋의 검증 근거로 쓸 수 없습니다.
-
-`#backend-actions`의 PR 알림에는 위험도, 판단 근거, 다음 행동, PR·커밋·검증 링크가 표시됩니다. CI 실행 결과와 공식 Codex 리뷰 완료를 각각 알립니다. 보호 경로 또는 main 릴리스는 높음, 일반 변경에 미해결 지적이 있으면 중간, 보호 경로·호출 순서 변경·테스트 약화가 없는 것으로 확인된 일반 변경은 낮음 후보입니다. 근거가 부족하면 미판정입니다. 공식 무지적 리뷰가 있어도 필수 CI와 변경 범위를 확인합니다. Jira 키 검사는 유지하며 완료 조건별 별도 증명은 요구하지 않습니다.
-
-`development`를 대상으로 하는 고위험 내부 PR은 공식 Codex가 최신 커밋의 리뷰를 완료하면 `sol-max-review` 체크에서 OpenAI Responses API의 `gpt-6.2-sol`을 `max`로 한 번 호출합니다. 보호 경로 외에도 대화 턴 접수·결과 확정·종료 서비스와 Java 변경 구간에서 기존 메서드들의 호출 순서가 뒤바뀐 경우를 포함합니다. 호출 순서 탐지는 같은 변경 구간에서 식별되는 명시적 호출을 비교합니다. 다른 파일에 걸친 간접 호출은 팀원이 확인합니다. `development → main` 승격 PR은 기존 릴리스 CI와 팀원 승인을 따르며 Sol Max를 호출하지 않습니다.
-
-2차 판정이 **수정 필요**이면 대화 탭에 요약과 영향이 큰 순서로 최대 10건의 지적을 게시하고 Files changed의 해당 줄에 코멘트를 답니다. 추가·문맥 줄은 변경 후 줄, 삭제 줄은 변경 전 줄을 사용합니다. 위치를 확인할 수 없는 지적도 요약에 남습니다. 게시 실패 시 해당 Actions 실행에서 실패한 작업을 다시 실행하면 저장된 체크 결과로 게시를 재시도합니다. 같은 검토를 재실행해도 모델을 다시 호출하거나 같은 리뷰를 중복 게시하지 않습니다.
-
-2차 리뷰에는 PR 제목·본문과 변경 파일의 텍스트 패치를 전달합니다. 체크와 Slack에 위험 근거, 모델, 추론 강도, 커밋, 결과를 표시합니다. 지적이 없어도 고위험 PR은 팀원의 독립 승인이 필요합니다. 추가 push 후에는 PR에 `@codex review`를 남기면 1차 완료 후 같은 기준으로 다시 선별합니다.
-
-GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브랜치를 허용하고 팀 프로젝트의 `OPENAI_API_KEY`를 등록합니다. 저장소 변수 `DEVELOPMENT_SOL_REVIEW=true`를 설정하면 내부의 일반 development PR을 열거나 갱신할 때 PR 번호와 head SHA를 보호된 development 워크플로에 전달합니다. 이 실행은 고위험 변경의 공식 앱 리뷰가 해당 SHA에서 완료되기를 약 20분 기다립니다. 시간 초과 후에는 공식 리뷰 완료를 확인하고 Actions의 **Slack Notification**을 development에서 같은 PR 번호와 전체 SHA로 다시 실행합니다.
-
-같은 PR·커밋의 유료 호출은 체크에 미리 기록하며 타임아웃에도 자동 재호출하지 않습니다. 입력 자료는 160,000바이트, 출력은 추론 포함 48,000토큰까지입니다. API 응답은 최대 30분 대기하며 전체 2차 리뷰 작업의 기한은 35분입니다. 키 누락·패치 생략·한도 초과·불완전한 모델 응답은 팀원 확인 대상으로 표시합니다. 외부 포크에는 유료 호출을 실행하지 않습니다.
-
-### development 작업 PR 자동 병합
-
-정기 릴리스에서 워크플로와 승인 예외를 활성화하면 내부 작업 브랜치의 열린 일반 PR을 대상으로 합니다. 모든 위험도에서 최신 커밋의 공식 Codex 무지적 판정, 필수 CI 성공, 리뷰 대화 해결, GitHub 병합 가능 상태가 필요합니다. 병합 직전에 head와 base를 확인하고, 검토한 head SHA를 지정해 squash 병합합니다.
-
-| 위험도 | 추가 조건 |
-| --- | --- |
-| 낮음 | 보호 경로 변경, 호출 순서 변경, 테스트 약화가 없음을 전체 패치에서 확인합니다. 팀원 승인과 추가 모델 호출을 생략합니다. 문서, 단순 필드·반환식, 독립적인 신규 테스트가 대표 사례입니다. |
-| 중간 | 변경이 복잡하거나 기존 테스트의 강도를 확인하기 어려우면 작성자·마지막 푸시자와 다른 backend 팀원이 최신 커밋을 승인해야 합니다. |
-| 높음 | 중간의 팀원 승인 조건과 해당 PR·head·base에 대한 운영 Sol Max 통과 기록이 모두 필요합니다. |
-| 대기 | 현재 리뷰 지적, CI 실패·미완료, 확인할 수 없는 리뷰 결과, 미해결 대화, Draft, 포크는 자동 병합 대상에서 제외합니다. |
-
-공식 리뷰·CI 알림 이후와 15분 간격의 재확인에서 판정합니다. 수정 커밋은 공식 재리뷰를 요청해야 합니다. PR 번호를 지정해 Actions의 `Development Review Merge`를 직접 재실행할 수 있습니다. 로컬에서 `GITHUB_REPOSITORY=DodamDodam-Capstone/backend python3 .github/scripts/auto_merge.py 60`을 실행하면 쓰기 없이 판정합니다.
-
-**운영 전환 순서**
-
-1. 정기 릴리스로 워크플로를 `main`에 배포합니다. 비활성 상태에서는 기존 팀원 승인 1건이 계속 필요합니다.
-2. backend 저장소에만 전용 GitHub App을 설치하고 Contents 쓰기와 조직 Members 읽기 권한을 줍니다. `main`만 허용하는 환경 `development-review-merge`에 앱의 `LOW_RISK_APP_CLIENT_ID` 변수와 `LOW_RISK_APP_PRIVATE_KEY` 비밀을 저장합니다.
-3. `development` 전용 Ruleset을 먼저 만들어 기존 승인 수 1명, 마지막 푸시자 외 승인, 오래된 승인 해제를 복제합니다. 이 **승인 전용 규칙**에서만 전용 앱을 Pull requests only 예외로 지정합니다. 이후 기존 `Protect development`에서 중복된 승인 수와 마지막 푸시 승인 조건을 옮깁니다. 필수 CI 3개, 최신 base, 대화 해결, squash, 선형 이력과 별도 보호 경로 backend 팀 리뷰 규칙은 계속 적용합니다. 일반 토큰과 사람에게 새 예외를 추가하지 않습니다.
-4. 승인 전용 예외와 기존 CI·대화 차단을 시험용 보호 브랜치에서 확인한 뒤 저장소 변수 `DEVELOPMENT_REVIEW_MERGE=true`로 활성화합니다. 운영에서 되돌릴 때는 먼저 이 변수를 끄고 승인 전용 규칙의 앱 예외를 제거합니다. `development → main` 릴리스는 기존 정책을 따릅니다.
 
 ## 7. 완료 확인
 
@@ -218,7 +178,7 @@ GitHub Environment `sol-max-review`에는 보호된 `development`와 `main` 브�
 
 ## 8. 문제 발생 시
 
-- `jira-issue-key` 실패: 작업 PR은 Jira 키와 `[BE]`, main 승격은 같은 저장소의 development·제목 버전·VERSION 일치를 확인합니다.
+- `jira-issue-key` 실패: 작업 PR은 Jira 키와 `[BE]`, main 승격은 출발 브랜치와 제목 버전·VERSION 일치를 확인합니다. 긴급 패치는 운영 버전의 다음 패치 번호를 사용합니다.
 - Jira 자동 생성이 건너뛰어짐: `task` 또는 `bug`를 확인한 뒤 `jira-sync` 레이블을
   추가합니다.
 - Jira 자동 생성 실패: `jira-sync`를 제거 후 다시 추가하거나 `GitHub Issue to
