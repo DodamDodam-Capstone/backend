@@ -23,5 +23,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2 # hotfix는 시험 병합의 첫 부모에서 운영 버전을 읽는다.
       - name: Jira 키 또는 main 릴리스 버전 검사
         run: python3 .github/scripts/validate_pr_contract.py

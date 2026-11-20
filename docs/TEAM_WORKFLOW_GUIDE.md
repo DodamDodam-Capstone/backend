@@ -160,8 +160,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 - `development` → `main`은 merge commit으로 계보를 유지합니다. 기존 계보가 갈라졌다면 commit을 삭제하지 않고 보호된 동기화 PR로 연결합니다.
 - 자동 브랜치 삭제는 사용하지 않으며 작업 브랜치는 sprint 정리 시 수동 삭제합니다.
 - PR 제목 형식은 `<gitmoji> <type>(optional-scope): <description>`입니다.
-- `main` 대상 PR은 `development`에서만 만들며 긴급 수정도 같은 승격 경로를
-  사용합니다.
+- 정기 릴리스는 `development`에서, 운영 긴급 패치는 최신 `main`을 기준으로 만든 같은 저장소의 `hotfix/SCRUM-번호-설명`에서 승격합니다. 긴급 패치를 출시한 뒤 수정과 버전을 `development`에 반영합니다.
 - `main` 승격 제목은 `🚀 chore(release): [BE] v0.1.0 스프린트 릴리스`처럼
   VERSION과 같은 버전을 사용합니다. Jira 키는 필수가 아니며 Epic 완료와 무관합니다.
   생성물·보호 설정·재실행은 [Backend 릴리스 가이드](RELEASE_GUIDE.md)를 따릅니다.
@@ -179,7 +178,7 @@ database credential, 개인정보는 첨부하지 않습니다.
 
 ## 8. 문제 발생 시
 
-- `jira-issue-key` 실패: 작업 PR은 Jira 키와 `[BE]`, main 승격은 같은 저장소의 development·제목 버전·VERSION 일치를 확인합니다.
+- `jira-issue-key` 실패: 작업 PR은 Jira 키와 `[BE]`, main 승격은 출발 브랜치와 제목 버전·VERSION 일치를 확인합니다. 긴급 패치는 운영 버전의 다음 패치 번호를 사용합니다.
 - Jira 자동 생성이 건너뛰어짐: `task` 또는 `bug`를 확인한 뒤 `jira-sync` 레이블을
   추가합니다.
 - Jira 자동 생성 실패: `jira-sync`를 제거 후 다시 추가하거나 `GitHub Issue to

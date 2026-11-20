@@ -23,6 +23,28 @@ def read_version(path=Path("VERSION")):
     return validate_version(Path(path).read_text(encoding="utf-8").strip())
 
 
+def is_promotion_source(head, head_repo, repo):
+    """PR 검사와 실제 릴리스에서 같은 저장소·승격 브랜치 조건을 사용한다."""
+    return head_repo == repo and (
+        head == "development" or re.fullmatch(r"hotfix/SCRUM-[1-9][0-9]*-[a-z0-9]+(?:-[a-z0-9]+)*", head) is not None
+    )
+
+
+def validate_patch_version(head, version):
+    """PR 시험 병합과 실제 병합 모두 첫 부모가 변경 직전 main이다."""
+    if head == "development":
+        return
+    try:
+        previous = subprocess.check_output(["git", "show", "HEAD^1:VERSION"], text=True,
+                                           stderr=subprocess.PIPE, timeout=10).strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise ValueError("hotfix 기준 main의 VERSION을 읽을 수 없습니다.") from error
+    major, minor, patch = validate_version(previous).split(".")
+    expected = f"{major}.{minor}.{int(patch) + 1}"
+    if version != expected:
+        raise ValueError(f"hotfix VERSION은 main의 다음 패치 버전 {expected}여야 합니다.")
+
+
 def validate_notes(body):
     """승격 PR에서 검토할 스프린트 작업 섹션이 비어 있지 않은지 검사한다."""
     section = re.search(r"^## 스프린트 작업[ \t]*\r?\n([\s\S]*?)(?=^##[ \t]|\Z)", body or "", re.M)
@@ -63,14 +85,15 @@ def ref_commit(repo, short_ref):
     return obj["sha"]
 
 
-def promotion_notes(repo, sha):
+def promotion_notes(repo, sha, version):
     """현재 main merge commit을 만든 승격 PR의 검토된 본문을 읽는다."""
     pulls = api(f"repos/{repo}/commits/{sha}/pulls?per_page=100", paginate=True)
     matches = [pr for pr in pulls if pr.get("merged_at") and pr.get("merge_commit_sha") == sha
-               and pr["base"]["ref"] == "main" and pr["head"]["ref"] == "development"
-               and (pr["head"].get("repo") or {}).get("full_name") == repo]
+               and pr["base"]["ref"] == "main"
+               and is_promotion_source(pr["head"]["ref"], (pr["head"].get("repo") or {}).get("full_name"), repo)]
     if len(matches) != 1:
         raise ValueError("정확한 main 커밋에 연결된 승격 PR을 하나 찾을 수 있어야 합니다.")
+    validate_patch_version(matches[0]["head"]["ref"], version)
     return validate_notes(matches[0].get("body"))
 
 
@@ -95,7 +118,7 @@ def publish(repo, sha, version):
             raise ValueError("Existing release has no verifiable tag; inspect it before publishing.")
 
     # Jira 조회·목록 검토는 PR 준비 때 수행한다. 재실행은 이미 발행한 본문을 덮어쓰지 않는다.
-    notes = promotion_notes(repo, sha) if existing_release is None else None
+    notes = promotion_notes(repo, sha, version) if existing_release is None else None
 
     # 생성 API만 사용한다. 경합·부분 실패는 중단하고 같은 SHA로 재실행한다.
     for ref, existing in refs.items():
