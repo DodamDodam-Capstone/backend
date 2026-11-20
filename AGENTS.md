@@ -1,6 +1,7 @@
 # DodamDodam Backend
 
-이 지침은 API, domain, database, 인증·인가, 외부 연결과 테스트를 담당하는 `DodamDodam-Capstone/backend`에만 적용한다. 명령은 저장소 루트에서 실행한다.
+API, domain, database, 인증·인가, 외부 시스템 연결과 Backend 테스트를 담당한다.
+이 지침은 `DodamDodam-Capstone/backend`에만 적용한다. 명령은 backend 저장소 루트에서 실행한다.
 
 ## 작업 원칙
 
@@ -19,7 +20,9 @@
 - 문자열·설정·문서, MCP 사용 불가·결과 부족 시 `rg`와 파일 읽기로 전환한다. 문서 작업만으로 전체 코드를 인덱싱하지 않는다.
 <!-- codebase-memory-mcp:end -->
 
-## 작업별 상세 문서 (해당 작업의 관련 부분만 읽는다)
+## 작업별 상세 문서
+
+아래 문서는 해당 작업의 관련 부분만 읽는다. 상세 규칙이 링크만으로 자동 적용된다고 가정하지 않는다.
 
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
@@ -30,16 +33,12 @@
 
 ## Git·Jira 기본 흐름
 
-- 기존 Jira Task는 `[BE]` 접두어를 사용하고 GitHub Task Form을 중복 생성하지 않는다. 착수 전에 담당자·Story point·계획 시작일·목표 종료일을 설정하고 `해야할 일 → 진행 중 → 검토중 → 완료` 기준으로 실제 Jira transition을 사용한다.
+- Jira 접두어는 `[BE]`다. 기존 Jira Task가 있으면 GitHub Task Form을 중복 생성하지 않는다.
+- 착수 전에 담당자·Story point·계획 시작일·목표 종료일을 설정한다. `해야할 일 → 진행 중 → 검토중 → 완료` 기준으로 실제 Jira transition을 사용한다.
 - 브랜치는 최신 `development`에서 `feature/<Jira키>-<설명>`, `fix/...`, `hotfix/...`로 만든다. 보호 브랜치 직접 push·force push는 금지한다.
 - 작업 commit·PR은 Gitmoji + Conventional Commit에 같은 Jira 키와 `[BE]`를 넣고 squash 병합한다. `development → main`은 [릴리스 규칙](docs/RELEASE_GUIDE.md)의 버전 제목·merge commit을 사용한다.
-- 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 리뷰어 조건은 [팀 가이드](docs/TEAM_WORKFLOW_GUIDE.md#review-policy)를 따른다. 현재는 마지막 push를 하지 않은 다른 팀원의 승인과 모든 review conversation 해결이 필요하다.
+- 필수 검사는 `backend-quality`, `gitmoji-conventional-title`, `jira-issue-key`다. 마지막 push를 하지 않은 다른 팀원의 승인과 모든 review conversation 해결이 필요하다.
 - PR 병합 후 Jira 자동 완료를 확인하고, GitHub-first이면 연결 GitHub Issue 종료도 확인한다. Sub-task·Epic 완료 기준은 실행 규칙을 따른다.
-
-## Code Review Rules
-
-- SCRUM 완료 조건에 어긋나는 동작은 재현 입력·기대 결과와 코드 위치를 제시한다. Jira 원문이나 최신 커밋 근거가 없으면 팀원 확인을 요청한다.
-- 인증·소유권 확인과 데이터 쓰기 순서가 달라지거나 기존 단언이 약해지면 영향을 받는 호출·테스트를 짚는다.
 
 ## 구현·검증
 
@@ -57,4 +56,5 @@
 | Compose 변경 검증 | `docker compose config --quiet` |
 
 - 통합 테스트는 Docker daemon과 PostgreSQL Testcontainers를 필요로 한다. 검증 불가 시 원인을 보고한다.
-- `AGENTS.md`는 60줄, `CLAUDE.md`는 10줄 이내로 유지한다. 상세 절차는 backend의 `docs/`로 분리하고 고유 규칙이 필요한 하위 디렉터리에만 개별 지침을 만든다. 규칙 수정에는 명시적 요청이 필요하다. 최종 보고에는 변경·검증·미해결 사항과 관련 이슈/PR 링크를 남긴다.
+- `AGENTS.md`는 60줄 이내, `CLAUDE.md`는 10줄 이내로 유지한다. 상세 절차는 backend의 `docs/`로 분리하고, 고유 규칙이 필요한 하위 디렉터리에만 개별 지침을 만든다.
+- 규칙 자체는 명시적으로 요청받았을 때 수정한다. 최종 보고에는 변경·검증·미해결 사항과 관련 이슈/PR 링크를 남긴다.
