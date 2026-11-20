@@ -3,6 +3,7 @@
 import io
 import json
 import unittest
+from urllib.error import HTTPError
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -137,7 +138,7 @@ class DeepReviewTests(unittest.TestCase):
                       "group: sol-max-${{ github.event.issue.number || inputs.number }}-${{ needs.notify.outputs.deep_sha }}",
                       "cancel-in-progress: false", "ref: ${{ github.workflow_sha }}", "checks: write"):
             self.assertIn(guard, paid_job)
-        self.assertIn("timeout-minutes: 35", paid_job)
+        self.assertIn("timeout-minutes: 75", paid_job)
         self.assertNotIn("pull-requests: write", paid_job)
         self.assertNotIn("pull_request_target", workflow)
         self.assertIn("github.ref == 'refs/heads/development' && github.ref_protected", workflow)
@@ -172,8 +173,30 @@ class DeepReviewTests(unittest.TestCase):
         self.assertIsNone(self.run_review())
         self.paid.assert_called_once()
 
+    def test_interrupted_workflow_resumes_recorded_id_only_on_original_run_and_base(self):
+        def disconnect(data, key, identity, save, *, response_id=None):
+            self.assertIsNone(response_id)
+            save("resp_123")
+            raise TimeoutError()
+        self.paid.side_effect = disconnect
+        run_url = "run/42"
+        deep.run(self.repo, 62, self.sha, "test", run_url=run_url)
+        self.assertEqual(self.writes[-1]["conclusion"], "action_required")
+        self.assertIn("resp_123", self.writes[-1]["output"]["text"])
+        self.paid.reset_mock()
+        self.paid.side_effect = None
+        self.assertIsNone(deep.run(self.repo, 62, self.sha, "test", run_url="run/other"))
+        with patch.dict(self.pr["base"], sha="d" * 40):
+            self.assertIsNone(deep.run(self.repo, 62, self.sha, "test", run_url=run_url))
+        self.paid.assert_not_called()
+        proof = Mock()
+        deep.run(self.repo, 62, self.sha, "test", run_url=run_url, record_clear=proof)
+        self.assertEqual(self.paid.call_args.kwargs["response_id"], "resp_123")
+        self.assertEqual(len(self.checks), 1)
+        proof.assert_called_once_with(f"62 {self.sha} {self.pr['base']['sha']} 711")
+
     def test_push_during_paid_review_discards_verdict(self):
-        def result(*args):
+        def result(*args, **kwargs):
             self.pr["head"]["sha"] = "c"*40
             return "failure", "수정 필요", "근거", [{"path": "a", "anchor": "R1", "body": "지적"}]
         self.paid.side_effect = result
@@ -182,19 +205,69 @@ class DeepReviewTests(unittest.TestCase):
 
 
 class ResponsesTests(unittest.TestCase):
+    identity = {"github_check": "org/backend#62@head:base:711"}
+
+    def response(self, status, **extra):
+        return io.BytesIO(json.dumps({"id": "resp_123", "metadata": self.identity, "status": status} | extra).encode())
+
+    @patch.object(deep, "urlopen")
+    def test_pending_and_lost_get_resume_the_same_paid_response(self, http):
+        part = {"type": "output_text", "text": json.dumps({"evidence": "확인", "assessment": {"decision": "clear"}})}
+        http.side_effect = [self.response("queued"), TimeoutError(), HTTPError("", 503, "", {}, None),
+                            self.response("in_progress"), self.response("completed", output=[{"type": "message", "content": [part]}])]
+        saved = []
+        # 30분을 넘긴 뒤에도 같은 응답이 완료되면 그 결과를 쓴다.
+        with patch("time.sleep"), patch("time.monotonic", side_effect=[0, 10, 1801, 1950, 2000]):
+            answer = deep.model_review("입력", "key", self.identity, saved.append)
+        self.assertEqual(answer[:2], ("success", "추가 지적 없음"))
+        self.assertEqual(saved, ["resp_123"])
+        requests = [call.args[0] for call in http.call_args_list]
+        self.assertEqual([r.get_method() for r in requests], ["POST"] + ["GET"] * 4)
+        self.assertEqual({r.full_url for r in requests[1:]}, {"https://api.openai.com/v1/responses/resp_123"})
+
+    @patch.object(deep, "urlopen")
+    def test_resume_uses_get_and_rejects_wrong_proof_or_terminal_state(self, http):
+        for status, updates in (("completed", {"metadata": {}}), ("completed", {"id": "resp_other"}),
+                                ("failed", {}), ("cancelled", {}), ("incomplete", {})):
+            with self.subTest(status=status, updates=updates):
+                http.reset_mock()
+                http.return_value = self.response(status, **updates)
+                with self.assertRaises(ValueError):
+                    deep.model_review(None, "key", self.identity, self.fail, response_id="resp_123")
+                self.assertEqual([c.args[0].get_method() for c in http.call_args_list], ["GET"])
+
+    @patch.object(deep, "urlopen")
+    def test_expired_id_or_lost_submission_never_resubmits(self, http):
+        for saved_id, error, method in (("resp_123", HTTPError("", 404, "", {}, None), "GET"),
+                                        (None, TimeoutError(), "POST")):
+            with self.subTest(stage=method):
+                http.reset_mock()
+                http.side_effect = error
+                with self.assertRaises(type(error)):
+                    deep.model_review("입력", "key", self.identity, self.fail, response_id=saved_id)
+                self.assertEqual([c.args[0].get_method() for c in http.call_args_list], [method])
+
+    @patch.object(deep, "urlopen")
+    def test_get_deadline_stops_polling_without_another_create(self, http):
+        http.side_effect = [self.response("in_progress")]
+        with patch("time.monotonic", side_effect=[0, 3601]), self.assertRaises(TimeoutError):
+            deep.model_review("입력", "key", self.identity, lambda _: None)
+        self.assertEqual([c.args[0].get_method() for c in http.call_args_list], ["POST"])
+
     @patch.object(deep, "urlopen")
     def test_reasoning_model_budget_and_structured_response(self, post):
         findings = [{"path": "A.java", "anchor": "R3", "body": "호출 순서를 확인하세요."}]
         report = {"evidence": "파일 A 호출 순서", "assessment": {"decision": "changes", "findings": findings}}
         part = {"type": "output_text", "text": json.dumps(report)}
-        post.return_value = io.BytesIO(json.dumps({"status": "completed", "output": [
-            {"type": "reasoning"}, {"type": "message", "content": [part]}]}).encode())
-        self.assertEqual(deep.model_review("입력", "test"), ("failure", "수정 필요", "파일 A 호출 순서", findings))
-        self.assertEqual(post.call_args.kwargs["timeout"], 30 * 60)
+        post.return_value = self.response("completed", output=[{"type": "reasoning"}, {"type": "message", "content": [part]}])
+        self.assertEqual(deep.model_review("입력", "test", self.identity, lambda _: None), ("failure", "수정 필요", "파일 A 호출 순서", findings))
+        self.assertLessEqual(post.call_args.kwargs["timeout"], 60)
         request = post.call_args.args[0]
         body = json.loads(request.data)
         self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
         self.assertEqual((body["model"], body["reasoning"], body["max_output_tokens"]), ("gpt-6.2-sol", {"effort": "max"}, 48_000))
+        self.assertTrue(body["background"])
+        self.assertEqual(body["metadata"], self.identity)
         self.assertFalse(body["store"])
         self.assertNotIn("tools", body)
 
@@ -203,9 +276,9 @@ class ResponsesTests(unittest.TestCase):
         for result in ({"status": "incomplete"}, {"status": "completed", "output": []},
                        {"status": "completed", "output": [{"type": "message", "content": [{"type": "refusal"}]}]}):
             with self.subTest(result=result):
-                post.return_value = io.BytesIO(json.dumps(result).encode())
+                post.return_value = self.response(**result)
                 with self.assertRaises(ValueError):
-                    deep.model_review("입력", "test")
+                    deep.model_review("입력", "test", self.identity, lambda _: None)
 
 
 if __name__ == "__main__":
