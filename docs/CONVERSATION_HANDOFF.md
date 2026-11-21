@@ -1,19 +1,24 @@
-# 대화 시작·종료 및 발화 저장 구현 계약
+# 아이 홈·대화 시작·종료 및 발화 저장 구현 계약
 
-SCRUM-86의 공통 대화 기반과 SCRUM-88의 내부 발화 저장 기능을 후속 API·AI·기록·worker 작업이 재사용하기 위한 인계서다.
+SCRUM-85의 아이 Home, SCRUM-86의 공통 대화 기반과 SCRUM-88의 내부 발화 저장 기능을 후속 API·AI·기록·worker 작업이 재사용하기 위한 인계서다.
 현재 구현·검증한 기능과 후속 작업의 책임을 함께 관리한다.
 
 ## 1. 기준과 구현 지도
 
-- 코드 기준: `feature/SCRUM-88-conversation-turn-storage`, HEAD `46851097a4a25b044c3431089d77c86560af0b00`.
-- 최신 확인일: 2026-11-17 KST. 최신 전체 검증과 이번 문서 확인 범위는 §11을 따른다.
-- 계약 원본: [대화 API §7.1·§8](p0/api/06-conversations.md), [음성·비동기 API](p0/api/07-voice.md), [대화 JSON 스키마](p0/api/schemas/conversations.md), [공개 읽기 모델 JSON 스키마](p0/api/schemas/records.md), [공통 API](p0/api/01-common.md), [ERD §5·§8·§12.2](p0/Integrated_ERD_Design.md), [확정 결정](p0/Decision_Record.md).
+- 코드 기준: `feature/SCRUM-85-child-home`, HEAD `1fb0129` 및 이번 문서 변경 작업 트리.
+- 최신 확인일: 2026-11-20 KST. SCRUM-85 구현·최종 검증과 완료 조건 대응은 §12를 따른다.
+- 계약 원본: [홈·대화 API §7.1·§7.2·§8](p0/api/06-conversations.md), [음성·비동기 API](p0/api/07-voice.md), [대화 JSON 스키마](p0/api/schemas/conversations.md), [공개 읽기 모델 JSON 스키마](p0/api/schemas/records.md), [공통 API](p0/api/01-common.md), [ERD §5·§8·§12.2](p0/Integrated_ERD_Design.md), [확정 결정](p0/Decision_Record.md).
 - 이 문서는 구현 사용법과 검증 범위를 기록한다. 통합 API/ERD v3.1이나 미확정 정책을 변경하지 않는다.
 - SCRUM-86 당시 기준은 HEAD `10e0053a70f1f6bb3e1628dc56373c92da3ba131`·2026-11-11이며 §8에 당시 검증을 보존한다.
 - SCRUM-88 내부 발화 접수는 §9, 결과 저장·조건부 만료는 §10, PostgreSQL 검증 근거는 §11을 따른다.
+- SCRUM-88 당시 코드 기준은 HEAD `46851097a4a25b044c3431089d77c86560af0b00`·2026-11-17이며 §11의 검증 기록을 보존한다.
 
 | 구현 위치 | 제공하는 계약 |
 | --- | --- |
+| [ChildHomeController](../src/main/java/com/dodamdodam/backend/home/api/ChildHomeController.java) | Home GET·인증/UUID/소유권·200 data envelope·성공 표식 |
+| [ChildHomeService](../src/main/java/com/dodamdodam/backend/home/application/ChildHomeService.java) | `getHome`의 잠금·조건부 정리·현재 시간/상태/연결 재검사 |
+| [ChildHome](../src/main/java/com/dodamdodam/backend/home/dto/ChildHome.java) | 공개 7필드·nickname 인사·KST 등록일 포함 계산·availability·고정 메뉴 |
+| [ChildHomeResponseFilter](../src/main/java/com/dodamdodam/backend/home/api/ChildHomeResponseFilter.java) | 성공 본문 보류·별도 Tx의 최신 Home 교체·공통 인증 오류 연결 |
 | [ConversationController](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationController.java) | 시작 요청·공통 접근 검증·HTTP 상태/Location·응답 보호 표식 |
 | [ConversationService](../src/main/java/com/dodamdodam/backend/conversation/application/ConversationService.java) | `create`, `verifyStartResponse`, 생성·멱등성·최종 업무 상태 검사 |
 | [ConversationRepository](../src/main/java/com/dodamdodam/backend/conversation/infrastructure/ConversationRepository.java) | DB 시각·시작 키/미종료 조회·부분 UNIQUE 대응·대화/link 저장 |
@@ -236,6 +241,7 @@ ENDED 200의 conversationId/status/endedAt/summaryStatus 네 필드만이다. �
 
 | Task | 현재 재사용할 것 | 후속 구현·인수 대상 |
 | --- | --- | --- |
+| [SCRUM-85](https://dodamdodam.atlassian.net/browse/SCRUM-85) | §12 Home GET·현재 availability·접근 가능한 당일 ACTIVE ID·전송 전 재검사 | FE 홈 실제 연동. Home은 resume/end/receipt·주기 worker·AI 실행을 대신하지 않음 |
 | [SCRUM-87](https://dodamdodam.atlassian.net/browse/SCRUM-87) | §9 accept·최초 커밋의 AcceptedTurn·§10 succeed/fail·AllowedTextPolicy.select | multipart·음성 형식/크기/길이 검사·HTTP 인증/CSRF 연결·최소 아이 문맥·실제 STT/LLM/TTS 호출. 신규 커밋 실행자만 잠금 밖 1회 호출 시도, 필드별 허용 신호 매핑·음성 자산/삭제 연동 |
 | [SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88) | 기존 V6·공개 모델·허용 정책·접수/결과/ACTIVE 만료 및 §11 경합 시험 구현·검증 완료 | 아래 후속 API·실제 AI·검색·운영 worker 연결을 해당 Task에 인계. 공통 스키마 중복 생성·중복 작업량 산정 금지 |
 | [SCRUM-89](https://dodamdodam.atlassian.net/browse/SCRUM-89) | 기존 상태 재사용·IDEMPOTENCY_CONFLICT·TURN_IN_PROGRESS·newlyAccepted/completionPermit | 동일 키 재전송의 PROCESSING 202·terminal 200·충돌 409 매핑 및 응답 유실 처리. 기존 키에도 현재 접근/응답 직전 검사, 내부 반환값 전체 직렬화·AI 재실행 금지 |
@@ -243,7 +249,7 @@ ENDED 200의 conversationId/status/endedAt/summaryStatus 네 필드만이다. �
 | [SCRUM-102](https://dodamdodam.atlassian.net/browse/SCRUM-102) | reconcile/REQUEST_END·최초 경계·원래 deadline drain·원자적 ENDED·발화/종료 경합 시험 | 0바이트 /end·인증/CSRF·적격 기존 연결·202→200 receipt·응답/음성 삭제 연동. 동일 상위 잠금 순서 유지 |
 | [SCRUM-103](https://dodamdodam.atlassian.net/browse/SCRUM-103) | 기존 적격 links의 고정 end_recovery_until·endedAt | 종료 확인 권한·600초 equality·내용 없는 receipt·응답 유실 복구·현재 로그인 무효화 우선·기한 불변 테스트 |
 | [SCRUM-106](https://dodamdodam.atlassian.net/browse/SCRUM-106) | 저장된 발화 ID/요청 키·PROCESSING/SUCCEEDED/FAILED·공개 TurnView | ID/요청 키 GET·현재 소유권/연결/시간/ACTIVE/응답 직전 검사·HTTP 응답 조립. 기존 FOR UPDATE 조회는 접수/결과 업무용이며 읽기 API가 아님. GET 404만으로 미접수 확정·새 키/AI 재실행 금지 |
-| [SCRUM-107](https://dodamdodam.atlassian.net/browse/SCRUM-107) | hasSummaryInput·허용 FAILED 입력·최초 ENDED의 PENDING/EMPTY·ClosureResult.endedNow | 허용 입력 조회·실제 요약 1회 시도·조건부 READY/FAILED·요약 기한 정리. start/응답 재검사/결과/만료의 모든 ENDED 경유점 연결, AI 호칭은 nickname |
+| [SCRUM-107](https://dodamdodam.atlassian.net/browse/SCRUM-107) | hasSummaryInput·허용 FAILED 입력·최초 ENDED의 PENDING/EMPTY·ClosureResult.endedNow | 허용 입력 조회·실제 요약 1회 시도·조건부 READY/FAILED·요약 기한 정리. Home/start/응답 재검사/결과/만료의 모든 ENDED 경유점 연결, AI 호칭은 nickname |
 | [SCRUM-108](https://dodamdodam.atlassian.net/browse/SCRUM-108) | ConversationView/TurnView·독립 visibility·성공/실패 순차 샘플·같은 날 다중 ENDED | 보호자 로그인/소유권/PIN·ENDED 목록/상세/검색·안정 정렬·100턴 페이지·허용 텍스트 검색 인덱스. ACTIVE/CLOSING 우회 노출·금지 원문 색인 차단 검증 |
 | [SCRUM-110](https://dodamdodam.atlassian.net/browse/SCRUM-110) | §10 expireOverdue·공통 종료 조정기·원래 deadline·terminal 불변 | 신뢰된 DB 후보 탐색·주기 sweep·재시작 catch-up·운영 worker. crash 후 AI 재시도 금지 |
 
@@ -256,14 +262,15 @@ D13/D14의 실제 AI wire·허용 신호·음성 수치/기한 및 D17의 운영
 
 | 구분 | 코드 기준 현재 상태 |
 | --- | --- |
+| SCRUM-85 Home 구현·검증 | 최소 프로필·KST 날짜/시간·availability·현재 연결 ID·고정 메뉴·조건부 정리·성공 본문 재검사. 코드와 최종 실행 결과·미검증 범위는 §12 |
 | SCRUM-86 공통 기반 구현 완료 | V6 공통 3개 스키마, 시작 입력/접근/시간/멱등성/동시성/원자성, 415, 시작 응답 직전 보호, 공통 종료 조정·PENDING/EMPTY·복구기한 |
 | SCRUM-88 내부 저장 구현·검증 완료 | §9 원본 해시/멱등 접수/순번/PROCESSING/최초 커밋 문맥, §10 조건부 SUCCEEDED/FAILED·ACTIVE timeout·허용 텍스트·terminal 불변·종료 정리 연결·§11 PostgreSQL 제약/경합 시험 |
 | 후속 API·worker 미구현 | multipart 음성 HTTP·실제 AI 연동·재전송 HTTP 매핑·발화 상태 GET·resume·/end·receipt·보호자 읽기/검색·timer/catch-up/sweep·요약 실행/timeout·음성 자산 삭제 |
 | Part 2 413 | 명세에는 REQUEST_TOO_LARGE가 있으나 JSON/음성 크기 정책 미확정으로 현재 크기 검사는 없음. 승인된 수치·범위 확정 후 별도 연결, Part 1 16 KiB를 복사하지 않음 |
-| 공통 429 | 현재 시작 경로에 API_IP/auth_rate_limits 요청량 예약 실행부가 없음. 공통 담당 범위·연계 기준 확인 후 429/Retry-After/별도 예약 커밋을 검증해야 함 |
+| 공통 429 | 현재 `GlobalApiRateLimitFilter`가 Home·시작을 포함한 API/OAuth에 API_IP 300회/60초 예산을 별도 Tx로 예약. 초과 시 429 RATE_LIMITED·Retry-After. Home의 실제 HTTP 검증은 §12, 필터 순서는 개발환경 §10.6 |
 | 실제 아이 등록·AI·운영 | 기존 캐릭터 목록 연결, 실제 AI 자료·운영 timeout/OAuth/HTTPS 등은 별도 기존 범위. 합성 fixture 테스트가 신규 사용자부터 전체 운영 흐름의 인수를 대신하지 않음 |
 
-413/429나 후속 API·worker를 SCRUM-86에서 이미 완료한 기능으로 기록하지 않는다.
+Part 2 크기 제한과 후속 API·worker는 여전히 미구현이며 전역 429는 현재 공통 구현을 재사용한다.
 이 의존성의 담당·완료 범위는 명시적으로 인계하며 정책·Part 1 코드를 문서 작업에서 임의 변경하지 않는다.
 SCRUM-88의 내부 저장 구현 완료와 원격 PR의 CI·리뷰·병합/Jira 상태 전환은 구분한다.
 
@@ -313,7 +320,7 @@ SCRUM-88의 내부 저장 구현 완료와 원격 PR의 CI·리뷰·병합/Jira 
 | 후속 Task 구현 계약 문서 | 본 인계서, README, 개발환경 문서 연결 | 로컬 링크·내용·결과 개수 대조 | 충족 |
 | PROCESSING 중 resume·실제 /end 경합·내용 없는 종료 확인과 600초 HTTP 접근 | SCRUM-101/102/103 및 87/88 연동 대상 | 해당 API 인수 테스트는 후속 필요 | 상세 API 미구현: 후속 범위 |
 | 실제 AI/요약·음성 자산·자동 worker | 후속 구현 대상 | 후속 통합 검증 필요 | 미구현: 후속 범위 |
-| 413·429 전체 공통 계약 | §7의 미확정/미연결 의존성 | 해당 경계 검증 미완료 | 미완료: 범위/정책·공통 연계 확인 필요 |
+| 413·429 전체 공통 계약 | 당시 미확정/미연결 의존성. 현재 전역 429는 §7·§12 참조 | 당시 해당 경계 검증 미완료 | 당시 미완료: 범위/정책·공통 연계 확인 필요 |
 | 필수 CI·리뷰·PR 병합·development 반영·Jira Done | 팀 실행 절차 | 이번 문서 작업에서 원격 상태 확인/변경하지 않음 | 미검증 |
 
 SCRUM-86의 구현·로컬 검증 충족과 Jira Task의 최종 Done은 구분한다.
@@ -414,6 +421,8 @@ terminal/기한의 SQL 조건·원래 기한 불변·독립 visibility·무효 �
 
 ## 11. PostgreSQL 통합·동시성 검증 근거
 
+이 절은 SCRUM-88 당시 검증 기록이다. SCRUM-85의 최신 전체 검증은 §12를 따른다.
+
 기준은 P0 v3.1과 [SCRUM-88](https://dodamdodam.atlassian.net/browse/SCRUM-88)의 저장·허용 텍스트 수용 조건이다.
 JDK 25·Gradle Wrapper·`postgres:18.6-alpine`은 현재 브랜치 설정을 따르며 기존 TestcontainersConfiguration을 사용한다.
 별도 DB 인프라·운영 Controller·migration을 추가하지 않는다. 모든 데이터는 합성 계정·텍스트·바이트 배열이다.
@@ -454,8 +463,8 @@ HEAD `4685109` 기준 2026-11-17 KST 검증 결과는 다음과 같다. 각 실�
 | UNIQUE 대기 3건 + 3자 경합 6건 강제 재실행 | 2 suites / 9 tests, 실패·오류·건너뜀 0 |
 | 직전 완료 여부 점검의 전체 clean check, 빌드 캐시 비활성 | 42 suites / 1,201 tests, 실패·오류·건너뜀 0; 대화 15 suites / 670 tests 포함 |
 
-최신 XML의 주요 suite는 Schema 181·Acceptance 52·Result 83·AllowedTextPolicy 87·ViewSerialization 11·ClosureCoordinator 27개다.
-이번 인계서 최신화에서는 같은 HEAD의 XML 결과를 재집계하고 문서 링크·코드/명세 대응·diff 공백을 확인했다. 전체 테스트는 새로 실행하지 않았다.
+당시 XML의 주요 suite는 Schema 181·Acceptance 52·Result 83·AllowedTextPolicy 87·ViewSerialization 11·ClosureCoordinator 27개다.
+2026-11-17 인계서 확인에서는 같은 HEAD의 XML 결과를 재집계하고 문서 링크·코드/명세 대응·diff 공백을 확인했다. 그 문서 확인 때는 전체 테스트를 새로 실행하지 않았다. SCRUM-85의 이번 재실행 결과는 §12에 구분한다.
 
 앞선 PostgreSQL 시험 보강에서는 16개 사례를 추가했으며 당시 운영 코드·V1~V6·Testcontainers 구성은 변경하지 않았다.
 다중 대기자가 최초 보유자를 직접 차단자로 표시한다는 테스트 가정은 실제 PostgreSQL 대기 경로 확인으로 수정했다.
@@ -477,3 +486,162 @@ v2 운영 DB 이관도 수행하지 않는다. 이 저장소는 V4부터 nicknam
 [ERD 이관 전제](p0/Integrated_ERD_Design.md#102-v20--v31-데이터-이관-초안)는 기존 name을 nickname으로 backfill하기 전 길이/trim 검증,
 기존 ENDED의 MIDNIGHT/기존 scheduled_end_at 경계 검증이며 유효하지 않은 기존 시각은 임의 보정하지 않고 중단·분류한다.
 이 전제를 검토한 것이 실제 v2 이관을 실행·검증했다는 의미는 아니다.
+
+## 12. SCRUM-85 아이 Home 구현과 최종 검증
+
+### 공개 계약과 요청 처리
+
+[SCRUM-85](https://dodamdodam.atlassian.net/browse/SCRUM-85)의 설명·완료 조건과
+[API §7.2](p0/api/06-conversations.md#section-7-2), [ChildHome 스키마](p0/api/schemas/conversations.md#section-14-33)를
+2026-11-20 KST에 대조했다. 아래는 해당 Backend 구현 범위이며 후속 API·FE·AI 인수 완료를 의미하지 않는다.
+
+`GET /api/v1/children/{childId}/home`은 기존 Security → `AuthenticatedSessionService` 인증 →
+`StartConversationRequest.parseChildId` UUID 검사 → `ChildService.requireChildAccess` 소유권 →
+`ChildHomeService.getHome` 순서로 처리한다. GET에 CSRF 검사나 보호자 PIN 검사를 추가하지 않는다.
+성공은 `data` envelope 안에 다음 7필드만 반환한다.
+
+| 필드 | 구현 계약 |
+| --- | --- |
+| child | childId/name/nickname/characterId. 기존 ChildContext에서 최소 프로필만 매핑하며 name과 nickname을 구분 |
+| greeting | `{nickname}, 오늘도 반가워!` 서버 고정 문구 |
+| joinedAt | ChildContext.createdAt, 즉 실제 아이 등록 시각을 KST +09:00·초 정밀도로 공개 |
+| daysTogether | KST 현재 날짜와 등록 날짜의 차이 + 1, 등록 당일 1 |
+| activeConversationId | 이용시간 안의 당일 ACTIVE이며 현재 session_security 문맥의 기존 link가 있을 때만 ID, 나머지는 명시적 null |
+| menus | TALK/PLAY 각 1개·해당 순서. TALK은 canEnter에 따라 AVAILABLE/UNAVAILABLE, PLAY는 COMING_SOON |
+| availability | timeZone/serverTime/serviceDate/opensAt/closesAt/canEnter/reason/nextOpensAt의 8필드 |
+
+`timeZone=Asia/Seoul`, serviceDate는 KST 현재일, opensAt은 당일08시, closesAt은 다음 날00시다.
+공개 시각은 모두 KST +09:00·초 정밀도이며 serviceDate는 날짜다. nullable 필드는 생략하지 않는다.
+
+| 최종 판정 | canEnter / reason | activeConversationId / nextOpensAt |
+| --- | --- | --- |
+| KST 00:00 이상 08:00 미만 | false / OUTSIDE_SERVICE_HOURS. CLOSING보다 우선 | null / 당일08시 |
+| KST 08:00 이상 다음 날00:00 미만, 정리 후에도 CLOSING | false / CONVERSATION_CLOSING | null / null |
+| 같은 이용시간, CLOSING 없음 | true / null | 현재 연결의 당일 ACTIVE ID 또는 null / null |
+
+로그인·소유권이 유효하면 시간 외와 CLOSING도 200이다. 잘못된 UUID는 400 VALIDATION_FAILED,
+인증 무효는 401 AUTHENTICATION_REQUIRED, 미존재/미소유 아이는 404 RESOURCE_NOT_FOUND다.
+기존 전역 429 RATE_LIMITED·Retry-After, 인증 저장소 장애 503 AUTH_STATE_UNAVAILABLE,
+업무 DB 장애 500 INTERNAL_ERROR와 `error.code/message/requestId/fields`를 재사용한다.
+모든 응답의 서버 `X-Request-ID`·`Cache-Control: no-store`·명시적 credentialed CORS 정책을 유지한다.
+
+### 재사용·잠금·조건부 정리
+
+`getHome`은 기존 쓰기 가능 `@Transactional` 업무 Tx다. 기본 projection은 읽기지만 조건부 정리가
+같은 Tx에서 일어날 수 있으므로 `readOnly=true`를 사용하지 않는다.
+
+1. `SessionSecurityRepository.requireCurrentContextForUpdate`로 계정·현재 보안 문맥을 잠그고,
+   `ChildService.requireChildAccessForUpdate` 후 `getChildContext`로 기존 아이 문맥을 조회한다.
+2. `ConversationRepository.findUnendedForUpdate`로 해당 아이의 ACTIVE/CLOSING만 잠근다.
+   상위 잠금 순서는 계정 → 보안 문맥 → 아이 → 대화 → 발화 → 연결이다.
+3. CLOSING 또는 예정 자정에 도달한 ACTIVE는 기존 `ConversationClosureCoordinator.reconcile(..., OBSERVE)`에 맡긴다.
+   이 경로의 PROCESSING 만료를 중복 실행하지 않는다. 아직 자정 전 ACTIVE는 기존
+   `ConversationClosureRepository.lockProcessingTurns/expireProcessing`만 재사용한다.
+4. 실제 `ConversationRepository.currentTime()`으로 잠금 대기 뒤 시간을 다시 읽고 문맥을 재검증한다.
+   기존 기한 equality부터만 조건부 AI_TIMEOUT/FAILED로 정리하며, 기한이 남은 PROCESSING은 유지한다.
+   ACTIVE의 일반 발화 만료만으로 수동 종료를 요청하지 않는다.
+5. `ConversationServiceHours.isOpen`, serviceDate·scheduledEndAt·현재 상태를 확인한 후 필요한 경우에만
+   `hasLinkForUpdate`로 현재 문맥의 기존 연결을 확인한다. 최종 시각/상태를 다시 검사하고,
+   도중 자정이 지났으면 같은 조정기로 정리한 최신 결과를 DTO에 반영한다.
+
+이전 날짜 ACTIVE의 최초 경계는 예정 자정/MIDNIGHT이며 기존 MANUAL CLOSING의 경계·원인은 보존한다.
+기한 내 작업이 남으면 CLOSING을 유지한다. 모두 terminal일 때 조정기가 실제 endedAt으로 ENDED를
+확정하고 허용 입력 유무에 따라 기존 PENDING/EMPTY 및 적격 기존 연결의 endedAt+600초를 원자 기록한다.
+이것은 기존 정리 규칙의 재사용이며 Home이 종료 완료나 요약 성공을 추정하는 것이 아니다.
+ENDED 기록과 이전 요약 PENDING은 같은 날 새 키의 대화 시작을 막지 않는다.
+
+Home은 대화·발화·새 link·AI/TTS/요약 실행을 생성하지 않는다. 기존 deadline·terminal 결과·최초 종료 경계·
+bound_at을 바꾸거나 반복 조회로 종료 복구기한을 늘리지 않는다. 시간 외·미연결·새 로그인이어도 같은 규칙이다.
+SPRING_SESSION 프레임워크 저장과 auth_rate_limits의 별도 예산 예약은 계속 수행되므로 요청 전체가
+DB 무쓰기라는 뜻은 아니다. 테이블·migration·새 SQL·인증/대화 규칙은 SCRUM-85에서 추가하지 않았다.
+
+### 응답 직전 재검사
+
+`ChildHomeController`는 최초 조회 성공 후 검증된 문맥·childId를 request 표식으로 남긴다.
+`ChildHomeResponseFilter`는 Security order+2에 한 번 등록하고 Home GET의 본문을 캐싱한다.
+성공 표식이 있는 200만 현재 인증을 다시 검증하고, 최초 조회와 별도 Tx로 `getHome`을 호출한다.
+최신 Home을 다시 직렬화하여 본문과 Content-Length를 함께 교체한다. 자정·CLOSING·ENDED·연결 소실은
+최신 상태의 200이며 인증 무효/확인 장애는 이전 성공 본문·갱신 쿠키를 제거한 뒤 기존 401/503으로 처리한다.
+오류 응답이나 다른 API를 다시 조회하지 않는다. 등록 순서·공통 헤더·캐시와 writer/flush 처리의 상세는
+[개발환경 §10.6](DEVELOPMENT_SETUP.md#106-필터-실행-순서와-변경-기준)을 따른다.
+
+### FE 연동과 후속 Task 경계
+
+- Home은 기존 로그인 쿠키를 `credentials: 'include'`로 보낸다. 시간 계산은 응답의 serverTime/timeZone/
+  serviceDate를 기준으로 하며 화면 복귀 시 다시 조회한다. 응답은 이후 시점의 진입 권한을 보장하지 않는다.
+- 아이 화면 호칭은 nickname, 캐릭터 표시는 characterId를 사용한다. 서버 Home greeting과 별개인
+  대화 화면의 FE 고정 첫 인사는 AI/TTS·발화 저장·발화 수·요약에 보내지 않는다. 실제 FE 동작 인수는 별도다.
+- `canEnter=false`에서는 TALK을 진입 불가로 표시한다. 시간 외에는 CLOSING/ENDED를 구분하거나 종료
+  완료를 추정하지 않고 opensAt/nextOpensAt부터 Home을 재확인한다. closingConversationId는 제공하지 않는다.
+- `activeConversationId=null`만으로 DB에 ACTIVE가 없다고 판단하지 않는다. 새 로그인에 기존 link를
+  만들지 않으므로 미연결 ACTIVE도 null이다. 기존 시작 API의 ACTIVE 충돌 등 응답을 처리하고,
+  명시 resume·현재 문맥 연결·전체 허용 turns 복원은 **SCRUM-101**에 맡긴다.
+- 화면 이탈은 대화를 종료하지 않는다. 이야기 마치기의 0바이트 POST /end·CSRF·202→200 처리는
+  **SCRUM-102**, 적격 기존 연결의 내용 없는 receipt·600초 접근 판정·응답 유실 복구는 **SCRUM-103**이다.
+  Home은 receipt나 종료 복구 권한을 반환하지 않는다.
+- Home의 요청 시 조건부 정리는 전역 후보 탐색·주기 실행·재시작 catch-up/sweep을 대신하지 않는다.
+  이는 **SCRUM-110**이며, 실제 요약 실행·기한 처리는 **SCRUM-107**, 음성/AI 연결은 **SCRUM-87/89**다.
+  학습·사진·게임·보상·감정 분석을 이번 P0 범위에 추가하지 않는다. 전체 책임표는 §6을 유지한다.
+
+### 최종 검증 기록
+
+코드 HEAD `1fb0129`와 이번 문서 변경 작업 트리에서 2026-11-20 KST에 아래 명령을 재실행했다.
+각 범위는 중복되므로 서로 또는 이전 §8·§11의 과거 건수와 합산하지 않는다.
+
+| 명령 | 이번 최종 실행 결과 |
+| --- | --- |
+| `.\gradlew.bat compileJava` | 성공, UP-TO-DATE |
+| `.\gradlew.bat test --tests "com.dodamdodam.backend.home.*"` | 5 suites / 171 tests, 실패·오류·건너뜀 0 |
+| `.\gradlew.bat clean check` | 70 suites / 1,767 tests, 실패·오류·건너뜀 0 |
+| `python docs/p0/support/validate_contract.py` | 기본 Python은 의존성 누락으로 실패. 별도 임시 venv의 Python에 `-X utf8`을 적용한 재실행은 PASS |
+| `git diff --check` | 성공 |
+
+Home 세부 건수는 Serialization 23·Service 24·Controller 21·ResponseFilter 47·Contract 56개다.
+최종 전체 테스트는 Docker/PostgreSQL Testcontainers를 사용하며 환경 제약을 성공이나 skip으로 대체하지 않는다.
+
+P0 검증 전용 임시 venv에는 [P0 검증 안내](p0/README.md#검증-재실행)의 Python 패키지만 설치했다.
+시스템 Python·프로젝트 의존성·검증 스크립트는 변경하지 않았다. 기본 Python 3.11에서는
+`openapi_spec_validator`가 없어 시작하지 못했으며, 패키지 설치 후에도 Windows 기본 CP949로
+UTF-8 OpenAPI를 읽으면 UnicodeDecodeError가 발생했다. 임시 venv의 Python으로
+`python -X utf8 docs/p0/support/validate_contract.py`와 같은 방식으로 실행해 해결했다.
+검증 결과는 24 paths / 26 operations / 61 schemas, P0 로컬 링크 460개·도식 32개 PASS다.
+이 결과는 SVG 재렌더나 실제 서버/AI 실행을 포함하지 않는다. 과거 원본 9개 부재로 원본 해시 확인과
+원본/v2 스키마 직접 비교는 미실행이다. 별도로 수정 문서 2개의 로컬 파일 링크 94개에서 누락이 없음을 확인했다.
+
+Home 검증은 다음 기존 5개 suite를 사용한다. HTTP 통합은 기존 TestcontainersConfiguration의 PostgreSQL,
+실제 Spring Session JDBC와 임의 포트 서버를 사용한다. 시간 경계만 `ConversationRepository.currentTime()`
+spy로 고정하며 인증·SQL·트랜잭션·상태 전이는 실제 실행한다. ResponseGate/latch와 pg_blocking_pids로
+응답·잠금 대기 순서를 확인하며 sleep으로 추정하지 않는다.
+
+| suite | 검증 대상 |
+| --- | --- |
+| [ChildHomeSerializationTests](../src/test/java/com/dodamdodam/backend/home/dto/ChildHomeSerializationTests.java) | 7/4/8필드·nickname·등록일 포함·자정/월말/연말/윤일·이용시간·명시 null·KST 초 정밀도 |
+| [ChildHomeServiceTests](../src/test/java/com/dodamdodam/backend/home/application/ChildHomeServiceTests.java) | 접근/잠금 순서·기존 종료 조정 재사용·당일 상태/연결·정리 후 재검사·생성 호출 없음 |
+| [ChildHomeControllerTests](../src/test/java/com/dodamdodam/backend/home/api/ChildHomeControllerTests.java) | 기본 HTTP·envelope·공통 오류/헤더·필터 등록/순서 |
+| [ChildHomeResponseFilterTests](../src/test/java/com/dodamdodam/backend/home/api/ChildHomeResponseFilterTests.java) | 자정·상태/연결/인증 변경·성공 본문 제거·writer/output stream/flushBuffer·길이/헤더·경로 격리 |
+| [ChildHomeContractTests](../src/test/java/com/dodamdodam/backend/home/api/ChildHomeContractTests.java) | 실제 DB/세션/HTTP·반복 진입·기존/새 로그인·당일 ENDED 후 새 시작·이전 날짜 정리·기한 ±1µs/equality·terminal/경계/bound_at/복구기한 보존·응답/계정 잠금/동시 조회 경합·실제 장애 503/500·정리 rollback·전역 429·새 업무 행 미생성 |
+
+### 완료 조건 대응과 미검증 범위
+
+아래 10개 항목은 현재 게시 계약에 대한 Backend 구현·로컬 검증 범위에서 충족을 확인했다.
+Jira 상태·Story Point·PR/CI/리뷰/병합 완료 및 아래 별도 미검증 범위와는 구분한다.
+
+| 완료 조건 | 구현·검증 근거 |
+| --- | --- |
+| DTO 및 날짜 계산 | ChildHome.from·SerializationTests 및 ContractTests의 DB 등록 시각/달력 경계 |
+| 기존 인증과 소유권 | 공통 인증/ChildService 재사용·Controller/ServiceTests·ContractTests의 폐기/만료/버전/미소유 차단 |
+| API 정상·오류 응답 | ControllerTests·ContractTests의 200/400/401/404/429/500/503·data/error·공통 헤더 |
+| ACTIVE/CLOSING/ENDED 상태 | ServiceTests·ContractTests의 접근 가능한 ACTIVE·CLOSING·ENDED 및 같은 날 새 시작 |
+| 시간 경계 및 이용 가능 상태 | 07:59:59/08:00/23:59:59/00:00·시간 외+CLOSING 우선순위·메뉴 |
+| 현재 세션 연결 확인 | hasLinkForUpdate·연결/미연결·새 로그인·반복 Home 시 bound_at/행 수 보존 |
+| 응답 직전 재검사 | ResponseFilterTests·실제 HTTP ResponseGate 경합과 DB 잠금 대기 후 최신 판정 |
+| 데이터 생성 및 정리 불변성 | 업무 행 snapshot·기존 조정기·기한/최초 경계/terminal/복구기한·장애 rollback |
+| 통합·회귀 테스트 | 이번 최종 검증 표의 Home 전체 및 clean check 결과 |
+| 문서 일치 여부 | 개발환경 §10.6·본 §12를 실제 코드 및 Jira/API/ERD v3.1과 대조·P0 검증기·문서 링크/diff 검사 |
+
+실제 FE 브라우저의 신규 가입→Home→resume/end 연동, 실제 공급자 로그인·운영 HTTPS/쿠키/CORS·다중 서버,
+AI wire/STT/LLM/TTS/요약 호출·음성 파일 삭제·프로세스 재시작/주기 worker는 이번에 검증하지 않았다.
+새 업무 행 미생성·기존 요약 상태 보존과 코드의 호출 경로를 확인한 것이 실제 외부 작업의 실행 인수는 아니다.
+D13/D14의 실제 AI·음성 수치와 D17의 운영값은 기존 미확정 상태다.
+P0 검증기의 과거 원문 해시·v2 직접 비교는 원본 부재로 미실행이며 현재 게시 산출물 검증과 구분한다.
+로컬 검증 완료만으로 후속 Task나 원격 CI·팀원 승인·PR 병합까지 완료했다고 판단하지 않는다.
