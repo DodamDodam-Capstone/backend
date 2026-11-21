@@ -27,6 +27,15 @@ public class EmailVerificationAccountRepository {
     /** 공개 목적 적격 판정에 필요한 최소 계정 상태다. */
     public record AccountState(UUID id, String email, long sessionVersion) { }
 
+    /** 계정 잠금 상태에서 비밀번호를 교체한다. 버전 증가로 이전 로그인과 RESET_PASSWORD 증명을 폐기한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean replacePassword(UUID accountId, String hash) {
+        return jdbc.update("""
+                UPDATE accounts SET password_hash = ?, session_version = session_version + 1, updated_at = clock_timestamp()
+                WHERE id = ? AND password_hash IS NOT NULL
+                """, hash, accountId) == 1;
+    }
+
     /** 계정·세션 잠금을 얻은 호출자 Tx에서 현재 PIN 행을 잠그고 존재 여부를 반환한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean lockPin(UUID accountId) {
