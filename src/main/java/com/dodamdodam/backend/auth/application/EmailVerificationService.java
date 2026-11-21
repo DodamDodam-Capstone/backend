@@ -136,7 +136,7 @@ public class EmailVerificationService {
             && (!MessageDigest.isEqual(initial.codeHash(), codeHash) || !initial.eligible());
         var challenge = wrongReset
             ? repository.lockChallenge(input.challengeId()).orElseThrow(EmailVerificationException::invalid)
-            : lockChallenge(pending);
+            : lockChallenge(pending, false);
         var now = requireVerifiableCode(challenge, current);
         boolean matches = MessageDigest.isEqual(challenge.codeHash(), codeHash);
         // 공개 decoy에도 일반 오답과 같은 제한을 적용하되 성공 상태는 만들지 않는다.
@@ -173,16 +173,20 @@ public class EmailVerificationService {
         }
         work.executeWithoutResult(status -> {
             var current = pending.current();
-            var challenge = lockChallenge(pending);
+            var challenge = lockChallenge(pending, false);
             var now = current == null ? repository.databaseNow() : checkPinContext(challenge, current);
             requireActiveToken(challenge, now);
         });
     }
 
     /** 발급·응답 재검사·소비 모두 계정을 먼저 잠그고 같은 reset 발급 시점의 버전을 확인한다. */
-    private Challenge lockChallenge(PendingGrant pending) {
+    private Challenge lockChallenge(PendingGrant pending, boolean lockPinSetupProofs) {
         if (pending.current() != null) {
             lockPinContext(pending.current());
+            // 최초 설정은 대기 중 만료도 확인하도록 관련 증명을 먼저 ID 순서로 잠근다.
+            if (lockPinSetupProofs) {
+                repository.lockPinSetupProofs(pending.current().accountId(), pending.id());
+            }
         }
         var reset = pending.resetEmail() == null ? null
             : accounts.findForUpdate(pending.resetEmail()).orElseThrow(EmailVerificationException::invalid);
@@ -268,6 +272,11 @@ public class EmailVerificationService {
         }
     }
 
+    /** 기존 PIN 유무를 확인하기 전에 요청 토큰의 구조만 검증한다. */
+    public static boolean isTokenFormatValid(String token) {
+        return token != null && TOKEN.matcher(token).matches();
+    }
+
     /** 가입·비밀번호·PIN 업무의 기존 트랜잭션에서만 해당 목적의 토큰을 소비한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public ConsumedVerification consume(String token, Purpose expectedPurpose, AuthenticatedSession current) {
@@ -287,7 +296,8 @@ public class EmailVerificationService {
             }
             requirePinBinding(initial, current);
         }
-        var challenge = lockChallenge(PendingGrant.from(id, initial, pin ? current : null));
+        var pending = PendingGrant.from(id, initial, pin ? current : null);
+        var challenge = lockChallenge(pending, expectedPurpose == Purpose.PIN_SETUP);
         requireMatchingToken(challenge, expectedPurpose, hash);
         var now = pin ? checkPinContext(challenge, current) : repository.databaseNow();
         requireActiveToken(challenge, now);

@@ -27,10 +27,11 @@ public class EmailVerificationAccountRepository {
     /** 공개 목적 적격 판정에 필요한 최소 계정 상태다. */
     public record AccountState(UUID id, String email, long sessionVersion) { }
 
-    /** 계정·세션 잠금을 얻은 호출자 Tx에서 현재 PIN 행을 마지막 상위 row로 잠근다. */
+    /** 계정·세션 잠금을 얻은 호출자 Tx에서 현재 PIN 행을 잠그고 존재 여부를 반환한다. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void lockPin(UUID accountId) {
-        jdbc.queryForList("SELECT account_id FROM guardian_pins WHERE account_id=? FOR UPDATE", UUID.class, accountId);
+    public boolean lockPin(UUID accountId) {
+        return !jdbc.queryForList("SELECT account_id FROM guardian_pins WHERE account_id = ? FOR UPDATE",
+                UUID.class, accountId).isEmpty();
     }
 
     /** PIN 원문 없이 현재 세션·이메일·generation·PIN 버전을 같은 DB 조회로 읽는다. */
