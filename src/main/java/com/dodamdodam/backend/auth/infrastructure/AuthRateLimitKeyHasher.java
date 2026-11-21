@@ -40,6 +40,17 @@ public final class AuthRateLimitKeyHasher {
         return List.of(hash(Action.LOGIN_EMAIL, normalizedEmail), hash(Action.LOGIN_IP, addressScope(clientAddress)));
     }
 
+    /** 전체 요청량은 현재 계정과 실제 연결 IP의 고정창에 예약한다. */
+    public List<AuthRateLimitKey> pinUnlockKeys(UUID accountId, InetAddress clientAddress) {
+        return List.of(hash(Action.PIN_UNLOCK_ACCOUNT, accountId.toString()),
+                hash(Action.PIN_UNLOCK_IP, addressScope(clientAddress)));
+    }
+
+    /** 오답 이력은 세션 교체나 비밀번호 재설정과 독립된 계정 키를 사용한다. */
+    public byte[] pinFailureKey(UUID accountId) {
+        return hashBytes("PIN_FAILURE_ACCOUNT", accountId.toString());
+    }
+
     /** 정규화·권한 검사한 범위로 누적 한도와 현재 문맥의 cooldown 키를 만든다. */
     public List<AuthRateLimitKey> emailIssueKeys(String normalizedEmail, Purpose purpose, UUID accountId,
                                                UUID securityContextId, InetAddress clientAddress) {
@@ -82,15 +93,20 @@ public final class AuthRateLimitKeyHasher {
 
     /** action과 각 UTF-8 필드의 길이를 포함해 경계가 모호하지 않은 전용 HMAC을 만든다. */
     private AuthRateLimitKey hash(Action action, String... scope) {
+        return new AuthRateLimitKey(action, hashBytes(action.name(), scope));
+    }
+
+    /** 고정창 예산과 계정 오답 이력에 같은 HMAC 필드 인코딩을 적용한다. */
+    private byte[] hashBytes(String action, String... scope) {
         try {
             var mac = Mac.getInstance(ALGORITHM);
             mac.init(key);
             mac.update("auth-rate:v1\0".getBytes(StandardCharsets.UTF_8));
-            updateField(mac, action.name());
+            updateField(mac, action);
             for (String component : scope) {
                 updateField(mac, component);
             }
-            return new AuthRateLimitKey(action, mac.doFinal());
+            return mac.doFinal();
         }
         catch (GeneralSecurityException failure) {
             throw new AuthStateUnavailableException(failure);
