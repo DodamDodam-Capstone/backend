@@ -5,10 +5,7 @@ import com.dodamdodam.backend.auth.dto.SignupRequest;
 import com.dodamdodam.backend.auth.dto.SignupResult;
 import com.dodamdodam.backend.auth.exception.EmailVerificationException;
 import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
-import com.dodamdodam.backend.global.error.ApiErrorResponse;
-import com.dodamdodam.backend.global.error.ApiErrorResponses;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -19,7 +16,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.core.JacksonException;
@@ -57,12 +53,5 @@ public class SignupController {
             // 트랜잭션 커밋 중 발생한 장애도 공통 인증 상태 오류로 전달한다.
             throw new AuthStateUnavailableException(failure);
         }
-    }
-
-    /** 요청 구조·토큰·중복 계정 오류를 공통 JSON 형식으로 응답한다. */
-    @ExceptionHandler(EmailVerificationException.class)
-    public ResponseEntity<ApiErrorResponse> handle(EmailVerificationException failure, HttpServletResponse response) {
-        return ResponseEntity.status(failure.status()).body(ApiErrorResponses.body(response,
-                failure.code(), failure.getMessage(), failure.fields()));
     }
 }
