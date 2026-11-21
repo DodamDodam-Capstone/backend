@@ -89,6 +89,9 @@ class SignupHttpTests {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM spring_session", Long.class)).isZero();
         assertError(send(HttpRequest.newBuilder(uri("/api/v1/auth/me")).GET().build()), 401, "AUTHENTICATION_REQUIRED");
 
+        var wrongPassword = encode(Map.of("email", EMAIL, "password", "wrong-synthetic-password"));
+        assertError(send(post("/api/v1/auth/login", wrongPassword, csrf())), 401, "LOGIN_FAILED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM session_security", Long.class)).isZero();
         var login = send(post("/api/v1/auth/login", encode(Map.of("email", EMAIL, "password", password)), csrf()));
         assertThat(login.statusCode()).isEqualTo(200);
         assertThat(json.readTree(login.body()).get("data").get("accountId").asText()).isEqualTo(accountId.toString());
@@ -137,6 +140,20 @@ class SignupHttpTests {
         assertError(send(request(PATH, "application/json", body).build()), 403, "CSRF_INVALID");
         assertThat(consumed(grant)).isFalse();
         assertThat(send(post(PATH, max, csrf)).statusCode()).isEqualTo(201);
+    }
+
+    @Test
+    void exhaustedGlobalBudgetRejectsSignupWithoutConsumingGrant() throws Exception {
+        var grant = seedGrant(EMAIL, null);
+        var csrf = csrf();
+        assertThat(jdbc.update("UPDATE auth_rate_limits SET attempt_count=300 WHERE action='API_IP'")).isEqualTo(1);
+        var response = send(signup(grant, PASSWORD, csrf));
+
+        assertError(response, 429, "RATE_LIMITED");
+        long waitSeconds = Long.parseLong(response.headers().firstValue("Retry-After").orElseThrow());
+        assertThat(waitSeconds).isBetween(1L, 60L);
+        assertThat(consumed(grant)).isFalse();
+        assertThat(accountCount(EMAIL)).isZero();
     }
 
     @Test
