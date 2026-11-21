@@ -5,6 +5,8 @@ import com.dodamdodam.backend.auth.dto.IssueEmailVerificationRequest.Purpose;
 import com.dodamdodam.backend.auth.infrastructure.EmailVerificationRepository.IssuedChallenge;
 import com.dodamdodam.backend.auth.infrastructure.EmailVerificationRepository.NewChallenge;
 import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.Map;
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
@@ -52,6 +56,29 @@ class EmailVerificationRepositoryTests {
         jdbc.update("DELETE FROM email_verifications");
         jdbc.update("DELETE FROM session_security");
         jdbc.update("DELETE FROM accounts");
+    }
+
+    @Test
+    void documentedEmailVerificationColumnsMatchFlyway() throws IOException {
+        var erd = new ClassPathResource("Integrated_ERD_Design.md").getContentAsString(StandardCharsets.UTF_8);
+        var ddl = Pattern.compile("<!-- integrated-ddl:start -->\\R```sql\\R(.*?)\\R```\\R<!-- integrated-ddl:end -->",
+                Pattern.DOTALL).matcher(erd);
+        assertThat(ddl.find()).as("ERD §12.2 DDL").isTrue();
+        String columns = """
+                SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+                FROM information_schema.columns
+                WHERE table_schema=current_schema() AND table_name='email_verifications' ORDER BY column_name
+                """;
+        var migrated = jdbc.queryForList(columns);
+        assertThat(migrated).isNotEmpty();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // 문서 DDL을 빈 스키마에 적용하고 트랜잭션 종료 시 스키마까지 되돌린다.
+            status.setRollbackOnly();
+            jdbc.execute("CREATE SCHEMA erd_verification_test");
+            jdbc.execute("SET LOCAL search_path TO erd_verification_test");
+            jdbc.execute(ddl.group(1));
+            assertThat(jdbc.queryForList(columns)).containsExactlyElementsOf(migrated);
+        });
     }
 
     @ParameterizedTest

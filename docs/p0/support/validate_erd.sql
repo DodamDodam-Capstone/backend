@@ -1,4 +1,4 @@
--- 최종 설계 v3.0 13테이블/115컬럼 검증. 권위 있는 DDL은 Integrated_ERD_Design.md §12.2다.
+-- SCRUM-82를 반영한 13테이블/116컬럼 검증. 검토용 DDL은 Integrated_ERD_Design.md §12.2다.
 -- 검증 대상은 DB row/구조 제약이다. 실제 현재 권한·교차 테이블 업무 상태·HTTP/AI 실행은 별도 서비스 검사다.
 -- 독립 임시 DB에서 BEGIN; CREATE SCHEMA ...; SET LOCAL search_path=...;
 -- 본문 §12.2 DDL; 이 파일; ROLLBACK; 순으로 실행한다. 운영 DB 사용 금지.
@@ -28,8 +28,8 @@ END $$;
 
 SELECT pg_temp.expect_true((SELECT count(*)=13 FROM information_schema.tables
   WHERE table_schema=current_schema() AND table_type='BASE TABLE'),'13 tables');
-SELECT pg_temp.expect_true((SELECT count(*)=115 FROM information_schema.columns
-  WHERE table_schema=current_schema()),'115 columns');
+SELECT pg_temp.expect_true((SELECT count(*)=116 FROM information_schema.columns
+  WHERE table_schema=current_schema()),'116 columns');
 
 -- 세션 timezone을 UTC로 두어 날짜 CHECK가 Asia/Seoul을 명시적으로 사용하는지 확인한다.
 SET LOCAL TIME ZONE 'UTC';
@@ -372,9 +372,28 @@ DELETE FROM SPRING_SESSION WHERE PRIMARY_ID=pg_temp.uid(81)::text;
 SELECT pg_temp.expect_true((SELECT count(*)=0 FROM SPRING_SESSION_ATTRIBUTES), 'framework attribute cascade only');
 SELECT pg_temp.expect_true((SELECT count(*)=2 FROM accounts), 'framework delete leaves business accounts');
 
+-- 같은 DB 기한을 가진 구·신규 발급분에서 §9.2의 공개 만료 시각이 각각 복원되는지 확인한다.
+INSERT INTO email_verifications(id,email,purpose,eligible,code_hash,created_at,expires_at,verified_at,token_hash,token_expires_at)
+SELECT pg_temp.uid(n),'expiry@example.test','SIGNUP',true,decode(repeat('aa',32),'hex'),
+       '2026-10-02 10:00+09','2026-10-02 10:10+09','2026-10-02 10:05:00.900001+09',
+       decode(repeat('bb',32),'hex'),'2026-10-02 10:15:00.900001+09'
+FROM (VALUES (8201),(8202)) AS fixture(n);
+UPDATE email_verifications SET token_expiry_includes_fraction=true WHERE id=pg_temp.uid(8202);
+WITH published AS (
+    SELECT id, CASE WHEN token_expiry_includes_fraction THEN token_expires_at
+                    ELSE date_trunc('second',token_expires_at) END AS deadline
+    FROM email_verifications
+)
+SELECT pg_temp.expect_true(deadline=expected, label) FROM published
+JOIN (VALUES (pg_temp.uid(8201),timestamptz '2026-10-02 10:15:00+09','legacy token expires at published second'),
+             (pg_temp.uid(8202),timestamptz '2026-10-02 10:15:00.900001+09','new token keeps published microseconds'))
+     AS fixture(id,expected,label) USING(id);
+SELECT pg_temp.expect_reject($s$UPDATE email_verifications SET token_expiry_includes_fraction=NULL WHERE id=pg_temp.uid(8201)$s$,
+                             '23502','token expiry precision is required');
+
 DO $$ BEGIN
-  IF (SELECT count(*) FROM erd_audit_results)<>184 THEN RAISE EXCEPTION 'Unexpected test count'; END IF;
+  IF (SELECT count(*) FROM erd_audit_results)<>187 THEN RAISE EXCEPTION 'Unexpected test count'; END IF;
 END $$;
 \o
 SELECT kind,count(*) AS passed FROM erd_audit_results GROUP BY kind ORDER BY kind;
-SELECT 'PASS '||count(*)||' / 184' AS result FROM erd_audit_results;
+SELECT 'PASS '||count(*)||' / 187' AS result FROM erd_audit_results;

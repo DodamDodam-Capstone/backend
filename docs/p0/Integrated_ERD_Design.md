@@ -1,6 +1,6 @@
 # DodamDodam 통합 ERD 설계서
 
-2026-10-03 · v3.1 · P0 최종 통합 설계 · PostgreSQL 물리 모델 · 사용자 확정 결정 반영
+2026-10-03 · v3.1 P0 통합 설계 · 2026-11-21 SCRUM-82 토큰 만료 정밀도 반영
 
 이 문서는 두 파트의 제공 설계에 사용자 확정 결정을 반영한 최종 데이터 사전이다. **운영에 적용된 migration은 아니다.** 수동·자정 종료·당일 새 대화·기존 연결의 종료 복구·이메일 PIN 재설정·주제추천 제외를 API와 같은 기준으로 명시한다. 원문 기록, 사용자 확정 정책, 정책을 구현하기 위한 기술 설계, AI 응답 대기와 운영 연기를 구분한다. API 계약은 [통합 API 명세](Integrated_API_Spec.md), 담당별 작업과 남은 외부 확인은 FE·BE 인계서(별도 전달)를 따른다. 확정 근거는 [결정 기록](Decision_Record.md)이며 현재 DDL의 검증 범위와 결과는 §12.3에 기록한다.
 
@@ -424,6 +424,7 @@ DB는 아이당 ACTIVE/CLOSING 합계 최대1개, 대화당 PROCESSING 최대1�
 | reset_account_id | uuid | N | NULL | eligible RESET_PASSWORD만 FK accounts(id), RESTRICT |
 | reset_session_version | bigint | N | NULL | 재설정 발급 당시 계정 version |
 | created_at | timestamptz | NN | CURRENT_TIMESTAMP | 서비스는 발급 잠금 후 읽은 DB 시각을 명시 |
+| token_expiry_includes_fraction | boolean | NN | false | 토큰 발급 시 소수 초까지 안내했으면 true, 초 단위로 안내했으면 false |
 
 `reset_account_id/reset_session_version`은 기존 비밀번호 재설정 기술 기준이다. 신규 SIGNUP·decoy는 존재하지 않는 계정 FK를 요구하지 않는다. PIN_SETUP/PIN_RESET은 decoy를 허용하지 않으며 이메일·계정·현재 securityContext를 서버가 결정한다. setup_* 세 컬럼의 기존 이름을 유지하여 두 PIN 목적에 재사용하고, PIN_RESET의 기존 PIN 버전만 pin_version_snapshot에 추가한다. PIN_RESET 별도 테이블은 없다. 번호/토큰 TTL·재발급 간격·요청량/오답 제한은 기존 이메일 인증 기준을 재사용하는 기술 설계이며 새 사용자 선택값으로 표현하지 않는다.
 
@@ -986,6 +987,8 @@ COMMIT;
 ```
 <!-- integrated-v3-migration:end -->
 
+위 이관은 v3.1의 115컬럼에서 끝난다. 이 결과에 SCRUM-82의 토큰 만료 판정을 적용하려면 §12.2에 연결한 V9를 이어서 실행한다.
+
 새 배포의 start가 지난 날짜 미종료 행을 먼저 정리하고, ENDED의 같은 키는 CONVERSATION_ENDED, 새 키는 같은 날에도 새 ID를 생성하는지 서비스 인수 시험에서 확인한다. 단순 제약 변경만으로 수동 종료/권한/AI 실행이 구현되었다고 간주하지 않는다.
 
 ### 10.3 실행 범위와 남은 필수 검증
@@ -1001,7 +1004,7 @@ COMMIT;
 | 세션·정리 | framework 저장 실패 대 업무 커밋·고정 버전 무상한 설정·긴 이메일 principal 색인·FK 참조 정리 순서·활성 제한/유효 토큰 유지 |
 | 조회 | ENDED-only·페이지 전부 읽기·sequence 공백·필드별 visibility·금지 원문 검색 제외·한글/영문/와일드카드 문자 검색 |
 
-v1.1의 PostgreSQL 18.4 검사 108건과 v1.2의 문서/도식 검증은 **이전 110컬럼 설계의 이력**이다. v2.0의 112컬럼/150건 검사도 이전 이력이며 현재 115컬럼 DDL은 변경됐으므로 이전 PASS를 승계하지 않는다. 최종 DDL의 별도 검증 결과는 §12.3에 기록한다. 실제 애플리케이션 트랜잭션·두 인스턴스 경합·framework 인증 동작·기존 데이터 migration·부하·파일 삭제는 문서만으로 검증되지 않는다.
+v1.1의 PostgreSQL 18.4 검사 108건과 v1.2의 문서/도식 검증은 **이전 110컬럼 설계의 이력**이다. v2.0의 112컬럼/150건 검사도 이전 이력이며 현재 116컬럼 DDL은 변경됐으므로 이전 PASS를 승계하지 않는다. 최종 DDL의 별도 검증 결과는 §12.3에 기록한다. 실제 애플리케이션 트랜잭션·두 인스턴스 경합·framework 인증 동작·기존 데이터 migration·부하·파일 삭제는 문서만으로 검증되지 않는다.
 
 **근거:** P1-ERD §2·§5·§8.1–8.2·§10; P1-F §11·§13·§15; P2-ERD §4–6; P2-API §9. 실제 migration은 대상 schema/데이터 조사 후 작성한다.
 
@@ -1033,7 +1036,7 @@ v1.1의 PostgreSQL 18.4 검사 108건과 v1.2의 문서/도식 검증은 **이�
 
 ### 12.1 적용 경계와 DB가 보장하지 않는 조건
 
-§12.2는 13개 테이블·115개 컬럼을 빈 스키마에 생성하는 **검토용 전체 DDL**이다. 사용자 확정 동작을 반영했으며 운영 migration 적용은 별도다. v2.0의 112컬럼에 children.nickname과 conversations.end_requested_at/end_reason을 추가했다. CLOSING을 명시 상태로 추가하고 일별 UNIQUE를 제거했으며 미종료 부분 UNIQUE를 ACTIVE/CLOSING으로 확장했다. 동의·별도 PIN proof·종료 요청용 신규 테이블은 추가하지 않는다.
+§12.2는 13개 테이블·116개 컬럼을 빈 스키마에 생성하는 **검토용 전체 DDL**이다. 사용자 확정 동작을 반영했으며 운영 migration 적용은 별도다. v2.0의 112컬럼에 children.nickname과 conversations.end_requested_at/end_reason을 추가했다. CLOSING을 명시 상태로 추가하고 일별 UNIQUE를 제거했으며 미종료 부분 UNIQUE를 ACTIVE/CLOSING으로 확장했다. 동의·별도 PIN proof·종료 요청용 신규 테이블은 추가하지 않는다.
 
 UUID는 앱 생성하므로 확장이나 DB UUID DEFAULT를 추가하지 않는다. 미확정 AI TTL·요약/발화 timeout·음성 크기·문자열 길이를 DDL에 추정값으로 넣지 않는다. timestamp DEFAULT는 편의값이며 판정용 created_at/ended_at/completed_at과 deadline은 필요한 잠금 후 얻은 DB 시각으로 명시한다. `CURRENT_TIMESTAMP`의 트랜잭션 시작 시각을 잠금 대기 뒤의 새 판정 시각으로 착각하지 않는다.
 
@@ -1056,7 +1059,7 @@ UUID는 앱 생성하므로 확장이나 DB UUID DEFAULT를 추가하지 않는�
 
 ### 12.2 전체 DDL
 
-아래 블록 하나가 본문 데이터 사전과 대응하는 DDL 원본이다. Spring Session 부분은 §6의 4.1.1 공식 스키마와 대조했지만 프로젝트 채택 버전 확인이 선행되어야 한다. `CREATE TABLE IF NOT EXISTS`로 기존 스키마 차이를 숨기지 않는다.
+빈 검증 스키마에는 아래 블록을 한 번 실행한다. §3.5 사전과 §14.5 JSON처럼 토큰 정밀도 열을 포함한다. 기존 115컬럼 문서 스키마에서 §9.2를 검증할 때는 [Flyway V9](../../src/main/resources/db/migration/V9__track_published_token_expiry_precision.sql)를 한 번 적용한 뒤 §12.3의 검증 SQL을 실행한다. Spring Session 부분은 §6의 4.1.1 공식 스키마와 대조했지만 프로젝트 채택 버전 확인이 선행되어야 한다. `CREATE TABLE IF NOT EXISTS`로 기존 스키마 차이를 숨기지 않는다.
 
 <!-- integrated-ddl:start -->
 ```sql
@@ -1168,6 +1171,7 @@ CREATE TABLE email_verifications (
     reset_account_id uuid DEFAULT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
     reset_session_version bigint DEFAULT NULL,
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    token_expiry_includes_fraction boolean NOT NULL DEFAULT false,
     CONSTRAINT fk_setup_account_session FOREIGN KEY (setup_session_binding,setup_account_id)
         REFERENCES session_security(id,account_id) ON DELETE RESTRICT,
     CONSTRAINT ck_verification_purpose CHECK (purpose IN ('SIGNUP','RESET_PASSWORD','PIN_SETUP','PIN_RESET')),
@@ -1413,9 +1417,20 @@ CREATE TABLE SPRING_SESSION_ATTRIBUTES (
 
 ### 12.3 최종 DDL의 실제 검증 결과
 
-2026-10-03 KST, **PostgreSQL18.4 독립 임시 클러스터에서 v3.1 DDL 184/184 PASS**했다. 정상·구조53건과 기대 오류 거부131건이다. §12.2의 현재13테이블·115컬럼 DDL을 그대로 추출해 실행했다. §10.2의 v2.0→v3.1 migration을 빈 v2 스키마에 적용한 뒤에도 같은184건이 모두 통과했다. 이전150건 결과를 승계하지 않았다.
+**현재 검증 (2026-11-21)** · PostgreSQL 18.6에서 빈 스키마에 §12.2를 적용한 경우와, 기존 115컬럼 문서 스키마에 실제 V9를 적용한 경우 모두 [검증 SQL](support/validate_erd.sql) 187/187건이 통과했다(정상·구조 55건, 기대 오류 132건). 같은 DB 기한을 가진 두 토큰에서 구버전의 초 단위 기한과 신규 발급분의 마이크로초 기한을 확인한다. 현재 §12.2 SQL 블록의 끝 개행을 제외한 SHA256은 `256a7c700c7298891463958279c826f2b27ed700f599d797348ae4d9a5b4d50f`이다.
 
-| 검사 | 이번 결과 |
+저장소 루트에서 `ERD_TEST_DB`를 빈 PostgreSQL 검증 DB 이름으로 지정하고 실행한다. 스키마 생성부터 검사까지 같은 연결에서 실행한 뒤 롤백한다.
+
+```sh
+awk '/^<!-- integrated-ddl:start -->$/{ddl=1;next} /^<!-- integrated-ddl:end -->$/{ddl=0} ddl && !/^`/' docs/p0/Integrated_ERD_Design.md |
+  psql -X -v ON_ERROR_STOP=1 -d "${ERD_TEST_DB:?빈 검증 DB 이름을 지정하세요}" \
+    -c 'BEGIN; CREATE SCHEMA erd_check; SET LOCAL search_path TO erd_check;' \
+    -f - -f docs/p0/support/validate_erd.sql -c 'ROLLBACK;'
+```
+
+**이전 검증 (2026-10-03)** · PostgreSQL 18.4 독립 임시 클러스터에서 v3.1 DDL 184/184건이 통과했다. 정상·구조53건과 기대 오류 거부131건이다. 당시 §12.2의 13테이블·115컬럼 DDL을 그대로 추출해 실행했다. §10.2의 v2.0→v3.1 migration을 빈 v2 스키마에 적용한 뒤에도 같은184건이 모두 통과했다. 이전150건 결과를 승계하지 않았다.
+
+| 검사 | 2026-10-03 결과 |
 | --- | --- |
 | 구조·삭제 정책 |13테이블115컬럼, 일별 UNIQUE·추천 컬럼·단일 종료 승자 인덱스 없음, 업무 RESTRICT/framework CASCADE 유지 |
 | 이름·애칭 |name1–5 유지, nickname 필수·빈값/trim/20코드포인트 상한, Unicode20코드포인트 허용 및 별도 저장 |
@@ -1429,7 +1444,7 @@ CREATE TABLE SPRING_SESSION_ATTRIBUTES (
 
 환경은 Homebrew PostgreSQL18.4, UTF-8/locale C의 새 임시 클러스터다. TCP 수신을 끄고 전용 로컬 Unix socket으로만 연결했다. `BEGIN → 새 schema 생성 → 문서 DDL 또는 v2 DDL+문서 migration → 검증 → ROLLBACK`으로 실행했다. 오류 이관도 트랜잭션 롤백되어 잔여 검증 schema0을 확인했다. 운영 DB·제품 코드는 수정하지 않았다.
 
-§12.2 SQL 블록의 끝 개행을 제외한 SHA256: `70dd7f61907e2871b216b020689def46af6fad34bd463e342090080bf17bd4f4`. 재실행은 새 격리 DB에서 이 블록과 [검증 SQL](support/validate_erd.sql)을 위 트랜잭션 순서로 실행한다. 검증 파일은 오류 SQLSTATE를 검사하고 결과를 합산한다. 다른 PostgreSQL 버전·collation은 별도 확인한다. 문서 JSON·DTO 및 Mermaid/PDF 렌더 결과는 [통합 API §12](api/08-errors-and-validation.md#section-12)와 최종 검증 보고서에 별도 기록한다.
+당시 SQL 블록의 끝 개행을 제외한 SHA256은 `70dd7f61907e2871b216b020689def46af6fad34bd463e342090080bf17bd4f4`이다. 184건을 재실행할 때는 같은 커밋의 [115컬럼 DDL](https://github.com/DodamDodam-Capstone/backend/blob/bb5d85f3658583ca025b2c6c21183c57ec03d8c2/docs/p0/Integrated_ERD_Design.md#L1057)과 [당시 검증 SQL](https://github.com/DodamDodam-Capstone/backend/blob/bb5d85f3658583ca025b2c6c21183c57ec03d8c2/docs/p0/support/validate_erd.sql)을 사용한다. 검증 파일은 오류 SQLSTATE를 검사하고 결과를 합산한다. 다른 PostgreSQL 버전·collation은 별도 확인한다. 문서 JSON·DTO 및 Mermaid/PDF 렌더 결과는 [통합 API §12](api/08-errors-and-validation.md#section-12)와 최종 검증 보고서에 별도 기록한다.
 
 **이 검사로 증명하지 않는 범위:** 실제 로그인/framework/PIN 판정, proof1회 소비의 동시 경합, HTTP 시간/권한 차단, 실제 서비스 잠금 및 두 인스턴스 end/발화 경합, 모든 발화 terminal 판정의 제품 구현, AI 실행 횟수, 세션 저장·브라우저·음성 삭제·운영 DB 이관·부하. 검증 SQL의 일부는 서비스에 필요한 조건부 쿼리를 가상 시각/문맥으로 실행한 것이며 제품 코드 인수 시험을 대신하지 않는다. D13·D14·D17의 대기 결정을 테스트 성공으로 확정하지 않는다.
 
@@ -1593,7 +1608,7 @@ DB 선택 결과:
 <a id="integrated-db-schema-json"></a>
 ## 14. 전체 테이블 스키마의 JSON 사전
 
-13개 테이블·115개 컬럼을 §3\~6 컬럼 사전과 동일한 JSON 메타데이터로 표현한다. `nullable=true`는 SQL NULL 허용이다. `defaultOrCreationRule`은 실제 DEFAULT 또는 애플리케이션 생성 규칙을 원문대로 구분한 설명이고, 모든 값을 SQL DEFAULT로 선언한다는 뜻이 아니다. PK/FK/UNIQUE/CHECK/index·다중 행 제약의 정확한 구현은 §7·§12.2 DDL을 함께 적용한다. 이 JSON은 API body나 DB에 저장할 JSONB 객체가 아니다.
+13개 테이블·116개 컬럼을 §3\~6 컬럼 사전과 동일한 JSON 메타데이터로 표현한다. `nullable=true`는 SQL NULL 허용이다. `defaultOrCreationRule`은 실제 DEFAULT 또는 애플리케이션 생성 규칙을 원문대로 구분한 설명이고, 모든 값을 SQL DEFAULT로 선언한다는 뜻이 아니다. PK/FK/UNIQUE/CHECK/index·다중 행 제약의 정확한 구현은 §7·§12.2 DDL을 함께 적용한다. 이 JSON은 API body나 DB에 저장할 JSONB 객체가 아니다.
 
 ### 14.1 accounts
 
@@ -1920,6 +1935,12 @@ DB 선택 결과:
       "nullable": false,
       "defaultOrCreationRule": "CURRENT_TIMESTAMP",
       "keyAndMeaning": "서비스는 발급 잠금 후 읽은 DB 시각을 명시"
+    },
+    "token_expiry_includes_fraction": {
+      "postgresType": "boolean",
+      "nullable": false,
+      "defaultOrCreationRule": "false",
+      "keyAndMeaning": "토큰 발급 시 소수 초까지 안내했으면 true, 초 단위로 안내했으면 false"
     }
   }
 }

@@ -14,7 +14,7 @@
 
 요구사항은 담당 범위와 인수 기준, 결정 기록은 정책 근거, 기능별 API·스키마와 ERD는 상세 계약을 관리합니다. 중복된 상세 설명은 해당 기준 문서의 링크로 연결합니다.
 
-API는 24개 경로·26개 operation·61개 schema, ERD는 13개 테이블·115개 컬럼입니다. API 담당은 각 operation의 `x-owner`와 명세에 표시합니다. D13/D14 AI 실제 wire·필드별 허용·음성 수치 및 D17 운영값은 아직 외부 확정 대기입니다.
+API는 24개 경로·26개 operation·61개 schema, ERD는 13개 테이블·116개 컬럼입니다. API 담당은 각 operation의 `x-owner`와 명세에 표시합니다. D13/D14 AI 실제 wire·필드별 허용·음성 수치 및 D17 운영값은 아직 외부 확정 대기입니다.
 
 GitHub에서는 각 문서의 Mermaid 또는 SVG를 확인합니다. 통합 HTML 사본은 별도로 관리하지 않습니다. Mermaid 원문 32개와 렌더된 SVG의 연결은 manifest로 검증합니다. 아래 도식은 별도 FE 전달서에서 공통 참고 도식만 옮긴 것입니다.
 
@@ -32,7 +32,7 @@ python docs/p0/support/validate_contract.py
 
 이 검사는 OpenAPI 구조·예시·거부 사례·업무 의미·DB JSON/DTO 대응·문서 링크·32개 Mermaid 원문 해시와 SVG XML을 검증합니다. 실제 HTTP 서버, 브라우저, AI 연동 또는 SVG 재렌더를 실행하지 않습니다. 원문은 배포하지 않으므로 원문 SHA 및 원문 schema 대조는 미실행으로 표시합니다. 원문을 별도로 보유한 경우 `docs/p0/sources/` 아래 원래 파일명으로 두어 비교할 수 있으나 원문을 커밋하지 않습니다. 과거 v2 비교 역시 해당 자료가 없으면 수행되지 않습니다.
 
-DB 검사는 [ERD §12](Integrated_ERD_Design.md)의 독립 임시 DB·트랜잭션 절차에 따라 DDL과 [검증 SQL](support/validate_erd.sql)을 실행합니다. 운영 DB에서 실행하지 않습니다. 기존 v3.1 DB 검증 결과는 ERD에 기록되어 있고, 이번 게시에서는 DDL을 변경하지 않았습니다.
+빈 PostgreSQL 검증 DB에서 [ERD §12.3의 명령](Integrated_ERD_Design.md#123-최종-ddl의-실제-검증-결과)으로 §12.2 DDL과 [검증 SQL](support/validate_erd.sql)을 실행합니다. SCRUM-82를 반영한 187건과 이전 115컬럼 설계의 184건 검증 기록은 같은 절에서 확인할 수 있습니다.
 
 ## 대화 종료 확인 도식
 

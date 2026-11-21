@@ -56,6 +56,10 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+tasks.processTestResources {
+    from("docs/p0/Integrated_ERD_Design.md")
+}
+
 tasks.named("jar") {
     enabled = false
 }

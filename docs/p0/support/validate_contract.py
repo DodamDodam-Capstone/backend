@@ -85,7 +85,7 @@ def db_tables_from_markdown(content):
                              'defaultOrCreationRule': default, 'keyAndMeaning': note}
         owner = 'Part 1' if heading[1] in ('3', '4') else ('Part 2' if heading[1] == '5' else 'Spring Session / Part 1 운영')
         tables[table] = {'table': table, 'owner': owner, 'columns': columns}
-    assert len(tables) == 13 and sum(len(t['columns']) for t in tables.values()) == 115
+    assert len(tables) == 13 and sum(len(t['columns']) for t in tables.values()) == 116
     assert {'service_date', 'scheduled_end_at', 'end_requested_at', 'end_reason'} <= tables['conversations']['columns'].keys()
     assert 'nickname' in tables['children']['columns']
     assert 'topic_suggestions' not in tables['conversation_turns']['columns']
