@@ -3,6 +3,7 @@ package com.dodamdodam.backend.auth.api;
 import com.dodamdodam.backend.auth.exception.*;
 import com.dodamdodam.backend.global.error.*;
 import com.dodamdodam.backend.guardian.api.GuardianPinSetupController;
+import com.dodamdodam.backend.guardian.api.GuardianUnlockController;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -10,7 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {EmailVerificationController.class, GuardianPinSetupController.class})
+@RestControllerAdvice(assignableTypes = {
+        EmailVerificationController.class, GuardianPinSetupController.class, GuardianUnlockController.class
+})
 public class EmailVerificationExceptionHandler {
     /** 이메일 발급 업무 오류를 고정 코드·필드 목록으로만 반환한다. */
     @ExceptionHandler(EmailVerificationException.class)
