@@ -10,9 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {EmailVerificationController.class, GuardianPinSetupController.class})
+@RestControllerAdvice(assignableTypes = {
+        EmailVerificationController.class, GuardianPinSetupController.class, SignupController.class})
 public class EmailVerificationExceptionHandler {
-    /** 이메일 발급 업무 오류를 고정 코드·필드 목록으로만 반환한다. */
+    /** 이메일 증명과 증명 사용 경로의 오류를 고정 코드와 필드 목록으로 반환한다. */
     @ExceptionHandler(EmailVerificationException.class)
     public ResponseEntity<ApiErrorResponse> handle(EmailVerificationException failure, HttpServletResponse response) {
         return ResponseEntity.status(failure.status()).body(ApiErrorResponses.body(response,
