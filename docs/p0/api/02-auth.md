@@ -240,7 +240,7 @@ DB 읽기: `accounts, guardian_pins, session_security`; 쓰기: `email_verificat
 {
   "data": {
     "challengeId": "88888888-8888-4888-8888-888888888888",
-    "expiresAt": "2026-09-30T10:10:00+09:00"
+    "expiresAt": "2026-09-30T10:10:00.900001+09:00"
   }
 }
 ```
@@ -284,7 +284,7 @@ DB 읽기: `accounts, session_security, guardian_pins`; 쓰기: `email_verificat
 {
   "data": {
     "verificationToken": "88888888-8888-4888-8888-888888888888.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    "tokenExpiresAt": "2026-09-30T10:15:00+09:00"
+    "tokenExpiresAt": "2026-09-30T10:15:00.900001+09:00"
   }
 }
 ```

@@ -85,7 +85,7 @@ class EmailVerificationHttpTests {
         assertThat(body.size()).isEqualTo(1); assertThat(body.get("data").size()).isEqualTo(2);
         assertThat(body.get("data").get("challengeId").asText()).hasSize(36);
         String expiresAt = body.get("data").get("expiresAt").asText();
-        assertThat(expiresAt).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00");
+        assertThat(expiresAt).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}\\+09:00");
         var id = UUID.fromString(body.get("data").get("challengeId").asText());
         assertThat(jdbc.queryForObject("SELECT expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
                 .isEqualTo(OffsetDateTime.parse(expiresAt));
@@ -195,6 +195,8 @@ class EmailVerificationHttpTests {
 
     @Test void parallelCodeChecksIssueExactlyOneToken() throws Exception {
         var id = publicChallenge(true, false);
+        var checkedAt = challenges.databaseNow().withNano(900_001_000);
+        doReturn(checkedAt).when(challenges).databaseNow();
         var request = verifyPost(id, "012345", csrf(""));
         var first = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
         var second = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
@@ -206,13 +208,14 @@ class EmailVerificationHttpTests {
         String token = data.get("verificationToken").asText();
         assertThat(data.size()).isEqualTo(2);
         assertThat(token).matches(id + "\\.[A-Za-z0-9_-]{43}");
-        assertThat(data.get("tokenExpiresAt").asText()).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00");
+        assertThat(data.get("tokenExpiresAt").asText()).endsWith(".900001+09:00");
+        assertThat(OffsetDateTime.parse(data.get("tokenExpiresAt").asText())).isEqualTo(checkedAt.plusSeconds(600));
         byte[] expectedHash = java.security.MessageDigest.getInstance("SHA-256")
                 .digest(token.substring(37).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         assertThat(jdbc.queryForObject("SELECT token_hash FROM email_verifications WHERE id=?", byte[].class, id))
                 .containsExactly(expectedHash);
         assertThat(jdbc.queryForObject("""
-                SELECT token_expires_at = date_trunc('second', verified_at) + interval '600 seconds' AND token_consumed_at IS NULL
+                SELECT token_expires_at - verified_at = interval '600 seconds' AND token_consumed_at IS NULL
                 FROM email_verifications WHERE id=?
                 """, Boolean.class, id)).isTrue();
         assertThat(jdbc.queryForObject("SELECT token_expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
@@ -679,8 +682,8 @@ class EmailVerificationHttpTests {
     }
 
     @ParameterizedTest
-    @CsvSource({"-1000,204", "0,400", "400000000,400"})
-    void guardianPinHonorsPublishedDeadlineForPreviouslyIssuedToken(long offsetNanos, int expectedStatus) throws Exception {
+    @CsvSource({"false,-1000,204", "false,0,400", "true,-1000,204", "true,0,400", "true,400000000,400"})
+    void guardianPinHonorsPublishedTokenDeadline(boolean previouslyIssued, long offsetNanos, int expectedStatus) throws Exception {
         var owner = fixture(false);
         var csrf = csrf(owner.cookie());
         var id = pinChallenge(owner, "PIN_SETUP");
@@ -688,8 +691,13 @@ class EmailVerificationHttpTests {
         assertThat(verified.statusCode()).isEqualTo(200);
         var data = mapper.readTree(verified.body()).get("data");
         var deadline = OffsetDateTime.parse(data.get("tokenExpiresAt").asText());
-        // 이전 버전은 응답에서 생략한 소수 초를 DB에 보관했다.
-        jdbc.update("UPDATE email_verifications SET token_expires_at=? WHERE id=?", deadline.plusNanos(800_000_000), id);
+        if (previouslyIssued) {
+            // 이전 버전은 DB에 소수 초를 보관하고 응답에는 초까지만 표시했다.
+            deadline = deadline.withNano(0);
+            jdbc.update("""
+                    UPDATE email_verifications SET token_expiry_includes_fraction=DEFAULT, token_expires_at=? WHERE id=?
+                    """, deadline.plusNanos(800_000_000), id);
+        }
         var state = accounts.findPinState(owner.account(), owner.context()).orElseThrow();
         var atBoundary = new EmailVerificationAccountRepository.PinState(state.email(), state.accountVersion(),
                 state.contextVersion(), state.setupGeneration(), state.revokedAt(), state.expiresAt(), state.pinVersion(),

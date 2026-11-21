@@ -28,7 +28,7 @@
 | 성공 | `{ "data": ... }`. 201은 Location, 204는 본문 없음. CSRF 응답·OAuth 302·음성 GET 바이너리만 예외 |
 | 오류 | `{ "error": { "code", "message", "requestId", "fields" } }`. fields는 `{field,reason}` 배열, 없으면 `[]`. ACTIVE_CONVERSATION_EXISTS 오류만 activeConversationId 확장 |
 | 헤더 | 명세된 모든 응답에 `Cache-Control: no-store`와 `X-Request-ID` 적용(공개 인증·실패·204·302·바이너리 포함). error.requestId는 같은 추적 ID. 429는 초 단위 `Retry-After`(최소 1) |
-| ID·시각 | 모든 업무 ID·clientRequestId UUID 문자열. 날짜 YYYY-MM-DD. 시각 YYYY-MM-DDTHH:mm:ss+09:00, DB timestamptz. 외부 시각은 같은 순간을 KST로 변환 |
+| ID·시각 | 모든 업무 ID·clientRequestId UUID 문자열. 날짜 YYYY-MM-DD. 시각 YYYY-MM-DDTHH:mm:ss+09:00, DB timestamptz. 이메일 인증번호·토큰의 만료 시각은 600초 기한을 보존하도록 소수 초를 최대 6자리까지 허용한다. 외부 시각은 같은 순간을 KST로 변환 |
 | NULL | 응답 명세에 있는 null 필드를 생략하지 않음. 요청은 허용한다고 명시한 경우만 null. 현재 요청 DTO에는 null 허용 필드 없음 |
 | 추가 필드 | Part 1 요청은 미정의 body 필드 400. Part 2 JSON·multipart도 명세 필드만 허용(D01). 응답은 정해진 DTO만 반환 |
 | body 없는 POST | Part 1 logout/lock은 0바이트, 내용이 있으면 400. Part 2 resume/end에도 같은 규칙 적용(D01). Content-Type 없는 0바이트 허용 |

@@ -150,7 +150,7 @@ public class EmailVerificationService {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        var expiresAt = now.withNano(0).plusSeconds(TOKEN_TTL_SECONDS);
+        var expiresAt = now.plusSeconds(TOKEN_TTL_SECONDS);
         repository.storeGrant(input.challengeId(), now, digest(secret), expiresAt);
         return new CodeCheck(new VerificationGrantResponse(input.challengeId() + "." + secret,
             expiresAt.withOffsetSameInstant(ZoneOffset.ofHours(9))), 0);
@@ -245,9 +245,8 @@ public class EmailVerificationService {
 
     /** 토큰의 기한·폐기·소비 상태를 검증한다. */
     private void requireActiveToken(Challenge challenge, OffsetDateTime now) {
-        // 이전 토큰도 발급 응답에 표시한 초에 만료된다.
         if (challenge.invalidatedAt() != null || challenge.tokenConsumedAt() != null
-            || challenge.tokenExpiresAt() == null || !now.isBefore(challenge.tokenExpiresAt().withNano(0))) {
+            || challenge.tokenExpiresAt() == null || !now.isBefore(challenge.tokenExpiresAt())) {
             throw EmailVerificationException.invalid();
         }
     }

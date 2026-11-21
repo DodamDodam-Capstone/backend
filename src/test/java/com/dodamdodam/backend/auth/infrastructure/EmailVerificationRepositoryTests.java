@@ -75,7 +75,7 @@ class EmailVerificationRepositoryTests {
         assertThat((byte[]) stored.get("code_hash")).containsExactly(HASH);
         var createdAt = timestamp(issued.challengeId(), "created_at");
         assertThat(createdAt.toInstant()).isBetween(before.toInstant(), after.toInstant());
-        assertThat(issued.expiresAt()).isEqualTo(createdAt.withNano(0).plusSeconds(600));
+        assertThat(issued.expiresAt()).isEqualTo(createdAt.plusSeconds(600));
         assertThat(timestamp(issued.challengeId(), "expires_at")).isEqualTo(issued.expiresAt());
     }
 

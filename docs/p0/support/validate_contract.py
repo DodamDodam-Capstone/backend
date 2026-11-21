@@ -32,12 +32,15 @@ RESOLVER = RefResolver.from_schema(DOC)
 KST = timezone(timedelta(hours=9))
 # Only these source contracts change in v3; every other Part 1 schema stays exact.
 SOURCE_SCHEMA_CHANGES = {
+    'VerificationIssue': 'SCRUM-82 preserves microseconds in the published code deadline',
+    'VerificationGrant': 'SCRUM-82 preserves microseconds in the published token deadline',
     'IssueEmailVerificationRequest': 'D16 adds the authenticated PIN_RESET purpose',
     'ChildView': 'F06 adds a separate required nickname; prior fields preserved',
     'CreateChildRequest': 'F06 adds required trimmed nickname; prior fields preserved',
     'ConversationView': 'F01-F04 adds CLOSING and immutable end cutoff/reason',
     'GuardianPinResetPendingRequest': 'D16 replaces the pending request with required PIN_RESET token',
 }
+EMAIL_EXPIRY_FIELDS = {'VerificationIssue': 'expiresAt', 'VerificationGrant': 'tokenExpiresAt'}
 COUNTS = {'schema_examples': 0, 'positive_cases': 0, 'negative_cases': 0,
           'semantic_positive_cases': 0, 'semantic_negative_cases': 0,
           'normalized_cases': 0, 'markdown_json_examples': 0,
@@ -57,6 +60,13 @@ def strict_end_patterns(node):
         return {k: strict_end_patterns(v) for k, v in node.items()}
     if isinstance(node, list): return [strict_end_patterns(v) for v in node]
     return node
+
+
+def allow_email_expiry_fraction(name, historical):
+    """이전 명세에서 승인된 두 만료 필드의 정밀도만 확장해 나머지 제약도 대조한다."""
+    expiry = historical['properties'][EMAIL_EXPIRY_FIELDS[name]]
+    expiry['pattern'] = expiry['pattern'].replace(
+        r'\+09:00', r'(?:\.\d{1,6})?\+09:00')
 
 
 def db_tables_from_markdown(content):
@@ -420,6 +430,9 @@ def main(api_only=False):
                         if not k.startswith('x-') and k not in ('description', 'title', 'example', 'examples')}
             return node
         for name, schema in originals.items():
+            if name in EMAIL_EXPIRY_FIELDS:
+                allow_email_expiry_fraction(name, schema)
+                assert constraints(schema) == constraints(SCHEMAS[name]), name
             if name in SOURCE_SCHEMA_CHANGES:
                 continue
             assert constraints(schema) == constraints(SCHEMAS[name]), name
@@ -458,7 +471,10 @@ def main(api_only=False):
                         if not k.startswith('x-') and k not in ('description', 'title', 'example', 'examples')}
             return node
         for name, schema in previous_schemas.items():
-            if name not in changed:
+            if name in EMAIL_EXPIRY_FIELDS:
+                allow_email_expiry_fraction(name, schema)
+                assert structural(schema) == structural(SCHEMAS[name]), name
+            elif name not in changed:
                 assert structural(schema) == structural(SCHEMAS[name]), name
                 COUNTS['v2_schemas_preserved'] += 1
 
@@ -559,6 +575,12 @@ def main(api_only=False):
         for key in fixture:
             bad = deepcopy(fixture); del bad[key]
             expect(schema_name, bad, False)
+    for schema, field in EMAIL_EXPIRY_FIELDS.items():
+        sample = {'challengeId': turn['turnId']} if schema == 'VerificationIssue' else {
+            'verificationToken': turn['turnId'] + '.' + 'A' * 43}
+        for fraction in ['', '.9', '.900001']:
+            expect(schema, {**sample, field: f'2026-10-03T13:00:00{fraction}+09:00'})
+        expect(schema, {**sample, field: '2026-10-03T13:00:00.9000001+09:00'}, False)
     pin = {'pin': '0000'}
     expect('GuardianUnlockRequest', pin)
     for value in [0, '000', '１２３４', ' 0000', None]:
@@ -703,7 +725,7 @@ def main(api_only=False):
         print(json.dumps({'result': 'PASS', 'paths': len(paths), 'operations': len(operations),
                           'schemas': len(SCHEMAS), **COUNTS,
                           'source_schema_changes': SOURCE_SCHEMA_CHANGES,
-                          'historical_schema_comparison': 'Only documented strict-end and MIME CRLF pattern corrections normalized before comparison',
+                          'historical_schema_comparison': 'Normalizes strict-end patterns, MIME CRLF, and the two email expiry precision changes',
                           'scope': 'OpenAPI and semantic fixtures only; Markdown, DB catalogs, diagrams and server integration not checked'}, ensure_ascii=False, indent=2))
         return
 
@@ -804,7 +826,7 @@ def main(api_only=False):
     print(json.dumps({'result': 'PASS', 'paths': len(paths), 'operations': len(operations),
                       'schemas': len(SCHEMAS), **COUNTS,
                       'source_schema_changes': SOURCE_SCHEMA_CHANGES,
-                          'historical_schema_comparison': 'Only documented strict-end and MIME CRLF pattern corrections normalized before comparison',
+                          'historical_schema_comparison': 'Normalizes strict-end patterns, MIME CRLF, and the two email expiry precision changes',
                       'scope': 'OpenAPI structure, source operation preservation, schema examples, negative fixtures, local document links; not server or AI integration'}, ensure_ascii=False, indent=2))
 
 

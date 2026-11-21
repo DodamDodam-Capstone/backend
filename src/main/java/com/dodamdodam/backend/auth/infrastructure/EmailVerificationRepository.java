@@ -44,7 +44,7 @@ public class EmailVerificationRepository {
             jdbc.queryForList("SELECT id FROM email_verifications WHERE " + unconsumedScope + " ORDER BY id FOR UPDATE",
                     UUID.class, scopeParameters.toArray());
             var issuedAt = databaseNow();
-            var expiresAt = issuedAt.withNano(0).plusSeconds(600);
+            var expiresAt = issuedAt.plusSeconds(600);
             var invalidationParameters = new ArrayList<>(scopeParameters);
             invalidationParameters.addFirst(issuedAt);
             jdbc.update("UPDATE email_verifications SET invalidated_at = ? WHERE " + unconsumedScope,
@@ -141,11 +141,13 @@ public class EmailVerificationRepository {
         return readChallenge(id, true);
     }
 
-    /** 목적과 발급 snapshot은 불변이며 갱신 가능한 검증 상태는 잠금 뒤 다시 읽는다. */
+    /** 토큰은 발급 응답에 표시한 정밀도로 읽는다. 이전 발급분은 초 단위였다. */
     private Optional<Challenge> readChallenge(UUID id, boolean lock) {
         return jdbc.query("""
                 SELECT email, purpose, eligible, code_hash, created_at, expires_at, attempt_count,
-                       verified_at, token_hash, token_expires_at, token_consumed_at, invalidated_at,
+                       verified_at, token_hash, CASE WHEN token_expiry_includes_fraction THEN token_expires_at
+                           ELSE date_trunc('second', token_expires_at) END AS token_expires_at,
+                       token_consumed_at, invalidated_at,
                        setup_account_id, setup_session_binding, setup_generation, pin_version_snapshot,
                        reset_account_id, reset_session_version
                 FROM email_verifications WHERE id = ?
@@ -173,7 +175,8 @@ public class EmailVerificationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public void storeGrant(UUID id, OffsetDateTime verifiedAt, byte[] hash, OffsetDateTime expiresAt) {
         jdbc.update("""
-                UPDATE email_verifications SET verified_at=?, token_hash=?, token_expires_at=? WHERE id=?
+                UPDATE email_verifications SET verified_at=?, token_hash=?, token_expires_at=?,
+                       token_expiry_includes_fraction=true WHERE id=?
                 """, verifiedAt, hash, expiresAt, id);
     }
 
