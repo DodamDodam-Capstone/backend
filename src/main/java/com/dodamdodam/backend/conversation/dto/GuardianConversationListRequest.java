@@ -5,13 +5,14 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 
-/** KST 시작 날짜 범위와 실제 쿼리에서 사용할 페이지 경계를 담는다. */
-public record GuardianConversationListRequest(LocalDate from, LocalDate to, long page, int size, long offset) {
+/** KST 시작 날짜 범위, 페이지 경계와 정규화한 검색어를 담는다. */
+public record GuardianConversationListRequest(LocalDate from, LocalDate to, long page, int size, long offset,
+                                              String keyword) {
     private static final Pattern FULL_DATE = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}");
     private static final Pattern NONNEGATIVE_INTEGER = Pattern.compile("[0-9]+");
 
     /** 생략한 날짜·페이지에만 기본값을 적용하고 PostgreSQL OFFSET 범위를 검사한다. */
-    public static GuardianConversationListRequest fromQuery(String from, String to, String page, String size) {
+    public static GuardianConversationListRequest fromQuery(String from, String to, String page, String size, String q) {
         var fromDate = parseDate(from, "from");
         var toDate = parseDate(to, "to");
         if (fromDate != null && toDate != null && toDate.isBefore(fromDate)) {
@@ -23,13 +24,26 @@ public record GuardianConversationListRequest(LocalDate from, LocalDate to, long
         if (pageSize < 1 || pageSize > 100) {
             throw ConversationException.validation("size");
         }
+        var keyword = normalizeKeyword(q);
         try {
             return new GuardianConversationListRequest(fromDate, toDate, pageNumber, (int) pageSize,
-                    Math.multiplyExact(pageNumber, pageSize));
+                    Math.multiplyExact(pageNumber, pageSize), keyword);
         }
         catch (ArithmeticException overflow) {
             throw ConversationException.validation("page");
         }
+    }
+
+    /** 검색어 양끝만 정리하고 Unicode 문자 기준으로 공개 명세의 길이를 검사한다. */
+    private static String normalizeKeyword(String query) {
+        if (query == null) {
+            return null;
+        }
+        var normalized = query.strip();
+        if (normalized.codePointCount(0, normalized.length()) > 100) {
+            throw ConversationException.validation("q");
+        }
+        return normalized.isEmpty() ? null : normalized;
     }
 
     /** API의 네 자리 연도 날짜만 허용해 다음날 KST 경계가 지원 범위를 벗어나지 않게 한다. */
