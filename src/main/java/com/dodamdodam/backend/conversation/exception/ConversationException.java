@@ -31,6 +31,11 @@ public class ConversationException extends RuntimeException {
                 List.of(new FieldError(field, "유효하지 않은 값입니다.")), null, null);
     }
 
+    /** 소유 조합 불일치와 현재 읽을 수 없는 대화의 이유를 외부에 구분하지 않는다. */
+    public static ConversationException notFound() {
+        return new ConversationException("RESOURCE_NOT_FOUND", "대화 정보를 찾을 수 없습니다.", List.of(), null, null);
+    }
+
     /** 아이 대화 이용시간 밖의 요청을 공통 403 업무 오류로 표현한다. */
     public static ConversationException serviceHoursClosed() {
         return new ConversationException("SERVICE_HOURS_CLOSED", "대화 이용시간이 아닙니다.", List.of(), null, null);
