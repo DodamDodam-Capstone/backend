@@ -31,7 +31,7 @@ public class GuardianConversationController {
         var authenticated = authentication.requireAuthenticatedSession(request);
         var child = parseUuid(childId, "childId");
         var query = GuardianConversationListRequest.fromQuery(request.getParameter("from"), request.getParameter("to"),
-                request.getParameter("page"), request.getParameter("size"));
+                request.getParameter("page"), request.getParameter("size"), request.getParameter("q"));
         return Map.of("data", conversations.list(request, authenticated, child, query));
     }
 
