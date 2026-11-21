@@ -180,16 +180,19 @@ public class EmailVerificationService {
     }
 
     /** 발급·응답 재검사·소비 모두 계정을 먼저 잠그고 같은 reset 발급 시점의 버전을 확인한다. */
-    private Challenge lockChallenge(PendingGrant pending, boolean lockPinSetupProofs) {
+    private Challenge lockChallenge(PendingGrant pending, boolean lockRelatedProofs) {
         if (pending.current() != null) {
             lockPinContext(pending.current());
             // 최초 설정은 대기 중 만료도 확인하도록 관련 증명을 먼저 ID 순서로 잠근다.
-            if (lockPinSetupProofs) {
+            if (lockRelatedProofs) {
                 repository.lockPinSetupProofs(pending.current().accountId(), pending.id());
             }
         }
         var reset = pending.resetEmail() == null ? null
             : accounts.findForUpdate(pending.resetEmail()).orElseThrow(EmailVerificationException::invalid);
+        if (reset != null && lockRelatedProofs) {
+            repository.lockPasswordResetProofs(reset.id(), pending.id());
+        }
         var challenge = repository.lockChallenge(pending.id()).orElseThrow(EmailVerificationException::invalid);
         if (reset != null && (!reset.id().equals(challenge.resetAccountId())
             || !Objects.equals(reset.sessionVersion(), challenge.resetSessionVersion()))) {
@@ -297,7 +300,7 @@ public class EmailVerificationService {
             requirePinBinding(initial, current);
         }
         var pending = PendingGrant.from(id, initial, pin ? current : null);
-        var challenge = lockChallenge(pending, expectedPurpose == Purpose.PIN_SETUP);
+        var challenge = lockChallenge(pending, expectedPurpose == Purpose.PIN_SETUP || expectedPurpose == Purpose.RESET_PASSWORD);
         requireMatchingToken(challenge, expectedPurpose, hash);
         var now = pin ? checkPinContext(challenge, current) : repository.databaseNow();
         requireActiveToken(challenge, now);

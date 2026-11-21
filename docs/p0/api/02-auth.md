@@ -482,6 +482,8 @@ RESET_PASSWORD 토큰만. 이전 version 토큰도 거부. 새 해시·token 소
 
 DB 읽기: `accounts, email_verifications`; 쓰기: `accounts, email_verifications, auth_rate_limits`. 공통 제한 예약과 프레임워크 세션 저장은 별도 공통 처리다.
 
+[4.5의 요청 예시](#section-4-5)에 유효한 RESET_PASSWORD 토큰을 넣고 CSRF 쿠키와 헤더를 함께 보내면 `204 No Content`를 받는다. 같은 요청을 다시 보내면 `400`과 `error.code = VERIFICATION_INVALID`를 받는다. Google-only 계정은 유효한 토큰을 보내도 `409`와 `error.code = PASSWORD_RESET_NOT_AVAILABLE`를 받으며 기존 만료 시각까지 토큰은 미소비 상태로 유지된다.
+
 <a id="section-6-17"></a>
 <a id="operation-startgooglelogin"></a>
 ### 6.17 Google 로그인 시작

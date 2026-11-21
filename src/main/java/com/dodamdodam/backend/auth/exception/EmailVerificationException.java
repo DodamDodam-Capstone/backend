@@ -34,6 +34,11 @@ public final class EmailVerificationException extends RuntimeException {
             "이메일 인증 정보를 다시 확인해 주세요.", List.of());
     }
 
+    /** Google-only 계정은 검증 후 기존 로그인 수단을 안내한다. */
+    public static EmailVerificationException passwordResetNotAvailable() {
+        return new EmailVerificationException(409, "PASSWORD_RESET_NOT_AVAILABLE", "Google로 로그인해 주세요.", List.of());
+    }
+
     /** HTTP 오류 연결에 사용할 고정 검증 코드를 반환한다. */
     public String code() {
         return code;
