@@ -9,6 +9,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class GuardianAccessRepository {
@@ -45,6 +47,16 @@ public class GuardianAccessRepository {
             // 확인 장애를 행 없음이나 PIN 미설정으로 해석해 권한을 우회하지 않는다.
             throw GuardianAccessException.unavailable(failure);
         }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void createFirstPin(UUID accountId, String hash) {
+        jdbc.update("INSERT INTO guardian_pins(account_id, pin_hash) VALUES (?, ?)", accountId, hash);
+        jdbc.update("""
+                    UPDATE email_verifications SET invalidated_at = clock_timestamp()
+                    WHERE setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                    AND token_consumed_at IS NULL AND invalidated_at IS NULL
+                    """, accountId);
     }
 
     public record GuardianAccessState(long contextSessionVersion, long accountSessionVersion,

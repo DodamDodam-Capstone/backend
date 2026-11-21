@@ -124,17 +124,30 @@ public class EmailVerificationRepository {
         return readChallenge(id, false);
     }
 
+    /** 최초 PIN 설정에서 소비하거나 폐기할 행을 ID 순서로 잠근 뒤 기한을 판정한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockPinSetupProofs(UUID accountId, UUID presentedId) {
+        jdbc.queryForList("""
+                SELECT id FROM email_verifications
+                WHERE setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                  AND (id = ? OR (token_consumed_at IS NULL AND invalidated_at IS NULL))
+                ORDER BY id FOR UPDATE
+                """, UUID.class, accountId, presentedId);
+    }
+
     /** 같은 번호 검증·토큰 소비를 직렬화하며 PIN의 상위 잠금 뒤에 호출한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<Challenge> lockChallenge(UUID id) {
         return readChallenge(id, true);
     }
 
-    /** 목적과 발급 snapshot은 불변이며 갱신 가능한 검증 상태는 잠금 뒤 다시 읽는다. */
+    /** 토큰은 발급 응답에 표시한 정밀도로 읽는다. 이전 발급분은 초 단위였다. */
     private Optional<Challenge> readChallenge(UUID id, boolean lock) {
         return jdbc.query("""
                 SELECT email, purpose, eligible, code_hash, created_at, expires_at, attempt_count,
-                       verified_at, token_hash, token_expires_at, token_consumed_at, invalidated_at,
+                       verified_at, token_hash, CASE WHEN token_expiry_includes_fraction THEN token_expires_at
+                           ELSE date_trunc('second', token_expires_at) END AS token_expires_at,
+                       token_consumed_at, invalidated_at,
                        setup_account_id, setup_session_binding, setup_generation, pin_version_snapshot,
                        reset_account_id, reset_session_version
                 FROM email_verifications WHERE id = ?
@@ -162,7 +175,8 @@ public class EmailVerificationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public void storeGrant(UUID id, OffsetDateTime verifiedAt, byte[] hash, OffsetDateTime expiresAt) {
         jdbc.update("""
-                UPDATE email_verifications SET verified_at=?, token_hash=?, token_expires_at=? WHERE id=?
+                UPDATE email_verifications SET verified_at=?, token_hash=?, token_expires_at=?,
+                       token_expiry_includes_fraction=true WHERE id=?
                 """, verifiedAt, hash, expiresAt, id);
     }
 

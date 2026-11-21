@@ -88,8 +88,8 @@ paths:
                   value:
                     data:
                       challengeId: 88888888-8888-4888-8888-888888888888
-                      expiresAt: '2026-09-30T10:10:00+09:00'
-                  summary: B-02.3 공유안 예시 발급10시00분 KST 기준600초, 재발급은10시01분부터
+                      expiresAt: '2026-09-30T10:10:00.900001+09:00'
+                  summary: 10:00:00.900001 KST 발급으로부터 600초 뒤 만료, 재발급은 60초 뒤부터
         '400':
           $ref: '#/components/responses/Error400ValidationFailed'
         '403':
@@ -250,8 +250,8 @@ paths:
                   value:
                     data:
                       verificationToken: 88888888-8888-4888-8888-888888888888.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-                      tokenExpiresAt: '2026-09-30T10:15:00+09:00'
-                  summary: B-02.3 공유안 예시 검증 성공10시05분 KST 기준600초, 번호 만료10시10분 이후에도 토큰은 별도 만료까지 유지
+                      tokenExpiresAt: '2026-09-30T10:15:00.900001+09:00'
+                  summary: 10:05:00.900001 KST 검증 성공으로부터 600초 뒤 만료, 번호와 토큰의 기한은 별개
         '400':
           $ref: '#/components/responses/Error400ValidationFailedVerificationInvalid'
         '403':
@@ -3928,8 +3928,8 @@ components:
         expiresAt:
           type: string
           format: date-time
-          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00(?![\s\S])
-          description: B-02.3 원문 입력 기준으로 발급 시각+600초, now>=expiry 거부. 발송 지연/재요청으로 임의 연장 없음. KST 오프셋 +09:00, 초 정밀도.
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?\+09:00(?![\s\S])
+          description: B-02.3 원문 입력 기준으로 발급 시각+600초, now>=expiry 거부. 발송 지연/재요청으로 임의 연장 없음. KST 오프셋 +09:00, 소수 초 최대 6자리.
             운영 세부값은 D17 보류.
       required:
       - challengeId
@@ -3949,9 +3949,9 @@ components:
         tokenExpiresAt:
           type: string
           format: date-time
-          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00(?![\s\S])
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?\+09:00(?![\s\S])
           description: B-02.3 원문 입력 기준으로 검증 성공 시각+600초, now>=expiry 거부. 번호 만료와 별도이며 소비/조회로 연장하지 않음. KST 오프셋 +09:00,
-            초 정밀도. 운영 세부값은 D17 보류.
+            소수 초 최대 6자리. 운영 세부값은 D17 보류.
       required:
       - verificationToken
       - tokenExpiresAt
