@@ -34,7 +34,7 @@ public class GuardianConversationService {
         requireOwnedChild(authenticated, childId);
         requireGuardianAccess(request, authenticated);
         var items = repository.listEnded(authenticated.accountId(), childId, query.from(), query.to(),
-                query.offset(), query.size() + 1);
+                query.keyword(), query.offset(), query.size() + 1);
         return new ConversationPageView(items.subList(0, Math.min(items.size(), query.size())),
                 query.page(), query.size(), items.size() > query.size());
     }

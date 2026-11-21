@@ -54,6 +54,7 @@ class GuardianConversationListHttpTests {
 
     @AfterEach
     void cleanDatabase() {
+        jdbc.update("DELETE FROM conversation_turns");
         jdbc.update("DELETE FROM conversations");
         jdbc.update("DELETE FROM SPRING_SESSION");
         jdbc.update("DELETE FROM guardian_pins");
@@ -157,6 +158,95 @@ class GuardianConversationListHttpTests {
             jdbc.execute("ALTER TABLE list_test_unavailable RENAME TO " + table);
         }
     }
+
+    @Test
+    void searchMatchesSummaryAndAllowedTurnFieldsWithoutDuplicates() throws Exception {
+        Fixture owned = fixture(true);
+        Fixture unrelated = fixture(true);
+        LocalDate date = LocalDate.of(2026, 10, 2);
+        UUID withSummary = readyConversation(owned.childId(), date, 10);
+        jdbc.update("UPDATE conversations SET summary = ? WHERE id = ?", "The DODAM  story", withSummary);
+        UUID withTurns = conversation(owned.childId(), UUID.randomUUID(), date, 11, "ENDED", "PENDING");
+        insertTurn(withTurns, 1, "Someone said Dodam  story", "REDACTED", null, "OMITTED");
+        insertTurn(withTurns, 2, null, "OMITTED", "Dodam  story reply", "VISIBLE");
+        UUID active = conversation(owned.childId(), UUID.randomUUID(), date, 13, "ACTIVE", "NOT_STARTED");
+        insertTurn(active, 1, "DODAM  story", "VISIBLE", null, "OMITTED");
+        UUID other = readyConversation(unrelated.childId(), date, 14);
+        jdbc.update("UPDATE conversations SET topic = ? WHERE id = ?", "Dodam  story", other);
+        UUID withSingleSpace = readyConversation(owned.childId(), date, 15);
+        jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", "Dodam story", withSingleSpace);
+
+        mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
+                        .cookie(owned.cookie()).queryParam("q", "  dodam  STORY  ").queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].conversationId").value(withTurns.toString()))
+                .andExpect(jsonPath("$.data.items[1].conversationId").value(withSummary.toString()))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    void searchTreatsWildcardsAndEscapeCharacterAsLiteral() throws Exception {
+        Fixture owned = fixture(true);
+        LocalDate date = LocalDate.of(2026, 10, 2);
+        UUID expected = readyConversation(owned.childId(), date, 10);
+        UUID wildcard = readyConversation(owned.childId(), date, 11);
+        jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", "%,_! is literal", expected);
+        jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", "anything,x! is not a match", wildcard);
+
+        mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
+                        .cookie(owned.cookie()).queryParam("q", "%,_!"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].conversationId").value(expected.toString()));
+    }
+
+    @Test
+    void searchValidatesTrimmedUnicodeLengthAndTreatsBlankAsNoFilter() throws Exception {
+        Fixture owned = fixture(true);
+        UUID expected = readyConversation(owned.childId(), LocalDate.of(2026, 10, 2), 10);
+        String title = "😀".repeat(100);
+        jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", title, expected);
+
+        mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
+                        .cookie(owned.cookie()).queryParam("q", " " + title + " "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].conversationId").value(expected.toString()));
+        mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
+                        .cookie(owned.cookie()).queryParam("q", "😀" + title))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
+                        .cookie(owned.cookie()).queryParam("q", "  "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].conversationId").value(expected.toString()));
+        mvc.perform(list(owned).param("q", "a\0b"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isEmpty());
+    }
+
+    private UUID readyConversation(UUID childId, LocalDate date, int startedHour) {
+        UUID id = conversation(childId, UUID.randomUUID(), date, startedHour, "ENDED", "PENDING");
+        jdbc.update("""
+                UPDATE conversations SET summary_status = 'READY', title = '제목', topic = '주제', summary = '요약',
+                    summary_completed_at = summary_started_at + interval '1 second' WHERE id = ?
+                """, id);
+        return id;
+    }
+
+    private void insertTurn(UUID conversationId, int sequence, String childText, String childVisibility,
+                            String replyText, String replyVisibility) {
+        jdbc.update("""
+                INSERT INTO conversation_turns (id, conversation_id, client_request_id, request_hash,
+                    sequence, status, child_text, child_text_visibility, reply_text, reply_text_visibility,
+                    created_at, processing_deadline_at, completed_at)
+                SELECT ?, c.id, ?, repeat('a', 64), ?, 'SUCCEEDED', ?, ?, ?, ?,
+                    c.started_at, c.started_at + interval '1 minute', c.started_at + interval '30 seconds'
+                FROM conversations c WHERE c.id = ?
+                """, UUID.randomUUID(), UUID.randomUUID(), sequence,
+                childText, childVisibility, replyText, replyVisibility, conversationId);
+    }
+
 
     private MockHttpServletRequestBuilder list(Fixture fixture) {
         return get(PATH.formatted(fixture.childId())).cookie(fixture.cookie());
