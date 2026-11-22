@@ -17,6 +17,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -60,9 +62,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Import({TestcontainersConfiguration.class, SessionCookieLifecycleTests.Probe.class})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
+// 환경변수 별칭 대신 실제 속성 키로 테스트의 쿠키·CORS 조건을 고정한다.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "SESSION_COOKIE_SECURE=false", "SESSION_COOKIE_SAME_SITE=lax", "spring.session.jdbc.cleanup-cron=-",
-        "APP_CORS_ALLOWED_ORIGINS=http://localhost:5173",
+        "server.servlet.session.cookie.secure=false", "server.servlet.session.cookie.same-site=lax",
+        "spring.session.jdbc.cleanup-cron=-",
+        "app.security.allowed-origins=http://localhost:5173",
         "logging.level.org.springframework.security=INFO", "logging.level.org.springframework.session=INFO"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SessionCookieLifecycleTests {
@@ -71,7 +75,7 @@ class SessionCookieLifecycleTests {
     @Autowired private MockMvc mvc;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JdbcIndexedSessionRepository sessions;
-    @Autowired private CookieSerializer cookies;
+    @Autowired @Qualifier("cookieSerializer") private CookieSerializer cookies;
     @LocalServerPort private int port;
 
     @BeforeEach
@@ -93,6 +97,7 @@ class SessionCookieLifecycleTests {
                 .andExpect(status().isOk()).andReturn().getResponse();
         assertPersistentCookie(response, false, "Lax");
         var cookie = response.getCookie("JSESSIONID");
+        assertThat(cookie).isNotNull();
         mvc.perform(get(PROTECTED).cookie(cookie)).andExpect(status().isNoContent());
     }
 
@@ -107,7 +112,9 @@ class SessionCookieLifecycleTests {
             var response = mvc.perform(get(PROTECTED).cookie(current.cookie()))
                     .andExpect(status().isNoContent()).andReturn().getResponse();
             assertPersistentCookie(response, false, "Lax");
-            assertThat(response.getCookie("JSESSIONID").getValue().equals(current.cookie().getValue()))
+            var renewed = response.getCookie("JSESSIONID");
+            assertThat(renewed).isNotNull();
+            assertThat(renewed.getValue().equals(current.cookie().getValue()))
                     .as("renewal keeps the session ID").isTrue();
         }
         assertThat(jdbc.queryForMap("SELECT setup_generation, guardian_unlocked_until, guardian_pin_version, expires_at "
@@ -115,6 +122,7 @@ class SessionCookieLifecycleTests {
         assertThat(jdbc.queryForList("SELECT purpose, expires_at, token_expires_at FROM email_verifications "
                 + "WHERE setup_session_binding = ? ORDER BY purpose", current.context())).isEqualTo(proofs);
         Session stored = sessions.findById(current.sessionId());
+        assertThat(stored).isNotNull();
         assertThat(current.context().equals(stored.getAttribute("securityContextId"))).isTrue();
         assertThat(stored.getMaxInactiveInterval()).isEqualTo(Duration.ofSeconds(-1));
     }
@@ -223,11 +231,12 @@ class SessionCookieLifecycleTests {
         var response = mvc.perform(get("/oauth2/authorization/google"))
                 .andExpect(status().isFound()).andReturn().getResponse();
         var cookie = response.getCookie("JSESSIONID");
-        assertThat(cookie != null).isTrue();
+        assertThat(cookie).isNotNull();
         assertThat(cookie.getMaxAge()).isEqualTo(-1);
         var request = new MockHttpServletRequest();
         request.setCookies(cookie);
         Session stored = sessions.findById(cookies.readCookieValues(request).getFirst());
+        assertThat(stored).isNotNull();
         assertThat(stored.getMaxInactiveInterval()).isEqualTo(Duration.ofMinutes(30));
     }
 
@@ -278,7 +287,7 @@ class SessionCookieLifecycleTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"REVOKED", "VERSION", "NATIVE_MISSING", "PRINCIPAL", "CONTEXT"})
+    @ValueSource(strings = {"REVOKED", "VERSION", "NATIVE_MISSING", "NATIVE_EXPIRED", "PRINCIPAL", "CONTEXT"})
     void responseRecheckRejectsStateChangedAfterAuthorization(String mode) throws Exception {
         var current = authenticated(jdbc, sessions, cookies);
         var response = mvc.perform(get(PROTECTED + "/change").param("mode", mode).cookie(current.cookie()))
@@ -313,7 +322,9 @@ class SessionCookieLifecycleTests {
         assertThat(cookie.isHttpOnly()).isTrue();
         assertThat(cookie.getSecure()).isEqualTo(secure);
         assertThat(cookie.getAttribute("SameSite")).isEqualTo(sameSite);
-        var expiry = ZonedDateTime.parse(cookie.getAttribute("Expires"), DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+        var expires = cookie.getAttribute("Expires");
+        assertThat(expires).isNotNull();
+        var expiry = ZonedDateTime.parse(expires, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
         assertThat(expiry).isBetween(Instant.now().plusSeconds(31535995), Instant.now().plusSeconds(31536005));
         assertThat(response.getHeader("Cache-Control")).contains("no-store");
     }
@@ -356,7 +367,8 @@ class SessionCookieLifecycleTests {
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, security);
         var response = new MockHttpServletResponse();
         cookies.writeCookieValue(new CookieSerializer.CookieValue(new MockHttpServletRequest(), response, session.getId()));
-        return new Fixture(account, context, session.getId(), MockCookie.parse(response.getHeader("Set-Cookie")));
+        var header = Objects.requireNonNull(response.getHeader("Set-Cookie"));
+        return new Fixture(account, context, session.getId(), MockCookie.parse(header));
     }
 
     record Fixture(UUID account, UUID context, String sessionId, Cookie cookie) { }
@@ -424,6 +436,14 @@ class SessionCookieLifecycleTests {
                 case "REVOKED" -> jdbc.update("UPDATE session_security SET revoked_at = clock_timestamp() WHERE id = ?", context);
                 case "VERSION" -> jdbc.update("UPDATE accounts SET session_version = 1 WHERE id = ?", account);
                 case "NATIVE_MISSING" -> sessions.deleteById(session.getId());
+                case "NATIVE_EXPIRED" -> {
+                    // 인가 이후 요청 객체와 별도로 저장 세션만 만료시켜 응답 전 재검사를 확인한다.
+                    jdbc.update("""
+                            UPDATE SPRING_SESSION SET MAX_INACTIVE_INTERVAL = 60,
+                                LAST_ACCESS_TIME = ?, EXPIRY_TIME = ? WHERE SESSION_ID = ?
+                            """, Instant.now().minusSeconds(120).toEpochMilli(),
+                            Instant.now().minusSeconds(60).toEpochMilli(), session.getId());
+                }
                 case "PRINCIPAL" -> {
                     var security = SecurityContextHolder.createEmptyContext();
                     security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(UUID.randomUUID().toString(), null,

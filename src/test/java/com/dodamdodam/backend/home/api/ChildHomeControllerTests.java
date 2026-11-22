@@ -109,7 +109,8 @@ class ChildHomeControllerTests {
     @MockitoBean private EmailVerificationService verification;
     @MockitoBean private ConversationService conversations;
     @MockitoBean private JdbcIndexedSessionRepository sessions;
-    @MockitoBean private CookieSerializer cookies;
+    // 운영 쿠키 필터의 명시적 빈 이름과 테스트 대체 빈을 일치시킨다.
+    @MockitoBean(name = "cookieSerializer") private CookieSerializer cookies;
     @MockitoBean private ClientRegistrationRepository registrations;
 
     @BeforeEach
