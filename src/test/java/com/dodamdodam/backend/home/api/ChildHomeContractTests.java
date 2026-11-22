@@ -20,6 +20,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -495,6 +496,140 @@ class ChildHomeContractTests {
         assertCounts(1, change.equals("CLOSING") ? 1 : 0, change.equals("LINK_REMOVED") ? 0 : 1);
     }
 
+    @ParameterizedTest
+    @CsvSource({"DEADLINE,DELETED", "MIDNIGHT,DELETED", "DEADLINE,EXPIRED", "MIDNIGHT,EXPIRED",
+            "DEADLINE,REPLACED", "MIDNIGHT,REPLACED"})
+    void invalidStoredSessionPreventsBusinessCleanupAfterTheInitialHomeTransaction(String boundary, String invalidation)
+            throws Exception {
+        var fixture = prepareHomeRecheck(boundary);
+        var afterInitial = new AtomicReference<Map<String, List<Map<String, Object>>>>();
+
+        var response = racedHome(fixture.browser(), fixture.child(), () -> {
+            // 최초 조회가 끝난 뒤의 모든 업무 컬럼을 기준으로 재조회의 추가 쓰기만 검출한다.
+            afterInitial.set(businessRows());
+            assertThat(turn(fixture.pending().turn().turnId())).containsEntry("status", "PROCESSING")
+                    .containsEntry("completed_at", null).containsEntry("error_code", null);
+            assertThat(conversation(fixture.conversation())).containsEntry("status", "ACTIVE");
+            invalidateStoredSession(fixture.browser(), invalidation);
+            now(fixture.recheckAt());
+            assertThat(businessRows()).isEqualTo(afterInitial.get());
+        });
+
+        assertError(response, 401, "AUTHENTICATION_REQUIRED");
+        assertNoRenewalCookie(response);
+        assertThat(response.body()).doesNotContain(fixture.conversation().toString(), fixture.pending().turn().turnId().toString());
+        assertThat(businessRows()).isEqualTo(afterInitial.get());
+        assertCounts(1, 1, 1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"DEADLINE,SPRING_SESSION", "MIDNIGHT,SPRING_SESSION",
+            "DEADLINE,SPRING_SESSION_ATTRIBUTES", "MIDNIGHT,SPRING_SESSION_ATTRIBUTES",
+            "DEADLINE,session_security", "MIDNIGHT,session_security"})
+    void authenticationLookupFailurePreventsBusinessCleanupAfterTheInitialHomeTransaction(String boundary, String table)
+            throws Exception {
+        var fixture = prepareHomeRecheck(boundary);
+        var afterInitial = new AtomicReference<Map<String, List<Map<String, Object>>>>();
+        HttpResponse<String> response;
+        try {
+            response = racedHome(fixture.browser(), fixture.child(), () -> {
+                afterInitial.set(businessRows());
+                assertThat(turn(fixture.pending().turn().turnId())).containsEntry("status", "PROCESSING");
+                // 독립 Testcontainers DB에서 실제 조회를 실패시키고 업무 테이블은 건드리지 않는다.
+                jdbc.execute("ALTER TABLE " + table + " RENAME TO unavailable_home_recheck_store");
+                now(fixture.recheckAt());
+                assertThat(businessRows()).isEqualTo(afterInitial.get());
+            });
+        } finally {
+            jdbc.execute("ALTER TABLE IF EXISTS unavailable_home_recheck_store RENAME TO " + table);
+        }
+
+        assertError(response, 503, "AUTH_STATE_UNAVAILABLE");
+        assertNoRenewalCookie(response);
+        assertThat(response.body()).doesNotContain(fixture.conversation().toString(), fixture.pending().turn().turnId().toString(),
+                "unavailable_home_recheck_store");
+        assertThat(businessRows()).isEqualTo(afterInitial.get());
+        assertCounts(1, 1, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DEADLINE", "MIDNIGHT", "MIDNIGHT_PENDING"})
+    void validStoredSessionStillCommitsTheRequiredCleanupDuringTheResponseRecheck(String boundary) throws Exception {
+        var fixture = prepareHomeRecheck(boundary);
+        var afterInitial = new AtomicReference<Map<String, List<Map<String, Object>>>>();
+        var response = racedHome(fixture.browser(), fixture.child(), () -> {
+            afterInitial.set(businessRows());
+            assertThat(turn(fixture.pending().turn().turnId())).containsEntry("status", "PROCESSING");
+            assertThat(conversation(fixture.conversation())).containsEntry("status", "ACTIVE");
+            now(fixture.recheckAt());
+        });
+
+        assertOk(response);
+        assertThat(object(response, "$")).containsOnlyKeys("data");
+        assertThat(object(response, "$.data")).containsOnlyKeys("child", "greeting", "joinedAt", "daysTogether",
+                "activeConversationId", "menus", "availability");
+        boolean midnight = !boundary.equals("DEADLINE");
+        assertAvailability(response, !midnight, midnight ? "OUTSIDE_SERVICE_HOURS" : null);
+        assertMenus(response, !midnight);
+        assertThat(object(response, "$.data")).containsEntry("activeConversationId", midnight ? null : fixture.conversation().toString());
+        assertThat(response.headers().allValues("Set-Cookie").stream().filter(value -> value.startsWith("JSESSIONID="))
+                .map(MockCookie::parse).filter(cookie -> cookie.getMaxAge() == 31536000)).hasSize(1);
+
+        // 허용된 정리 컬럼만 기대값에 반영해 deadline·종료 사유·복구 기한을 포함한 전체 행을 비교한다.
+        var expected = new LinkedHashMap<>(Objects.requireNonNull(afterInitial.get()));
+        if (!boundary.equals("MIDNIGHT_PENDING")) {
+            var expectedTurn = new LinkedHashMap<>(expected.get("turns").getFirst());
+            expectedTurn.put("status", "FAILED");
+            expectedTurn.put("error_code", "AI_TIMEOUT");
+            expectedTurn.put("completed_at", java.sql.Timestamp.from(fixture.recheckAt().toInstant()));
+            expected.put("turns", List.of(expectedTurn));
+        }
+        if (midnight) {
+            var expectedConversation = new LinkedHashMap<>(expected.get("conversations").getFirst());
+            expectedConversation.put("status", boundary.equals("MIDNIGHT_PENDING") ? "CLOSING" : "ENDED");
+            expectedConversation.put("end_requested_at", java.sql.Timestamp.from(MIDNIGHT.toInstant()));
+            expectedConversation.put("end_reason", "MIDNIGHT");
+            if (boundary.equals("MIDNIGHT")) {
+                expectedConversation.put("ended_at", java.sql.Timestamp.from(MIDNIGHT.toInstant()));
+                expectedConversation.put("summary_status", "EMPTY");
+                var expectedLink = new LinkedHashMap<>(expected.get("links").getFirst());
+                expectedLink.put("end_recovery_until", java.sql.Timestamp.from(MIDNIGHT.plusSeconds(600).toInstant()));
+                expected.put("links", List.of(expectedLink));
+            }
+            expected.put("conversations", List.of(expectedConversation));
+        }
+        assertThat(businessRows()).isEqualTo(expected);
+        assertCounts(1, 1, 1);
+    }
+
+    @Test
+    void rejectedMidnightRecheckPreservesCleanupAlreadyCommittedByTheInitialHomeTransaction() throws Exception {
+        var fixture = prepareHomeRecheck("MIDNIGHT_ALREADY_EXPIRED");
+        var beforeRequest = businessRows();
+        assertThat(turn(fixture.pending().turn().turnId())).containsEntry("status", "PROCESSING");
+        var afterInitial = new AtomicReference<Map<String, List<Map<String, Object>>>>();
+
+        var response = racedHome(fixture.browser(), fixture.child(), () -> {
+            afterInitial.set(businessRows());
+            // 최초 조회가 커밋한 발화 만료는 유지하되, 실패한 재조회가 자정 종료를 추가하면 안 된다.
+            assertThat(turn(fixture.pending().turn().turnId())).containsEntry("status", "FAILED").containsEntry("error_code", "AI_TIMEOUT");
+            assertThat(time("SELECT completed_at FROM conversation_turns WHERE id = ?", fixture.pending().turn().turnId()))
+                    .isEqualTo(fixture.initialAt().toInstant());
+            assertThat(afterInitial.get().get("turns")).isNotEqualTo(beforeRequest.get("turns"));
+            assertThat(afterInitial.get().get("conversations")).isEqualTo(beforeRequest.get("conversations"));
+            assertThat(afterInitial.get().get("links")).isEqualTo(beforeRequest.get("links"));
+            sessions.deleteById(fixture.browser().sessionId());
+            now(MIDNIGHT);
+            assertThat(businessRows()).isEqualTo(afterInitial.get());
+        });
+
+        assertError(response, 401, "AUTHENTICATION_REQUIRED");
+        assertNoRenewalCookie(response);
+        assertThat(businessRows()).isEqualTo(afterInitial.get());
+        assertThat(conversation(fixture.conversation())).containsEntry("status", "ACTIVE")
+                .containsEntry("end_requested_at", null).containsEntry("end_reason", null).containsEntry("ended_at", null);
+    }
+
     @Test
     void aSuccessfulResultCommittedBeforeDeadlineIsNotOverwrittenByHomeAtDeadline() throws Exception {
         var browser = authenticated();
@@ -689,6 +824,46 @@ class ChildHomeContractTests {
         assertError(response, 429, "RATE_LIMITED");
         assertThat(Long.parseLong(response.headers().firstValue("Retry-After").orElseThrow())).isBetween(1L, 60L);
         assertThat(businessRows()).isEqualTo(before);
+    }
+
+    /** 최초 조회 전후와 재조회 경계를 분리하며 발화 기한은 실제 수락 서비스가 계산하게 한다. */
+    private HomeRecheck prepareHomeRecheck(String boundary) throws Exception {
+        var browser = authenticated();
+        var child = child(browser.accountId(), JOINED);
+        var at = boundary.equals("DEADLINE") ? NOW : MIDNIGHT;
+        now(at.minusMinutes(2));
+        var conversation = start(browser, child);
+        long secondsBefore = switch (boundary) {
+            case "MIDNIGHT_PENDING" -> 27;
+            case "MIDNIGHT_ALREADY_EXPIRED" -> 61;
+            default -> 60;
+        };
+        var pending = accept(browser, child, conversation, at.minusSeconds(secondsBefore));
+        var initialAt = at.minusNanos(1_000);
+        var recheckAt = boundary.equals("DEADLINE") ? pending.processingDeadlineAt().plusNanos(1_000) : MIDNIGHT;
+        now(initialAt);
+        return new HomeRecheck(browser, child, conversation, pending, initialAt, recheckAt);
+    }
+
+    /** 요청 캐시의 문맥을 유효하게 둔 채 JDBC 저장 세션만 삭제·만료·교체한다. */
+    private void invalidateStoredSession(Browser browser, String invalidation) {
+        switch (invalidation) {
+            case "DELETED" -> sessions.deleteById(browser.sessionId());
+            case "EXPIRED" -> expireFrameworkSession(browser);
+            case "REPLACED" -> {
+                var replacement = security.createLoginContext(browser.accountId(), null);
+                Session stored = sessions.findById(browser.sessionId());
+                assertThat(stored).isNotNull();
+                // immediate flush 설정으로 저장된 문맥만 바꾸며 기존 요청·업무 문맥은 폐기하지 않는다.
+                stored.setAttribute("securityContextId", replacement.securityContextId());
+                Session reloaded = sessions.findById(browser.sessionId());
+                assertThat(reloaded).isNotNull();
+                assertThat(reloaded.<UUID>getAttribute("securityContextId")).isEqualTo(replacement.securityContextId());
+                assertThat(security.isCurrentContext(browser.accountId(), browser.contextId())).isTrue();
+                assertThat(security.isCurrentContext(browser.accountId(), replacement.securityContextId())).isTrue();
+            }
+            default -> throw new IllegalArgumentException("Unknown invalidation fixture");
+        }
     }
 
     /** 응답 준비 후에만 변경을 커밋하며 sleep이나 운영 서비스 mock으로 순서를 대신하지 않는다. */
@@ -909,6 +1084,9 @@ class ChildHomeContractTests {
     }
 
     private record Browser(UUID accountId, UUID contextId, String sessionId, Cookie cookie) { }
+
+    private record HomeRecheck(Browser browser, UUID child, UUID conversation, Acceptance pending,
+                               OffsetDateTime initialAt, OffsetDateTime recheckAt) { }
 
     static class Pause {
         final CountDownLatch ready = new CountDownLatch(1);
