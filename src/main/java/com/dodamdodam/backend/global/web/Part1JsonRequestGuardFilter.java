@@ -29,6 +29,8 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
             .matcher(HttpMethod.POST, "/api/v1/auth/logout");
     private static final RequestMatcher CHILDREN = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.POST, "/api/v1/children");
+    private static final RequestMatcher SIGNUP = PathPatternRequestMatcher.withDefaults()
+            .matcher(HttpMethod.POST, "/api/v1/auth/signup");
     private static final RequestMatcher EMAIL = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.POST, "/api/v1/auth/email-verifications");
     private static final RequestMatcher EMAIL_VERIFY = PathPatternRequestMatcher.withDefaults()
@@ -47,6 +49,9 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
     /** 구현된 Part 1 JSON POST에 전송 크기·형식 검사를 적용한다. */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        if (SIGNUP.matches(request)) {
+            return false;
+        }
         return !LOGOUT.matches(request) && !CHILDREN.matches(request) && !EMAIL.matches(request)
             && !EMAIL_VERIFY.matches(request) && !PIN_SETUP.matches(request) && !LOGIN.matches(request);
     }

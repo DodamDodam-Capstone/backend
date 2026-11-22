@@ -802,7 +802,7 @@ Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상
 `SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
-검사 대상은 `POST /api/v1/auth/logout`, `POST /api/v1/children`,
+검사 대상은 `POST /api/v1/auth/signup`, `POST /api/v1/auth/logout`, `POST /api/v1/children`,
 `POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/email-verifications/verify`,
 `POST /api/v1/auth/login`, `POST /api/v1/guardian/pin`입니다. 이 경로들은
 실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
