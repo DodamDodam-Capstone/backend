@@ -37,6 +37,8 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
             .matcher(HttpMethod.POST, "/api/v1/auth/email-verifications/verify");
     private static final RequestMatcher PIN_SETUP = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.POST, "/api/v1/guardian/pin");
+    private static final RequestMatcher PIN_UNLOCK = PathPatternRequestMatcher.withDefaults()
+            .matcher(HttpMethod.POST, "/api/v1/guardian/unlock");
     private static final RequestMatcher LOGIN = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.POST, "/api/v1/auth/login");
     private final JsonMapper jsonMapper;
@@ -53,7 +55,8 @@ public class Part1JsonRequestGuardFilter extends OncePerRequestFilter {
             return false;
         }
         return !LOGOUT.matches(request) && !CHILDREN.matches(request) && !EMAIL.matches(request)
-            && !EMAIL_VERIFY.matches(request) && !PIN_SETUP.matches(request) && !LOGIN.matches(request);
+            && !EMAIL_VERIFY.matches(request) && !PIN_SETUP.matches(request) && !PIN_UNLOCK.matches(request)
+            && !LOGIN.matches(request);
     }
 
     /** CSRF 전에 전송 규칙을 검사하고, 후속 MVC가 읽을 수 있도록 본문을 보관한다. */

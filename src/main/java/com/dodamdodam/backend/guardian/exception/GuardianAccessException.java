@@ -22,6 +22,11 @@ public final class GuardianAccessException extends RuntimeException {
         return new GuardianAccessException(403, "GUARDIAN_UNLOCK_REQUIRED", "보호자 PIN 확인이 필요합니다.", null);
     }
 
+    /** 허용된 오답 횟수 안에서는 입력 오류를 고정 메시지로 알린다. */
+    public static GuardianAccessException incorrectPin() {
+        return new GuardianAccessException(400, "PIN_INVALID", "보호자 PIN을 확인해 주세요.", null);
+    }
+
     /** 저장소 확인 실패의 원인은 보존하고 응답 메시지는 고정한다. */
     public static GuardianAccessException unavailable(Throwable cause) {
         return new GuardianAccessException(503, "AUTH_STATE_UNAVAILABLE",
