@@ -113,12 +113,18 @@ public class ChildHomeResponseFilter extends OncePerRequestFilter implements Ord
         }
     }
 
-    /** Controller 조회 Tx 종료 뒤 서비스 프록시를 다시 호출하여 별도 Tx의 최신 상태를 직렬화한다. */
+    /** 요청·저장 세션을 검증한 뒤 서비스 프록시의 별도 Tx로 재조회하여 최신 상태를 직렬화한다. */
     private byte[] latestBody(HttpServletRequest request, ResponseAccess expected) {
         var current = authentication.requireAuthenticatedSession(request);
         if (!expected.session().equals(current)) {
             throw new InsufficientAuthenticationException("로그인이 필요합니다.");
         }
+        var session = request.getSession(false);
+        if (session == null) {
+            throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+        }
+        // 요청 캐시에만 남은 세션으로 발화 만료·대화 종료 정리 Tx가 실행되지 않게 한다.
+        authentication.requireCurrentStoredSession(session.getId(), current);
         return json.writeValueAsBytes(Map.of("data", homes.getHome(current, expected.childId())));
     }
 

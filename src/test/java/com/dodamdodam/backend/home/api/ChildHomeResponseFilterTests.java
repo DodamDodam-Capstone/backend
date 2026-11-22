@@ -40,7 +40,9 @@ import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilte
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.session.MapSession;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
@@ -64,6 +66,7 @@ import static org.mockito.Mockito.when;
 class ChildHomeResponseFilterTests {
 
     private static final AuthenticatedSession SESSION = new AuthenticatedSession(UUID.randomUUID(), UUID.randomUUID());
+    private static final String SESSION_ID = "synthetic-home-session";
     private static final UUID CHILD = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID ACTIVE = UUID.fromString("55555555-5555-4555-8555-555555555555");
     private static final String PATH = "/api/v1/children/" + CHILD + "/home";
@@ -83,6 +86,8 @@ class ChildHomeResponseFilterTests {
     void prepare() {
         filter = filter(homes, json);
         request = new MockHttpServletRequest("GET", PATH);
+        // 요청 캐시의 세션 ID와 실제 저장 세션 검증의 성공 결과를 각각 구성한다.
+        request.setSession(new MockHttpSession(null, SESSION_ID));
         response = new MockHttpServletResponse();
         response.setHeader("X-Request-ID", "test-request-id");
         response.setHeader("Cache-Control", "no-store");
@@ -90,6 +95,7 @@ class ChildHomeResponseFilterTests {
         response.setHeader("Access-Control-Allow-Credentials", "true");
         response.addHeader("Vary", "Origin");
         when(authentication.requireAuthenticatedSession(any())).thenReturn(SESSION);
+        when(authentication.requireCurrentStoredSession(SESSION_ID, SESSION)).thenReturn(new MapSession(SESSION_ID));
         when(homes.getHome(SESSION, CHILD)).thenReturn(original);
     }
 
@@ -110,9 +116,11 @@ class ChildHomeResponseFilterTests {
         assertThat(response.getContentAsByteArray()).isEqualTo(encoded(latest));
         assertThat(response.getContentAsString()).doesNotContain(ACTIVE.toString());
         assertLengthAndCommonHeaders();
-        verify(authentication).requireAuthenticatedSession(request);
-        verify(homes).getHome(SESSION, CHILD);
-        verifyNoMoreInteractions(homes);
+        var order = inOrder(authentication, homes);
+        order.verify(authentication).requireAuthenticatedSession(request);
+        order.verify(authentication).requireCurrentStoredSession(SESSION_ID, SESSION);
+        order.verify(homes).getHome(SESSION, CHILD);
+        verifyNoMoreInteractions(authentication, homes);
     }
 
     @ParameterizedTest
@@ -143,6 +151,8 @@ class ChildHomeResponseFilterTests {
         assertThat(response.getHeader("Location")).isNull();
         assertThat(response.getHeaders("Set-Cookie")).containsExactly("XSRF-TOKEN=preserved; Path=/");
         assertCommonHeaders();
+        verify(authentication).requireAuthenticatedSession(request);
+        verifyNoMoreInteractions(authentication);
         verifyNoInteractions(homes);
     }
 
@@ -165,7 +175,67 @@ class ChildHomeResponseFilterTests {
         assertError(failure.equals("STORE_FAILED") ? "AUTH_STATE_UNAVAILABLE" : "AUTHENTICATION_REQUIRED");
         assertThat(response.getHeader("Content-Length")).isNull();
         assertThat(response.getHeaders("Set-Cookie")).containsExactly("XSRF-TOKEN=preserved; Path=/");
+        verify(authentication).requireAuthenticatedSession(request);
+        verifyNoMoreInteractions(authentication);
         verifyNoInteractions(homes);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"INVALID,WRITER", "INVALID,STREAM", "INVALID,HEADER",
+            "UNAVAILABLE,WRITER", "UNAVAILABLE,STREAM", "UNAVAILABLE,HEADER"})
+    void storedSessionFailureRejectsTheResponseBeforeHomeLookup(String failure, String mode) throws Exception {
+        // 저장 세션 무효와 조회 장애 모두 재조회 Tx 전에 실패해야 한다.
+        boolean unavailable = failure.equals("UNAVAILABLE");
+        RuntimeException rejection = unavailable
+                ? new AuthStateUnavailableException(new DataAccessResourceFailureException("synthetic-store-failure"))
+                : new InsufficientAuthenticationException("로그인이 필요합니다.");
+        doThrow(rejection).when(authentication).requireCurrentStoredSession(SESSION_ID, SESSION);
+        response.setHeader("Location", "/synthetic-old-location");
+
+        outerAuthenticationFilter().doFilter(request, response,
+                (req, res) -> filter.doFilter(req, res, successfulResponse(mode, () -> { })));
+
+        assertThat(response.getStatus()).isEqualTo(unavailable ? 503 : 401);
+        assertError(unavailable ? "AUTH_STATE_UNAVAILABLE" : "AUTHENTICATION_REQUIRED");
+        assertThat(response.getHeader("Content-Length")).isNull();
+        assertThat(response.getHeader("Location")).isNull();
+        assertThat(response.getHeaders("Set-Cookie")).containsExactly("XSRF-TOKEN=preserved; Path=/");
+        assertThat(response.getContentAsString()).doesNotContain("synthetic-store-failure");
+        var order = inOrder(authentication);
+        order.verify(authentication).requireAuthenticatedSession(request);
+        order.verify(authentication).requireCurrentStoredSession(SESSION_ID, SESSION);
+        verifyNoMoreInteractions(authentication);
+        verifyNoInteractions(homes);
+    }
+
+    @Test
+    void missingRequestSessionRejectsBeforeStoredSessionLookupAndHomeLookup() throws Exception {
+        request.setSession(null);
+
+        outerAuthenticationFilter().doFilter(request, response,
+                (req, res) -> filter.doFilter(req, res, successfulResponse("HEADER", () -> { })));
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertError("AUTHENTICATION_REQUIRED");
+        assertThat(response.getHeaders("Set-Cookie")).containsExactly("XSRF-TOKEN=preserved; Path=/");
+        verify(authentication).requireAuthenticatedSession(request);
+        verifyNoMoreInteractions(authentication);
+        verifyNoInteractions(homes);
+    }
+
+    @Test
+    void validatesTheCurrentSessionIdEvenWhenTheRequestedCookieIdIsStale() throws Exception {
+        request.setRequestedSessionId("synthetic-old-session");
+
+        filter.doFilter(request, response, successfulResponse("WRITER", () -> { }));
+
+        var order = inOrder(authentication, homes);
+        order.verify(authentication).requireAuthenticatedSession(request);
+        order.verify(authentication).requireCurrentStoredSession(SESSION_ID, SESSION);
+        order.verify(homes).getHome(SESSION, CHILD);
+        verifyNoMoreInteractions(authentication, homes);
+        assertThat(response.getContentAsByteArray()).isEqualTo(encoded(original));
+        assertLengthAndCommonHeaders();
     }
 
     @Test
@@ -299,10 +369,15 @@ class ChildHomeResponseFilterTests {
             res.getOutputStream().write(json.writeValueAsBytes(body));
         });
 
-        var order = inOrder(transactions);
+        var order = inOrder(transactions, authentication, homes);
+        order.verify(authentication).requireAuthenticatedSession(request);
         order.verify(transactions).getTransaction(any());
+        order.verify(homes).getHome(SESSION, CHILD);
         order.verify(transactions).commit(first);
+        order.verify(authentication).requireAuthenticatedSession(request);
+        order.verify(authentication).requireCurrentStoredSession(SESSION_ID, SESSION);
         order.verify(transactions).getTransaction(any());
+        order.verify(homes).getHome(SESSION, CHILD);
         order.verify(transactions).commit(second);
         assertThat(response.getContentAsByteArray()).isEqualTo(encoded(latest));
     }
