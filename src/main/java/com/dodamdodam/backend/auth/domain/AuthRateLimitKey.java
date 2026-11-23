@@ -26,7 +26,9 @@ public record AuthRateLimitKey(Action action, byte[] keyHash) {
         EMAIL_SEND_IP(20, 900),
         EMAIL_RESEND(1, 60),
         EMAIL_VERIFY_IP(100, 900),
-        EMAIL_VERIFY_SUBJECT(10, 900);
+        EMAIL_VERIFY_SUBJECT(10, 900),
+        PIN_UNLOCK_ACCOUNT(20, 900),
+        PIN_UNLOCK_IP(100, 900);
 
         private final long capacity;
         private final long windowSeconds;

@@ -34,6 +34,11 @@ public final class EmailVerificationException extends RuntimeException {
             "이메일 인증 정보를 다시 확인해 주세요.", List.of());
     }
 
+    /** 유효한 가입 토큰으로 이미 존재하는 이메일을 생성할 때 사용한다. */
+    public static EmailVerificationException accountAlreadyExists() {
+        return new EmailVerificationException(409, "ACCOUNT_ALREADY_EXISTS", "이미 가입된 계정입니다.", List.of());
+    }
+
     /** Google-only 계정은 검증 후 기존 로그인 수단을 안내한다. */
     public static EmailVerificationException passwordResetNotAvailable() {
         return new EmailVerificationException(409, "PASSWORD_RESET_NOT_AVAILABLE", "Google로 로그인해 주세요.", List.of());

@@ -8,7 +8,6 @@ import com.dodamdodam.backend.auth.session.AuthenticatedSession;
 import com.dodamdodam.backend.auth.session.SessionSecurityRepository;
 import com.dodamdodam.backend.guardian.dto.GuardianPinSetupRequest;
 import com.dodamdodam.backend.guardian.infrastructure.GuardianAccessRepository;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,15 +17,17 @@ public class GuardianPinSetupService {
     private final EmailVerificationAccountRepository accounts;
     private final EmailVerificationService verification;
     private final GuardianAccessRepository guardian;
-    private final Argon2PasswordEncoder pins = new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2);
+    private final GuardianPinHasher pins;
 
     /** 기존 로그인 문맥·이메일 증명과 보호자 PIN 저장을 연결한다. */
     public GuardianPinSetupService(SessionSecurityRepository sessions, EmailVerificationAccountRepository accounts,
-                                   EmailVerificationService verification, GuardianAccessRepository guardian) {
+                                   EmailVerificationService verification, GuardianAccessRepository guardian,
+                                   GuardianPinHasher pins) {
         this.sessions = sessions;
         this.accounts = accounts;
         this.verification = verification;
         this.guardian = guardian;
+        this.pins = pins;
     }
 
     /** 계정 잠금으로 동시 최초 생성을 직렬화하고 토큰 소비·PIN 생성·나머지 증명 폐기를 함께 커밋한다. */
