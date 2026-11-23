@@ -135,6 +135,32 @@ public class EmailVerificationRepository {
                 """, UUID.class, accountId, presentedId);
     }
 
+    /** 계정에 묶인 제출 증명과 함께 폐기할 증명을 ID 순서로 잠근 후 만료를 판정한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockPasswordResetProofs(UUID accountId, UUID presentedId) {
+        // 제출 ID를 분리해 재설정과 PIN 증명 분기가 각각 부분 인덱스 조건을 충족하게 한다.
+        jdbc.queryForList("""
+                SELECT id FROM email_verifications
+                WHERE (id = ? AND ((reset_account_id = ? AND purpose = 'RESET_PASSWORD')
+                    OR (setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET'))))
+                   OR (reset_account_id = ? AND purpose = 'RESET_PASSWORD'
+                       AND token_consumed_at IS NULL AND invalidated_at IS NULL)
+                   OR (setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                       AND token_consumed_at IS NULL AND invalidated_at IS NULL)
+                ORDER BY id FOR UPDATE
+                """, UUID.class, presentedId, accountId, accountId, accountId, accountId);
+    }
+
+    /** 재설정 Tx에서 잠근 두 PIN 목적의 미소비·미폐기 증명을 폐기한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void invalidateAccountPinProofs(UUID accountId) {
+        jdbc.update("""
+                UPDATE email_verifications SET invalidated_at = GREATEST(clock_timestamp(), created_at)
+                WHERE setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                  AND token_consumed_at IS NULL AND invalidated_at IS NULL
+                """, accountId);
+    }
+
     /** 같은 번호 검증·토큰 소비를 직렬화하며 PIN의 상위 잠금 뒤에 호출한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<Challenge> lockChallenge(UUID id) {
