@@ -34,16 +34,29 @@ public record GuardianConversationListRequest(LocalDate from, LocalDate to, long
         }
     }
 
-    /** 검색어 양끝만 정리하고 Unicode 문자 기준으로 공개 명세의 길이를 검사한다. */
+    /** 비분리 공백을 포함한 양끝 공백을 제거한 뒤 검색어의 코드포인트 길이를 검사한다. */
     private static String normalizeKeyword(String query) {
         if (query == null) {
             return null;
         }
-        var normalized = query.strip();
-        if (normalized.codePointCount(0, normalized.length()) > 100) {
+        // 양끝 경계만 이동해 검색어 내부의 공백을 유지한다.
+        int start = 0;
+        int end = query.length();
+        while (start < end && isSpace(query.codePointAt(start))) {
+            start += Character.charCount(query.codePointAt(start));
+        }
+        while (end > start && isSpace(query.codePointBefore(end))) {
+            end -= Character.charCount(query.codePointBefore(end));
+        }
+        if (query.codePointCount(start, end) > 100) {
             throw ConversationException.validation("q");
         }
-        return normalized.isEmpty() ? null : normalized;
+        return start == end ? null : query.substring(start, end);
+    }
+
+    /** 자녀 등록과 같은 Unicode 공백 기준을 적용한다. */
+    private static boolean isSpace(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
     }
 
     /** API의 네 자리 연도 날짜만 허용해 다음날 KST 경계가 지원 범위를 벗어나지 않게 한다. */

@@ -169,6 +169,10 @@ class GuardianConversationListHttpTests {
         UUID withTurns = conversation(owned.childId(), UUID.randomUUID(), date, 11, "ENDED", "PENDING");
         insertTurn(withTurns, 1, "Someone said Dodam  story", "REDACTED", null, "OMITTED");
         insertTurn(withTurns, 2, null, "OMITTED", "Dodam  story reply", "VISIBLE");
+        UUID childTextOnly = conversation(owned.childId(), UUID.randomUUID(), date, 12, "ENDED", "PENDING");
+        insertTurn(childTextOnly, 1, "Dodam  story from child", "VISIBLE", "How did you feel?", "VISIBLE");
+        UUID replyTextOnly = conversation(owned.childId(), UUID.randomUUID(), date, 9, "ENDED", "PENDING");
+        insertTurn(replyTextOnly, 1, "Can you tell me more?", "VISIBLE", "Another Dodam  story", "VISIBLE");
         UUID active = conversation(owned.childId(), UUID.randomUUID(), date, 13, "ACTIVE", "NOT_STARTED");
         insertTurn(active, 1, "DODAM  story", "VISIBLE", null, "OMITTED");
         UUID other = readyConversation(unrelated.childId(), date, 14);
@@ -177,11 +181,13 @@ class GuardianConversationListHttpTests {
         jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", "Dodam story", withSingleSpace);
 
         mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
-                        .cookie(owned.cookie()).queryParam("q", "  dodam  STORY  ").queryParam("size", "2"))
+                        .cookie(owned.cookie()).queryParam("q", "  dodam  STORY  ").queryParam("size", "4"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items.length()").value(2))
-                .andExpect(jsonPath("$.data.items[0].conversationId").value(withTurns.toString()))
-                .andExpect(jsonPath("$.data.items[1].conversationId").value(withSummary.toString()))
+                .andExpect(jsonPath("$.data.items.length()").value(4))
+                .andExpect(jsonPath("$.data.items[0].conversationId").value(childTextOnly.toString()))
+                .andExpect(jsonPath("$.data.items[1].conversationId").value(withTurns.toString()))
+                .andExpect(jsonPath("$.data.items[2].conversationId").value(withSummary.toString()))
+                .andExpect(jsonPath("$.data.items[3].conversationId").value(replyTextOnly.toString()))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
     }
 
@@ -202,14 +208,14 @@ class GuardianConversationListHttpTests {
     }
 
     @Test
-    void searchValidatesTrimmedUnicodeLengthAndTreatsBlankAsNoFilter() throws Exception {
+    void searchTrimsUnicodeSpacesBeforeCheckingLengthOrBlank() throws Exception {
         Fixture owned = fixture(true);
         UUID expected = readyConversation(owned.childId(), LocalDate.of(2026, 10, 2), 10);
         String title = "😀".repeat(100);
         jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", title, expected);
 
         mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
-                        .cookie(owned.cookie()).queryParam("q", " " + title + " "))
+                        .cookie(owned.cookie()).queryParam("q", "\u00A0 " + title + "\u202F\u00A0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].conversationId").value(expected.toString()));
         mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
@@ -217,7 +223,7 @@ class GuardianConversationListHttpTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
         mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
-                        .cookie(owned.cookie()).queryParam("q", "  "))
+                        .cookie(owned.cookie()).queryParam("q", " \u00A0\u202F "))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].conversationId").value(expected.toString()));
         mvc.perform(list(owned).param("q", "a\0b"))
