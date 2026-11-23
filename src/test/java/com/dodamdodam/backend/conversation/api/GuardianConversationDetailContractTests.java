@@ -1,9 +1,11 @@
 package com.dodamdodam.backend.conversation.api;
 
 import com.dodamdodam.backend.TestcontainersConfiguration;
+import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,9 +64,10 @@ class GuardianConversationDetailContractTests {
         var foreignConversation = conversation(other.childId(), "ENDED", "EMPTY");
 
         error(mvc.perform(get(DETAIL_PATH, "invalid", "invalid")), 401, "AUTHENTICATION_REQUIRED");
-        error(detail(locked, other.childId(), foreignConversation), 404, "RESOURCE_NOT_FOUND");
-        error(detail(locked, locked.childId(), foreignConversation), 404, "RESOURCE_NOT_FOUND");
-        error(detail(locked, locked.childId(), UUID.randomUUID()), 404, "RESOURCE_NOT_FOUND");
+        var notFound = notFoundBody(detail(locked, locked.childId(), UUID.randomUUID()));
+        assertThat(notFoundBody(detail(locked, locked.childId(), foreignConversation))).isEqualTo(notFound);
+        assertThat(notFoundBody(detail(locked, other.childId(), foreignConversation))).isEqualTo(notFound);
+        assertThat(notFoundBody(detail(locked, UUID.randomUUID(), ownedConversation))).isEqualTo(notFound);
         error(detail(locked, locked.childId(), ownedConversation), 403, "GUARDIAN_UNLOCK_REQUIRED");
     }
 
@@ -222,6 +225,12 @@ class GuardianConversationDetailContractTests {
     private void error(ResultActions call, int expectedStatus, String code) throws Exception {
         call.andExpect(status().is(expectedStatus)).andExpect(jsonPath("$.error.code").value(code))
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    private Map<String, Object> notFoundBody(ResultActions call) throws Exception {
+        error(call, 404, "RESOURCE_NOT_FOUND");
+        var response = call.andReturn().getResponse();
+        return JsonPath.parse(response.getContentAsString()).delete("$.error.requestId").read("$");
     }
 
     private Parent parent(boolean unlocked) {

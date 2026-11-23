@@ -42,10 +42,18 @@ public class GuardianConversationService {
                 query.page(), query.size(), items.size() > query.size());
     }
 
-    /** 조합의 소유권→PIN→ENDED 순서로 검사하고 서버 순번 기준으로 조회한다. */
+    /** 부재·미소유·조합 불일치는 같은 404로 처리하고 PIN 확인 뒤 종료 기록을 조회한다. */
     public ConversationDetailView detail(HttpServletRequest request, AuthenticatedSession authenticated, UUID childId,
                                          UUID conversationId, int afterSequence, int size) {
-        requireOwnedChild(authenticated, childId);
+        try {
+            requireOwnedChild(authenticated, childId);
+        }
+        catch (ChildException failure) {
+            if ("RESOURCE_NOT_FOUND".equals(failure.code())) {
+                throw ConversationException.notFound();
+            }
+            throw failure;
+        }
         var accountId = authenticated.accountId();
         if (!repository.hasConversation(accountId, childId, conversationId)) {
             throw ConversationException.notFound();
