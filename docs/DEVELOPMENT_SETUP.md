@@ -804,7 +804,8 @@ Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
 검사 대상은 `POST /api/v1/auth/signup`, `POST /api/v1/auth/logout`, `POST /api/v1/children`,
 `POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/email-verifications/verify`,
-`POST /api/v1/auth/login`, `POST /api/v1/guardian/pin`, `POST /api/v1/guardian/unlock`입니다. 이 경로들은
+`POST /api/v1/auth/login`, `POST /api/v1/auth/password-resets`, `POST /api/v1/guardian/pin`,
+`POST /api/v1/guardian/unlock`입니다. 이 경로들은
 실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
 Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
 UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.

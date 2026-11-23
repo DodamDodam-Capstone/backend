@@ -33,6 +33,7 @@ import org.springframework.mock.web.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
@@ -55,6 +56,9 @@ import static org.mockito.Mockito.*;
 class EmailVerificationHttpTests {
     static final String PATH="/api/v1/auth/email-verifications";
     static final String VERIFY_PATH = PATH + "/verify";
+    static final String RESET_PATH = "/api/v1/auth/password-resets";
+    static final String OLD_PASSWORD = "previous synthetic password";
+    static final String NEW_PASSWORD = "  새 비밀번호에 공백을 보존합니다🔑  ";
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
     @Autowired EmailVerificationService verification;
@@ -62,6 +66,7 @@ class EmailVerificationHttpTests {
     @Autowired JsonMapper mapper;
     @Autowired JdbcIndexedSessionRepository sessions;
     @Autowired CookieSerializer cookies;
+    @MockitoSpyBean PasswordEncoder passwords;
     @MockitoBean SmtpEmailVerificationSender sender;
     @MockitoSpyBean EmailVerificationKeys keys;
     @MockitoSpyBean EmailVerificationRepository challenges;
@@ -945,6 +950,220 @@ class EmailVerificationHttpTests {
         assertThatThrownBy(() -> verification.verifyResponseAccess(request))
                 .isInstanceOfSatisfying(EmailVerificationException.class, error ->
                         assertThat(error.code()).isEqualTo("VERIFICATION_INVALID"));
+    }
+
+    @Test void passwordResetChangesPasswordAndRevokesOldSessionsAndProofs() throws Exception {
+        var owner = fixture(false);
+        var pinSetup = pinChallenge(owner, "PIN_SETUP");
+        jdbc.update("INSERT INTO guardian_pins(account_id,pin_hash) VALUES(?,'synthetic-hash')", owner.account());
+        String email = owner.account() + "@example.invalid";
+        jdbc.update("UPDATE accounts SET password_hash=? WHERE id=?", passwords.encode(OLD_PASSWORD), owner.account());
+        var oldLogin = successfulLogin(email, OLD_PASSWORD);
+        var secondLogin = successfulLogin(email, OLD_PASSWORD);
+        var anonymous = csrf("");
+        var winner = resetForExistingAccount(owner.account());
+        String token = issuedToken(winner, anonymous);
+        var otherReset = resetForExistingAccount(owner.account());
+        var pinReset = pinChallenge(owner, "PIN_RESET");
+        var signup = publicChallenge(true, false);
+        var otherPin = pinChallenge(fixture(false), "PIN_SETUP");
+        jdbc.update("""
+                UPDATE session_security SET guardian_pin_version=1, guardian_unlocked_until=clock_timestamp()+interval '1 minute'
+                WHERE account_id=?
+                """, owner.account());
+        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/auth/me")).header("Cookie", oldLogin).GET().build()).statusCode())
+                .isEqualTo(200);
+        var response = send(resetPost(token, NEW_PASSWORD, anonymous));
+        assertThat(response.statusCode()).isEqualTo(204);
+        assertThat(response.body()).isEmpty();
+        assertThat(response.headers().allValues("Set-Cookie")).noneMatch(cookie -> cookie.startsWith("JSESSIONID="));
+        assertThat(jdbc.queryForObject("SELECT session_version FROM accounts WHERE id=?", Long.class, owner.account())).isEqualTo(1);
+        assertThat(consumed(winner)).isTrue();
+        assertThat(invalidated(otherReset) && invalidated(pinReset) && invalidated(pinSetup)).isTrue();
+        assertThat(invalidated(signup) || invalidated(otherPin)).isFalse();
+        for (String cookie : List.of(oldLogin, secondLogin)) {
+            assertError(send(HttpRequest.newBuilder(uri("/api/v1/auth/me")).header("Cookie", cookie).GET().build()),
+                    401, "AUTHENTICATION_REQUIRED");
+        }
+        assertError(send(loginPost(email, OLD_PASSWORD, anonymous)), 401, "LOGIN_FAILED");
+        assertError(send(resetPost(token, NEW_PASSWORD, anonymous)), 400, "VERIFICATION_INVALID");
+        var newLogin = successfulLogin(email, NEW_PASSWORD);
+        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/auth/me")).header("Cookie", newLogin).GET().build()).statusCode())
+                .isEqualTo(200);
+    }
+
+    @Test void passwordResetFromSignedInSessionAlsoReturnsNoContentAndOnlyOneConcurrentProofWins() throws Exception {
+        var owner = fixture(false);
+        String email = owner.account() + "@example.invalid";
+        jdbc.update("UPDATE accounts SET password_hash=? WHERE id=?", passwords.encode(OLD_PASSWORD), owner.account());
+        var oldLogin = successfulLogin(email, OLD_PASSWORD);
+        var signedIn = csrf(oldLogin);
+        var firstId = resetForExistingAccount(owner.account());
+        var secondId = resetForExistingAccount(owner.account());
+        var first = resetPost(issuedToken(firstId, signedIn), NEW_PASSWORD, signedIn);
+        var second = resetPost(issuedToken(secondId, signedIn), NEW_PASSWORD, signedIn);
+        var firstResponse = client.sendAsync(first, java.net.http.HttpResponse.BodyHandlers.ofString());
+        var secondResponse = client.sendAsync(second, java.net.http.HttpResponse.BodyHandlers.ofString());
+        var results = List.of(firstResponse.get(10, TimeUnit.SECONDS), secondResponse.get(10, TimeUnit.SECONDS));
+        assertThat(results).extracting(java.net.http.HttpResponse::statusCode).containsExactlyInAnyOrder(204, 400);
+        assertError(results.stream().filter(response -> response.statusCode() == 400).findFirst().orElseThrow(),
+                400, "VERIFICATION_INVALID");
+        assertThat(consumed(firstId) ^ consumed(secondId)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT session_version FROM accounts WHERE id=?", Long.class, owner.account())).isEqualTo(1);
+        assertError(send(HttpRequest.newBuilder(uri("/api/v1/auth/me")).header("Cookie", oldLogin).GET().build()),
+                401, "AUTHENTICATION_REQUIRED");
+    }
+
+    @Test void passwordResetRejectsWrongPurposeExpiredProofsAndAccountsWithoutPasswords() throws Exception {
+        var anonymous = csrf("");
+        var owner = UUID.randomUUID();
+        var id = resetChallenge(owner);
+        String token = issuedToken(id, anonymous);
+        var expiry = jdbc.queryForObject("SELECT token_expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id);
+        assertError(send(resetPost(issuedToken(publicChallenge(true, false), anonymous), NEW_PASSWORD, anonymous)),
+                400, "VERIFICATION_INVALID");
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var response = send(resetPost(token, NEW_PASSWORD, anonymous));
+            assertError(response, 409, "PASSWORD_RESET_NOT_AVAILABLE");
+            assertThat(mapper.readTree(response.body()).get("error").get("message").asText())
+                    .isEqualTo("이 계정은 비밀번호를 재설정할 수 없습니다.");
+            assertThat(consumed(id)).isFalse();
+            assertThat(jdbc.queryForObject("SELECT token_expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
+                    .isEqualTo(expiry);
+        }
+        assertThat(jdbc.queryForObject("SELECT password_hash FROM accounts WHERE id=?", String.class, owner)).isNull();
+        assertThat(jdbc.queryForObject("SELECT session_version FROM accounts WHERE id=?", Long.class, owner)).isEqualTo(2);
+        jdbc.update("UPDATE email_verifications SET token_expires_at=verified_at+interval '1 microsecond' WHERE id=?", id);
+        assertError(send(resetPost(token, NEW_PASSWORD, anonymous)), 400, "VERIFICATION_INVALID");
+        assertThat(consumed(id)).isFalse();
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"RESET_PASSWORD", "PIN_SETUP"})
+    void passwordResetChecksExpiryAfterWaitingForSiblingProofLock(String purpose) throws Exception {
+        var owner = fixture(false);
+        jdbc.update("UPDATE accounts SET password_hash=? WHERE id=?", passwords.encode(OLD_PASSWORD), owner.account());
+        var anonymous = csrf("");
+        var winner = resetForExistingAccount(owner.account());
+        var sibling = purpose.equals("RESET_PASSWORD")
+                ? resetForExistingAccount(owner.account()) : pinChallenge(owner, purpose);
+        var request = resetPost(issuedToken(winner, anonymous), NEW_PASSWORD, anonymous);
+        jdbc.update("UPDATE email_verifications SET token_expires_at=clock_timestamp()+interval '4 seconds' WHERE id=?", winner);
+
+        var pending = new TransactionTemplate(transactions).execute(tx -> {
+            jdbc.queryForObject("SELECT id FROM email_verifications WHERE id=? FOR UPDATE", UUID.class, sibling);
+            int blocker = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+            var response = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            // 요청이 행 잠금을 기다리는 동안 DB 시각이 만료선에 도달할 때까지 잠금을 유지한다.
+            var wait = org.awaitility.Awaitility.await().atMost(Duration.ofSeconds(8));
+            wait.until(() -> jdbc.queryForObject("""
+                    SELECT EXISTS (SELECT FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))
+                    """, Boolean.class, blocker));
+            wait.until(() -> jdbc.queryForObject("""
+                    SELECT clock_timestamp() >= token_expires_at FROM email_verifications WHERE id=?
+                    """, Boolean.class, winner));
+            return response;
+        });
+        assertError(pending.get(10, TimeUnit.SECONDS), 400, "VERIFICATION_INVALID");
+        assertThat(consumed(winner) || invalidated(sibling)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT session_version FROM accounts WHERE id=?", Long.class, owner.account())).isZero();
+    }
+
+    @Test void passwordResetStorageFailureRollsBackConsumedProofAndAccountChange() throws Exception {
+        var owner = fixture(false);
+        String oldHash = passwords.encode(OLD_PASSWORD);
+        jdbc.update("UPDATE accounts SET password_hash=? WHERE id=?", oldHash, owner.account());
+        var anonymous = csrf("");
+        var id = resetForExistingAccount(owner.account());
+        var otherReset = resetForExistingAccount(owner.account());
+        var pinProof = pinChallenge(owner, "PIN_SETUP");
+        var request = resetPost(issuedToken(id, anonymous), NEW_PASSWORD, anonymous);
+        // 마지막 PIN 증명 변경을 실패시켜 이전 해시·버전 변경과 RESET 증명 폐기도 함께 롤백되는지 확인한다.
+        jdbc.update("""
+                ALTER TABLE email_verifications ADD CONSTRAINT test_reset_pin_rollback
+                CHECK (purpose <> 'PIN_SETUP' OR invalidated_at IS NULL)
+                """);
+        try {
+            assertError(send(request), 503, "AUTH_STATE_UNAVAILABLE");
+            assertThat(consumed(id)).isFalse();
+            assertThat(invalidated(otherReset) || invalidated(pinProof)).isFalse();
+            assertThat(jdbc.queryForObject("SELECT password_hash FROM accounts WHERE id=?", String.class, owner.account()))
+                    .isEqualTo(oldHash);
+            assertThat(jdbc.queryForObject("SELECT session_version FROM accounts WHERE id=?", Long.class, owner.account()))
+                    .isZero();
+        }
+        finally {
+            jdbc.update("ALTER TABLE email_verifications DROP CONSTRAINT test_reset_pin_rollback");
+        }
+        assertThat(send(request).statusCode()).isEqualTo(204);
+    }
+
+    @Test void passwordResetEnforcesTransportCsrfAndStrictInput() throws Exception {
+        var request = HttpRequest.newBuilder(uri(RESET_PATH));
+        assertError(send(request.copy().header("Content-Type", "text/plain").POST(HttpRequest.BodyPublishers.ofString("{}")).build()),
+                415, "UNSUPPORTED_MEDIA_TYPE");
+        assertError(send(request.copy().header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("x".repeat(16385))).build()), 413, "REQUEST_TOO_LARGE");
+        assertError(send(request.copy().header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString("{}")).build()),
+                403, "CSRF_INVALID");
+        var anonymous = csrf("");
+        String token = issuedToken(publicChallenge(true, false), anonymous);
+        String prefix = "{\"verificationToken\":\"" + token + "\",\"newPassword\":";
+        for (String body : List.of("{}", prefix + "null}", prefix + "\"short\"}", prefix + "\"" + "🔑".repeat(129) + "\"}",
+                prefix + "\"long enough \\ud800\"}", prefix + "\"long enough text\",\"extra\":3}",
+                prefix + "\"long enough text\",\"newPassword\":\"second password\"}", prefix + "\"long enough text\"} {}")) {
+            assertError(send(post(RESET_PATH, body, anonymous)), 400, "VALIDATION_FAILED");
+        }
+        assertError(send(resetPost("malformed", NEW_PASSWORD, anonymous)), 400, "VALIDATION_FAILED");
+        assertError(send(resetPost(token, "🔑".repeat(15), anonymous)), 400, "VERIFICATION_INVALID");
+    }
+
+    @Test void passwordResetEncoderFailureKeepsProofAndReturnsGenericError() throws Exception {
+        var owner = fixture(false);
+        var oldHash = passwords.encode(OLD_PASSWORD);
+        jdbc.update("UPDATE accounts SET password_hash=? WHERE id=?", oldHash, owner.account());
+        var anonymous = csrf("");
+        var id = resetForExistingAccount(owner.account());
+        var request = resetPost(issuedToken(id, anonymous), NEW_PASSWORD, anonymous);
+        doThrow(new IllegalStateException("synthetic encoder detail")).when(passwords).encode(NEW_PASSWORD);
+
+        var response = send(request);
+        assertError(response, 503, "AUTH_STATE_UNAVAILABLE");
+        assertThat(response.body()).doesNotContain("synthetic encoder detail");
+        assertThat(consumed(id)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT password_hash FROM accounts WHERE id=?", String.class, owner.account()))
+                .isEqualTo(oldHash);
+    }
+
+    private String successfulLogin(String email, String password) throws Exception {
+        var response = send(loginPost(email, password, csrf("")));
+        assertThat(response.statusCode()).isEqualTo(200);
+        return response.headers().allValues("Set-Cookie").stream().filter(cookie -> cookie.startsWith("JSESSIONID="))
+                .map(cookie -> cookie.split(";", 2)[0]).findFirst().orElseThrow();
+    }
+
+    private HttpRequest loginPost(String email, String password, Csrf csrf) {
+        return post("/api/v1/auth/login", mapper.writeValueAsString(Map.of("email", email, "password", password)), csrf);
+    }
+
+    private HttpRequest resetPost(String token, String password, Csrf csrf) {
+        return post(RESET_PATH, mapper.writeValueAsString(Map.of("verificationToken", token, "newPassword", password)), csrf);
+    }
+
+    private UUID resetForExistingAccount(UUID accountId) {
+        var id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO email_verifications(id,email,purpose,eligible,code_hash,expires_at,reset_account_id,reset_session_version)
+                SELECT ?,email,'RESET_PASSWORD',true,?,clock_timestamp()+interval '600 seconds',id,session_version FROM accounts WHERE id=?
+                """, id, keys.codeHasher().hash("012345"), accountId);
+        return id;
+    }
+
+    private boolean consumed(UUID id) {
+        return jdbc.queryForObject("SELECT token_consumed_at IS NOT NULL FROM email_verifications WHERE id=?", Boolean.class, id);
+    }
+
+    private boolean invalidated(UUID id) {
+        return jdbc.queryForObject("SELECT invalidated_at IS NOT NULL FROM email_verifications WHERE id=?", Boolean.class, id);
     }
 
     private UUID resetChallenge(UUID accountId) {
