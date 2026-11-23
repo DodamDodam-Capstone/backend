@@ -1014,7 +1014,7 @@ class EmailVerificationHttpTests {
                 401, "AUTHENTICATION_REQUIRED");
     }
 
-    @Test void passwordResetRejectsWrongPurposeAndExpiredProofsAndLeavesGoogleOnlyProofUnused() throws Exception {
+    @Test void passwordResetRejectsWrongPurposeExpiredProofsAndAccountsWithoutPasswords() throws Exception {
         var anonymous = csrf("");
         var owner = UUID.randomUUID();
         var id = resetChallenge(owner);
@@ -1023,7 +1023,10 @@ class EmailVerificationHttpTests {
         assertError(send(resetPost(issuedToken(publicChallenge(true, false), anonymous), NEW_PASSWORD, anonymous)),
                 400, "VERIFICATION_INVALID");
         for (int attempt = 0; attempt < 2; attempt++) {
-            assertError(send(resetPost(token, NEW_PASSWORD, anonymous)), 409, "PASSWORD_RESET_NOT_AVAILABLE");
+            var response = send(resetPost(token, NEW_PASSWORD, anonymous));
+            assertError(response, 409, "PASSWORD_RESET_NOT_AVAILABLE");
+            assertThat(mapper.readTree(response.body()).get("error").get("message").asText())
+                    .isEqualTo("이 계정은 비밀번호를 재설정할 수 없습니다.");
             assertThat(consumed(id)).isFalse();
             assertThat(jdbc.queryForObject("SELECT token_expires_at FROM email_verifications WHERE id=?", OffsetDateTime.class, id))
                     .isEqualTo(expiry);

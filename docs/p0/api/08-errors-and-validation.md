@@ -34,7 +34,7 @@
 |409 TURN_IN_PROGRESS | 새 발화 키 접수와 기존 PROCESSING 충돌. 이미 접수된 키 유지 |
 |409 IDEMPOTENCY_CONFLICT | 같은 키에 다른 파일. 기존 요청 복구 또는 새 녹음에 새 키 |
 |409 PIN_ALREADY_SET / PIN_NOT_SET / CHILD_LIMIT_REACHED / ACCOUNT_ALREADY_EXISTS | 실제 계정 상태에 맞는 설정·로그인·목록 흐름 사용 |
-|409 PASSWORD_RESET_NOT_AVAILABLE | Google-only는 Google 로그인 안내, 새 password credential 자동 생성 없음 |
+|409 PASSWORD_RESET_NOT_AVAILABLE | 기존 비밀번호가 있는 계정에서만 재설정 가능. 토큰 미소비·기존 만료 유지 |
 |410 AUDIO_EXPIRED | 재생 불가 안내. 재생성 요청 없음 |
 |413 REQUEST_TOO_LARGE / AUDIO_TOO_LARGE | 해당 크기 기준에 맞춘 입력·새 녹음. 업로드 한도 D13 대기 |
 |415 UNSUPPORTED_MEDIA_TYPE / AUDIO_FORMAT_UNSUPPORTED | 요청 Content-Type과 실제 디코딩 가능한 형식 확인 |

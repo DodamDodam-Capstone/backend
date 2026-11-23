@@ -39,7 +39,7 @@ public class PasswordResetService {
             throw new AuthStateUnavailableException();
         }
         if (!accounts.replacePassword(account, hash)) {
-            // Google-only 계정의 인증 토큰 소비도 함께 롤백한다.
+            // 기존 비밀번호가 없으면 재설정 증명 소비를 롤백한다.
             throw EmailVerificationException.passwordResetNotAvailable();
         }
         proofs.invalidateAccountPinProofs(account);
