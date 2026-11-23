@@ -173,6 +173,8 @@ class GuardianConversationListHttpTests {
         insertTurn(childTextOnly, 1, "Dodam  story from child", "VISIBLE", "How did you feel?", "VISIBLE");
         UUID replyTextOnly = conversation(owned.childId(), UUID.randomUUID(), date, 9, "ENDED", "PENDING");
         insertTurn(replyTextOnly, 1, "Can you tell me more?", "VISIBLE", "Another Dodam  story", "VISIBLE");
+        UUID redactedTextOnly = conversation(owned.childId(), UUID.randomUUID(), date, 8, "ENDED", "PENDING");
+        insertTurn(redactedTextOnly, 1, "Dodam  story from [child]", "REDACTED", null, "OMITTED");
         UUID active = conversation(owned.childId(), UUID.randomUUID(), date, 13, "ACTIVE", "NOT_STARTED");
         insertTurn(active, 1, "DODAM  story", "VISIBLE", null, "OMITTED");
         UUID other = readyConversation(unrelated.childId(), date, 14);
@@ -181,13 +183,14 @@ class GuardianConversationListHttpTests {
         jdbc.update("UPDATE conversations SET title = ? WHERE id = ?", "Dodam story", withSingleSpace);
 
         mvc.perform(get("/api/v1/children/{childId}/conversations", owned.childId())
-                        .cookie(owned.cookie()).queryParam("q", "  dodam  STORY  ").queryParam("size", "4"))
+                        .cookie(owned.cookie()).queryParam("q", "  dodam  STORY  ").queryParam("size", "5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items.length()").value(4))
+                .andExpect(jsonPath("$.data.items.length()").value(5))
                 .andExpect(jsonPath("$.data.items[0].conversationId").value(childTextOnly.toString()))
                 .andExpect(jsonPath("$.data.items[1].conversationId").value(withTurns.toString()))
                 .andExpect(jsonPath("$.data.items[2].conversationId").value(withSummary.toString()))
                 .andExpect(jsonPath("$.data.items[3].conversationId").value(replyTextOnly.toString()))
+                .andExpect(jsonPath("$.data.items[4].conversationId").value(redactedTextOnly.toString()))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
     }
 
