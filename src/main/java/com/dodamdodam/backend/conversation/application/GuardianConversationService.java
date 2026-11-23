@@ -4,11 +4,14 @@ import com.dodamdodam.backend.auth.session.AuthenticatedSession;
 import com.dodamdodam.backend.auth.session.AuthStateUnavailableException;
 import com.dodamdodam.backend.child.application.ChildService;
 import com.dodamdodam.backend.child.exception.ChildException;
+import com.dodamdodam.backend.conversation.dto.ConversationDetailView;
 import com.dodamdodam.backend.conversation.dto.ConversationPageView;
 import com.dodamdodam.backend.conversation.dto.GuardianConversationListRequest;
+import com.dodamdodam.backend.conversation.exception.ConversationException;
 import com.dodamdodam.backend.conversation.infrastructure.GuardianConversationRepository;
 import com.dodamdodam.backend.guardian.application.GuardianAccessService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,34 @@ public class GuardianConversationService {
                 query.offset(), query.size() + 1);
         return new ConversationPageView(items.subList(0, Math.min(items.size(), query.size())),
                 query.page(), query.size(), items.size() > query.size());
+    }
+
+    /** 부재·미소유·조합 불일치는 같은 404로 처리하고 PIN 확인 뒤 종료 기록을 조회한다. */
+    public ConversationDetailView detail(HttpServletRequest request, AuthenticatedSession authenticated, UUID childId,
+                                         UUID conversationId, int afterSequence, int size) {
+        try {
+            requireOwnedChild(authenticated, childId);
+        }
+        catch (ChildException failure) {
+            if ("RESOURCE_NOT_FOUND".equals(failure.code())) {
+                throw ConversationException.notFound();
+            }
+            throw failure;
+        }
+        var accountId = authenticated.accountId();
+        if (!repository.hasConversation(accountId, childId, conversationId)) {
+            throw ConversationException.notFound();
+        }
+        requireGuardianAccess(request, authenticated);
+        var conversation = repository.findEnded(accountId, childId, conversationId)
+                .orElseThrow(ConversationException::notFound);
+        // ENDED 이후 발화는 바뀌지 않으므로 대화나 세션 행에 쓰기 잠금을 잡지 않는다.
+        var candidates = repository.listEndedTurns(accountId, childId, conversationId, afterSequence, size + 1);
+        // 추가 행은 다음 페이지 유무만 나타내므로 커서는 실제 반환한 마지막 발화를 가리킨다.
+        boolean hasNext = candidates.size() > size;
+        var turns = hasNext ? candidates.subList(0, size) : candidates;
+        return new ConversationDetailView(conversation, List.copyOf(turns), hasNext,
+                hasNext ? turns.getLast().sequence() : null);
     }
 
     /** 미소유와 부재를 공통 404로 처리한다. */
