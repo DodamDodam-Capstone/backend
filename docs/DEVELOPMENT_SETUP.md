@@ -802,8 +802,10 @@ Spring Security **내부** 필터는 `HttpSecurity.addFilterBefore/After`의 상
 `SecurityConfig`는 [Part1JsonRequestGuardFilter](../src/main/java/com/dodamdodam/backend/global/web/Part1JsonRequestGuardFilter.java)를
 `CsrfFilter` 바로 앞에 등록합니다. 해당 필터는 이 체인에 한 번 등록하며,
 `@Component`나 별도 서블릿 필터 등록을 추가하면 중복 등록 여부를 확인해야 합니다.
-검사 대상은 `POST /api/v1/auth/logout`, `POST /api/v1/children`,
-`POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/login`입니다. 네 경로 모두
+검사 대상은 `POST /api/v1/auth/signup`, `POST /api/v1/auth/logout`, `POST /api/v1/children`,
+`POST /api/v1/auth/email-verifications`, `POST /api/v1/auth/email-verifications/verify`,
+`POST /api/v1/auth/login`, `POST /api/v1/auth/password-resets`, `POST /api/v1/guardian/pin`,
+`POST /api/v1/guardian/unlock`입니다. 이 경로들은
 실제 스트림을 최대 16,385바이트까지 읽어 16,384바이트 초과를 413으로 거부합니다.
 Content-Length 누락·허위 값과 관계없이 실제 바이트를 기준으로 하며, `application/json`과
 UTF-8만 허용합니다. Content-Type 없는 0바이트 요청은 로그아웃에만 허용합니다.
@@ -847,8 +849,10 @@ Security 내부에서 Part 2 전송 필터 바로 앞에 한 번 등록합니다
 
 이메일 발급은 전역 예산을 다시 예약하지 않습니다. 구조 검증 뒤 발급 subject/IP/cooldown을 별도
 Tx로 함께 예약하고, 업무 Tx에서 실제 최신 created_at+60초를 다시 검사합니다. SMTP는 업무 커밋 뒤
-호출합니다. 성공 결과는 id와 고정6자리 소수부의 KST 만료 시각뿐이며 정상·decoy의 응답 구조·길이를
-같게 유지합니다. 공개 목적은 같은 발송 경로, PIN 목적은 검증한 계정 이메일을 사용합니다.
+호출합니다. 성공 결과는 id와 KST 만료 시각뿐이며 정상·decoy의 응답 구조·길이를 같게 유지합니다.
+인증번호와 토큰은 실제 발급·검증 DB 시각에 각각 600초를 더해 저장하고 소수 초 6자리까지 반환합니다.
+Flyway V9는 토큰 발급 시 사용한 응답 정밀도를 표시합니다. 이전 토큰은 당시 안내한 초에 만료됩니다.
+공개 목적은 같은 발송 경로, PIN 목적은 검증한 계정 이메일을 사용합니다.
 
 발급 marker는 HttpSession이 아닌 request에만 둡니다. 발송 뒤와 실제 전송 직전 DB를 새로 읽고
 PIN 이메일·문맥/generation/현재 PIN 버전이 바뀌었으면 해당 발급만 폐기한 뒤401/목적별403으로

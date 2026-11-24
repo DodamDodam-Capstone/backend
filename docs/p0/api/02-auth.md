@@ -240,7 +240,7 @@ DB 읽기: `accounts, guardian_pins, session_security`; 쓰기: `email_verificat
 {
   "data": {
     "challengeId": "88888888-8888-4888-8888-888888888888",
-    "expiresAt": "2026-09-30T10:10:00+09:00"
+    "expiresAt": "2026-09-30T10:10:00.900001+09:00"
   }
 }
 ```
@@ -284,7 +284,7 @@ DB 읽기: `accounts, session_security, guardian_pins`; 쓰기: `email_verificat
 {
   "data": {
     "verificationToken": "88888888-8888-4888-8888-888888888888.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    "tokenExpiresAt": "2026-09-30T10:15:00+09:00"
+    "tokenExpiresAt": "2026-09-30T10:15:00.900001+09:00"
   }
 }
 ```
@@ -457,7 +457,7 @@ DB 읽기: `accounts`; 쓰기: `session_security, email_verifications`. 공통 �
 
 `POST /api/v1/auth/password-resets` · `resetPassword` · **담당 Part 1** · A-03 · 권한 X+V(RESET_PASSWORD)
 
-RESET_PASSWORD 토큰만. 이전 version 토큰도 거부. 새 해시·token 소비·account session_version 증가·모든 이전 로그인/PIN_SETUP/PIN_RESET 무효화. 204는 재로그인 필요, 자동 로그인 없음. Google-only는 유효 RESET_PASSWORD 토큰 검증 후409 PASSWORD_RESET_NOT_AVAILABLE·Google 안내, 일반 업무 실패 롤백으로 토큰 미소비(B-03.3 공유안·v3에서 유지한 입력·흐름 계약). 새 password 수단·identity 연결·로그인 권한 생성 없음, 접근 상실 복구 별도. 토큰 재사용 400. 응답 유실 시 새 password 로그인으로 확인.
+RESET_PASSWORD 토큰만. 이전 version 토큰도 거부. 새 해시·token 소비·account session_version 증가·모든 이전 로그인/PIN_SETUP/PIN_RESET 무효화. 204는 재로그인 필요, 자동 로그인 없음. 유효한 RESET_PASSWORD 토큰을 검증한 뒤, 기존 비밀번호가 없는 계정에는 `409 PASSWORD_RESET_NOT_AVAILABLE`을 반환한다. 재설정은 기존 비밀번호를 교체하는 기능이며, 접근 상실 복구는 별도 흐름이다. 토큰 재사용 400. 응답 유실 시 새 password 로그인으로 확인.
 
 | 위치 | 필드 | 필수 | 타입·기본값·검증 |
 | --- | --- | --- | --- |
@@ -478,9 +478,11 @@ RESET_PASSWORD 토큰만. 이전 version 토큰도 거부. 새 해시·token 소
 
 응답 추가 헤더: 429 `Retry-After`: 최소 재시도 대기 초. 실제 남은 차단시간으로 계산.
 
-트랜잭션·재시도: 계정+challenge lock; 해시/버전/소비/다른 reset 및 PIN_SETUP/PIN_RESET 폐기 단일 트랜잭션. 물리 세션 삭제 지연은 version 검사로 차단. Google-only409는 일반 업무 실패 롤백으로 토큰 미소비·기존 만료 유지(B-03.3 공유안).
+트랜잭션·재시도: 계정+challenge lock; 해시/버전/소비/다른 reset 및 PIN_SETUP/PIN_RESET 폐기 단일 트랜잭션. 물리 세션 삭제 지연은 version 검사로 차단. 기존 비밀번호가 없는 계정의 `409` 응답은 토큰 소비를 롤백하고 기존 만료 시각을 유지한다.
 
 DB 읽기: `accounts, email_verifications`; 쓰기: `accounts, email_verifications, auth_rate_limits`. 공통 제한 예약과 프레임워크 세션 저장은 별도 공통 처리다.
+
+[4.5의 요청 예시](#section-4-5)에 유효한 RESET_PASSWORD 토큰을 넣고 CSRF 쿠키와 헤더를 함께 보내면 `204 No Content`를 받는다. 같은 요청을 다시 보내면 `400`과 `error.code = VERIFICATION_INVALID`를 받는다.
 
 <a id="section-6-17"></a>
 <a id="operation-startgooglelogin"></a>

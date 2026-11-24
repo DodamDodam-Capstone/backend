@@ -88,8 +88,8 @@ paths:
                   value:
                     data:
                       challengeId: 88888888-8888-4888-8888-888888888888
-                      expiresAt: '2026-09-30T10:10:00+09:00'
-                  summary: B-02.3 공유안 예시 발급10시00분 KST 기준600초, 재발급은10시01분부터
+                      expiresAt: '2026-09-30T10:10:00.900001+09:00'
+                  summary: 10:00:00.900001 KST 발급으로부터 600초 뒤 만료, 재발급은 60초 뒤부터
         '400':
           $ref: '#/components/responses/Error400ValidationFailed'
         '403':
@@ -250,8 +250,8 @@ paths:
                   value:
                     data:
                       verificationToken: 88888888-8888-4888-8888-888888888888.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-                      tokenExpiresAt: '2026-09-30T10:15:00+09:00'
-                  summary: B-02.3 공유안 예시 검증 성공10시05분 KST 기준600초, 번호 만료10시10분 이후에도 토큰은 별도 만료까지 유지
+                      tokenExpiresAt: '2026-09-30T10:15:00.900001+09:00'
+                  summary: 10:05:00.900001 KST 검증 성공으로부터 600초 뒤 만료, 번호와 토큰의 기한은 별개
         '400':
           $ref: '#/components/responses/Error400ValidationFailedVerificationInvalid'
         '403':
@@ -670,9 +670,8 @@ paths:
       operationId: resetPassword
       summary: 비밀번호 재설정
       description: RESET_PASSWORD 토큰만. 이전 version 토큰도 거부. 새 해시·token 소비·account session_version 증가·모든 이전 로그인/PIN_SETUP/PIN_RESET
-        무효화. 204는 재로그인 필요, 자동 로그인 없음. Google-only는 유효 RESET_PASSWORD 토큰 검증 후409 PASSWORD_RESET_NOT_AVAILABLE·Google
-        안내, 일반 업무 실패 롤백으로 토큰 미소비(B-03.3 공유안·v3에서 유지한 입력·흐름 계약). 새 password 수단·identity 연결·로그인 권한 생성 없음, 접근 상실 복구
-        별도. 토큰 재사용 400. 응답 유실 시 새 password 로그인으로 확인.
+        무효화. 204는 재로그인 필요, 자동 로그인 없음. 유효한 RESET_PASSWORD 토큰 확인 뒤 기존 비밀번호가 없는 계정에는 409 PASSWORD_RESET_NOT_AVAILABLE을 반환한다.
+        재설정은 기존 비밀번호를 교체하는 기능이며, 접근 상실 복구는 별도 흐름이다. 토큰 재사용 400. 응답 유실 시 새 password 로그인으로 확인.
       security: []
       responses:
         '204':
@@ -698,7 +697,7 @@ paths:
           $ref: '#/components/responses/Error429RateLimited'
       x-task-id: A-03
       x-transaction: 계정+challenge lock; 해시/버전/소비/다른 reset 및 PIN_SETUP/PIN_RESET 폐기 단일 트랜잭션. 물리 세션 삭제 지연은 version
-        검사로 차단. Google-only409는 일반 업무 실패 롤백으로 토큰 미소비·기존 만료 유지(B-03.3 공유안).
+        검사로 차단. 기존 비밀번호가 없는 계정의 409 응답은 토큰 소비를 롤백하고 기존 만료 시각을 유지한다.
       x-tables-read:
       - accounts
       - email_verifications
@@ -3928,8 +3927,8 @@ components:
         expiresAt:
           type: string
           format: date-time
-          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00(?![\s\S])
-          description: B-02.3 원문 입력 기준으로 발급 시각+600초, now>=expiry 거부. 발송 지연/재요청으로 임의 연장 없음. KST 오프셋 +09:00, 초 정밀도.
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?\+09:00(?![\s\S])
+          description: B-02.3 원문 입력 기준으로 발급 시각+600초, now>=expiry 거부. 발송 지연/재요청으로 임의 연장 없음. KST 오프셋 +09:00, 소수 초 최대 6자리.
             운영 세부값은 D17 보류.
       required:
       - challengeId
@@ -3949,9 +3948,9 @@ components:
         tokenExpiresAt:
           type: string
           format: date-time
-          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00(?![\s\S])
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?\+09:00(?![\s\S])
           description: B-02.3 원문 입력 기준으로 검증 성공 시각+600초, now>=expiry 거부. 번호 만료와 별도이며 소비/조회로 연장하지 않음. KST 오프셋 +09:00,
-            초 정밀도. 운영 세부값은 D17 보류.
+            소수 초 최대 6자리. 운영 세부값은 D17 보류.
       required:
       - verificationToken
       - tokenExpiresAt
@@ -5561,12 +5560,11 @@ components:
               value:
                 error:
                   code: PASSWORD_RESET_NOT_AVAILABLE
-                  message: 요청을 처리할 수 없습니다.
+                  message: 이 계정은 비밀번호를 재설정할 수 없습니다.
                   requestId: 44444444-4444-4444-8444-444444444444
                   fields: []
       x-error-retry:
-        PASSWORD_RESET_NOT_AVAILABLE: Google 로그인 안내. 기존 Google-only 비밀번호 재설정 제외 계약 유지. 새 credential/연결/로그인 권한 생성
-          없음, 토큰 미소비·기존 만료 유지.
+        PASSWORD_RESET_NOT_AVAILABLE: 기존 비밀번호가 있는 계정에서만 재설정 가능. 토큰 미소비·기존 만료 유지.
       x-error-codes:
       - PASSWORD_RESET_NOT_AVAILABLE
     Error409ChildLimitReached:

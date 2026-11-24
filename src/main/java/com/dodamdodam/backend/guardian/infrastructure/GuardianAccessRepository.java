@@ -9,6 +9,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class GuardianAccessRepository {
@@ -45,6 +47,43 @@ public class GuardianAccessRepository {
             // 확인 장애를 행 없음이나 PIN 미설정으로 해석해 권한을 우회하지 않는다.
             throw GuardianAccessException.unavailable(failure);
         }
+    }
+
+    /** 계정과 문맥 잠금 뒤 PIN 재설정과 직렬화한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<StoredPin> lockPinForUnlock(UUID accountId) {
+        return jdbc.query("SELECT pin_hash, pin_version FROM guardian_pins WHERE account_id = ? FOR UPDATE",
+                (row, index) -> new StoredPin(row.getString("pin_hash"), row.getLong("pin_version")), accountId)
+                .stream().findFirst();
+    }
+
+    /** 잠금과 현재 세션 재검사가 끝난 뒤 해당 로그인 문맥에만 확인 권한을 저장한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void storeUnlock(UUID accountId, UUID contextId, OffsetDateTime until, long pinVersion) {
+        if (jdbc.update("""
+                UPDATE session_security SET guardian_unlocked_until = ?, guardian_pin_version = ?
+                WHERE id = ? AND account_id = ?
+                """, until, pinVersion, contextId, accountId) != 1) {
+            throw GuardianAccessException.authenticationRequired();
+        }
+    }
+
+    public record StoredPin(String hash, long version) {
+        /** 진단 문자열에 저장된 PIN 해시를 노출하지 않는다. */
+        @Override
+        public String toString() {
+            return "StoredPin[redacted]";
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void createFirstPin(UUID accountId, String hash) {
+        jdbc.update("INSERT INTO guardian_pins(account_id, pin_hash) VALUES (?, ?)", accountId, hash);
+        jdbc.update("""
+                    UPDATE email_verifications SET invalidated_at = clock_timestamp()
+                    WHERE setup_account_id = ? AND purpose IN ('PIN_SETUP', 'PIN_RESET')
+                    AND token_consumed_at IS NULL AND invalidated_at IS NULL
+                    """, accountId);
     }
 
     public record GuardianAccessState(long contextSessionVersion, long accountSessionVersion,

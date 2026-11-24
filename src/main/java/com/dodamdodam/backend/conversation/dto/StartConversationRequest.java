@@ -38,7 +38,7 @@ public record StartConversationRequest(UUID clientRequestId) {
     }
 
     /** UUID.fromString이 허용하는 축약형과 공백·개행을 먼저 거부한다. */
-    private static UUID parseUuid(String value, String field) {
+    public static UUID parseUuid(String value, String field) {
         if (value == null || !UUID_TEXT.matcher(value).matches()) {
             throw ConversationException.validation(field);
         }

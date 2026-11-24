@@ -41,15 +41,9 @@ public class AuthRateLimitRepository {
         for (var entry : ordered.entrySet()) {
             // 최초 row 생성도 직렬화하고 모든 요청이 같은 순서로 잠금을 얻는다.
             jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended('auth-rate:' || ?, 0))",
-                    (result, row) -> true, entry.getKey());
+                (result, row) -> true, entry.getKey());
             var key = entry.getValue();
-            var rows = jdbc.query("""
-                    SELECT window_started_at, attempt_count, blocked_until FROM auth_rate_limits
-                    WHERE action = ? AND key_hash = ? FOR UPDATE
-                    """, (result, row) -> new RateLimitState(
-                    result.getObject("window_started_at", OffsetDateTime.class), result.getLong("attempt_count"),
-                    result.getObject("blocked_until", OffsetDateTime.class)), key.action().name(), key.keyHash());
-            states.put(key, rows.isEmpty() ? null : rows.getFirst());
+            states.put(key, findState(key, true));
         }
 
         // 모든 잠금 대기 뒤 한 DB 시각으로 판정해 여러 키의 경계를 일치시킨다.
@@ -67,6 +61,79 @@ public class AuthRateLimitRepository {
             reserveAllowed(entry.getKey(), entry.getValue(), checkedAt);
         }
         return 0;
+    }
+
+    /** 이미 예약한 예산은 건드리지 않고 해당 요청에 적용되는 최늦은 제한 해제 시간을 읽는다. */
+    public long retryAfterSeconds(List<AuthRateLimitKey> keys) {
+        var checkedAt = jdbc.queryForObject("SELECT clock_timestamp()", OffsetDateTime.class);
+        long retryAfter = 0;
+        for (var key : keys) {
+            var state = findState(key, false);
+            if (state != null) {
+                retryAfter = Math.max(retryAfter, state.retryAfterSeconds(key.action(), checkedAt));
+            }
+        }
+        return retryAfter;
+    }
+
+    /** 오답 행을 잠그고 차단 시각을 읽는다. 행이 없을 때는 상위 계정 잠금이 직렬화를 보장한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OffsetDateTime lockPinFailures(byte[] keyHash) {
+        var blocks = jdbc.query("""
+                SELECT blocked_until FROM auth_rate_limits
+                WHERE action = 'PIN_FAILURE_ACCOUNT' AND key_hash = ? FOR UPDATE
+                """, (row, index) -> row.getObject(1, OffsetDateTime.class), keyHash);
+        return blocks.isEmpty() ? null : blocks.getFirst();
+    }
+
+    /** 현재 차단을 연장하지 않고 응답에 적용할 남은 초를 계산한다. */
+    public long pinBlockRetryAfterSeconds(byte[] keyHash) {
+        var remaining = jdbc.query("""
+                SELECT GREATEST(0, ceil(extract(epoch FROM blocked_until - clock_timestamp())))::bigint
+                FROM auth_rate_limits WHERE action = 'PIN_FAILURE_ACCOUNT' AND key_hash = ?
+                """, (row, index) -> row.getLong(1), keyHash);
+        return remaining.isEmpty() ? 0 : remaining.getFirst();
+    }
+
+    /** 계정 잠금 아래 최근 900초 오답만 유지하고 다섯 번째 시도에 차단을 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean recordPinFailure(byte[] keyHash, OffsetDateTime checkedAt) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                WITH attempt AS (SELECT ?::timestamptz AS at, ?::bytea AS key_hash),
+                recent AS (
+                    SELECT a.at, a.key_hash, ARRAY(
+                        SELECT failed_at
+                        FROM auth_rate_limits r CROSS JOIN LATERAL unnest(r.failure_times) AS failures(failed_at)
+                        WHERE r.action = 'PIN_FAILURE_ACCOUNT' AND r.key_hash = a.key_hash
+                            AND failed_at > a.at - interval '900 seconds' AND failed_at <= a.at
+                        ORDER BY failed_at
+                    ) || ARRAY[a.at] AS failures FROM attempt a
+                )
+                INSERT INTO auth_rate_limits
+                    (action, key_hash, window_started_at, attempt_count, failure_times, blocked_until, expires_at)
+                SELECT 'PIN_FAILURE_ACCOUNT', key_hash, failures[1], cardinality(failures), failures,
+                    CASE WHEN cardinality(failures) = 5 THEN at + interval '900 seconds' END,
+                    at + interval '900 seconds'
+                FROM recent
+                ON CONFLICT (action, key_hash) DO UPDATE SET
+                    window_started_at = EXCLUDED.window_started_at,
+                    attempt_count = EXCLUDED.attempt_count,
+                    failure_times = EXCLUDED.failure_times,
+                    blocked_until = EXCLUDED.blocked_until,
+                    expires_at = EXCLUDED.expires_at
+                RETURNING blocked_until IS NOT NULL
+                """, Boolean.class, checkedAt, keyHash));
+    }
+
+    /** 예산을 예약하는 경로만 행을 잠그고, 429 응답 생성 중에는 상태를 조회한다. */
+    private RateLimitState findState(AuthRateLimitKey key, boolean lock) {
+        var states = jdbc.query("""
+                SELECT window_started_at, attempt_count, blocked_until FROM auth_rate_limits
+                WHERE action = ? AND key_hash = ?
+                """ + (lock ? " FOR UPDATE" : ""), (result, row) -> new RateLimitState(
+            result.getObject("window_started_at", OffsetDateTime.class), result.getLong("attempt_count"),
+            result.getObject("blocked_until", OffsetDateTime.class)), key.action().name(), key.keyHash());
+        return states.isEmpty() ? null : states.getFirst();
     }
 
     /** 모든 제한이 허용된 뒤에만 count를 쓰며 기존 창·차단을 임의로 연장하지 않는다. */

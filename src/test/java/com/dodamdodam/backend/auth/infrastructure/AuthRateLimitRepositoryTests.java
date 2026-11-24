@@ -61,13 +61,15 @@ class AuthRateLimitRepositoryTests {
     @EnumSource(Action.class)
     void capacityRequestIsAllowedAndNextRequestKeepsOriginalWindow(Action action) {
         var key = key(action);
-        int capacity = switch (action) {
-            case API_IP -> 300;
-            case LOGIN_EMAIL -> 10;
-            case LOGIN_IP -> 100;
-            case EMAIL_SEND_SUBJECT -> 5;
-            case EMAIL_SEND_IP -> 20;
-            case EMAIL_RESEND -> 1;
+        int capacity = switch (action.name()) {
+            case "API_IP" -> 300;
+            case "LOGIN_EMAIL" -> 10;
+            case "LOGIN_IP", "EMAIL_VERIFY_IP", "PIN_UNLOCK_IP" -> 100;
+            case "EMAIL_SEND_SUBJECT" -> 5;
+            case "EMAIL_SEND_IP", "PIN_UNLOCK_ACCOUNT" -> 20;
+            case "EMAIL_RESEND" -> 1;
+            case "EMAIL_VERIFY_SUBJECT" -> 10;
+            default -> throw new AssertionError("테스트에 요청 한도를 추가해야 합니다.");
         };
         for (int index = 0; index < capacity; index++) {
             service.reserve(List.of(key));

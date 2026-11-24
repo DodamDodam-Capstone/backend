@@ -28,6 +28,22 @@ public final class EmailVerificationException extends RuntimeException {
         return new EmailVerificationException(field);
     }
 
+    /** 번호나 토큰이 유효하지 않은 이유를 외부에서 구분할 수 없게 한다. */
+    public static EmailVerificationException invalid() {
+        return new EmailVerificationException(400, "VERIFICATION_INVALID",
+            "이메일 인증 정보를 다시 확인해 주세요.", List.of());
+    }
+
+    /** 유효한 가입 토큰으로 이미 존재하는 이메일을 생성할 때 사용한다. */
+    public static EmailVerificationException accountAlreadyExists() {
+        return new EmailVerificationException(409, "ACCOUNT_ALREADY_EXISTS", "이미 가입된 계정입니다.", List.of());
+    }
+
+    /** 기존 비밀번호가 없는 계정의 재설정 요청을 거부한다. */
+    public static EmailVerificationException passwordResetNotAvailable() {
+        return new EmailVerificationException(409, "PASSWORD_RESET_NOT_AVAILABLE", "이 계정은 비밀번호를 재설정할 수 없습니다.", List.of());
+    }
+
     /** HTTP 오류 연결에 사용할 고정 검증 코드를 반환한다. */
     public String code() {
         return code;
