@@ -746,6 +746,7 @@ order 값부터 진행하며, `H`는 `Ordered.HIGHEST_PRECEDENCE`(`Integer.MIN_V
 | Spring Session `SessionRepositoryFilter` | `H + 50` | 요청의 HttpSession을 JDBC 세션으로 연결하고 응답 커밋 시 native 세션을 저장합니다. |
 | Spring Security 위임 필터 (`springSecurityFilterChain`) | `-100` | [SecurityConfig](../src/main/java/com/dodamdodam/backend/global/config/SecurityConfig.java)의 보안 필터 체인을 실행합니다. |
 | [ConversationStartResponseFilter](../src/main/java/com/dodamdodam/backend/conversation/api/ConversationStartResponseFilter.java) | Security 위임 필터 order + 1, 기본 `-99` | 보안 체인이 다음 서블릿 필터를 호출하는 동안 인증 문맥을 유지한 채 대화 시작 성공 응답을 전송 전에 재검사합니다. |
+| [ChildHomeResponseFilter](../src/main/java/com/dodamdodam/backend/home/api/ChildHomeResponseFilter.java) | Security 위임 필터 order + 2, 기본 `-98` | Home 성공 본문을 보류하고 별도 업무 Tx로 인증·현재 상태를 재검사해 최신 Home으로 교체합니다. |
 
 `H + 50`과 `-100`은 현재 Spring Session 4.1.1·Spring Boot 4.1.2의 기본값을 사용합니다.
 프레임워크 버전이나 필터 등록 설정을 변경할 때도 이 관계를 다시 확인합니다.
@@ -782,7 +783,38 @@ Part 1·다른 Part 2 경로·400 이상 응답에는 적용하지 않습니다.
 DB 판정과 네트워크 전송을 하나의 원자적 작업으로 보장하는 기능은 아닙니다.
 현재 시작 API의 동기 MVC 응답에 적용하며, 후속 스트리밍/비동기 API는 별도 계약 검증이 필요합니다.
 
-두 사용자 정의 응답 wrapper는 `OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
+**아이 Home GET의 응답 재검사**
+
+`ChildHomeResponseFilter`는 `@Component`와 `Ordered`로 서블릿에 한 번 등록하며,
+`SecurityFilterProperties`의 실제 order + 2를 사용합니다. 요청 진입은 Security → 시작 응답
+필터 → Home 응답 필터 → MVC 순서입니다. 두 응답 필터의 적용 경로는 서로 다르며,
+기존 시작 필터의 order나 Security 내부 체인을 변경하지 않습니다.
+
+1. 정확한 `GET /api/v1/children/{childId}/home`만 `ContentCachingResponseWrapper`로 감쌉니다.
+   Controller가 writer/output stream으로 쓰거나 `flushBuffer()`를 호출해도 본문은 캐시에 보류합니다.
+2. Controller의 최초 조회 Tx가 끝나고 체인이 반환하면 성공 표식을 소비합니다.
+   HTTP 200과 서버가 기록한 로그인 문맥·childId 표식이 모두 있을 때만 다시 조회합니다.
+3. `AuthenticatedSessionService`로 현재 인증과 최초 문맥의 일치를 확인하고,
+   `ChildHomeService.getHome`의 서비스 프록시를 호출합니다. 최초 조회와 분리된 쓰기 가능 Tx에서
+   소유권·현재 DB 시각·미종료 대화·기존 연결 및 필요한 조건부 정리를 다시 확인합니다.
+4. 새 `data` envelope를 UTF-8 JSON 바이트로 직렬화한 뒤 이전 캐시를 비우고 본문과
+   `Content-Length`를 새 바이트 길이로 교체합니다. 자정 경과·CLOSING·ENDED·연결 소실은
+   최신 availability/activeConversationId를 가진 200으로 반환하며, 이후 `copyBodyToResponse()`로 전달합니다.
+
+인증 무효 또는 인증 저장소 장애는 보류한 성공 본문·길이·Location·JSESSIONID 갱신 쿠키를
+제거하고 기존 `AuthStateErrorFilter`의 401/503 처리로 넘깁니다. 소유권 소실은 기존 자녀
+오류 처리기의 404, 업무 DB·예상하지 못한 재조회 실패는 기존 대화 오류 처리기의 500 envelope를
+사용합니다. `X-Request-ID`·`no-store`·CORS와 다른 쿠키는 유지하고, 바깥 Spring Session 저장 및
+쿠키 최종 재검사도 유지합니다. 이미 만들어진 오류 응답과 다른 API는 Home 재조회 대상이 아닙니다.
+표식은 재조회 전에 제거하고 서비스를 직접 호출하므로 재디스패치나 필터 재진입은 없습니다.
+GET에 CSRF 검사를 추가하지 않으며 기존 전역 429 계약도 그대로 적용합니다.
+
+Home 응답은 동기 MVC의 작은 JSON 전체를 캐싱하는 방식입니다. 스트리밍/비동기 전송으로 확대하거나
+DB 판정과 네트워크 전송이 원자적이라고 가정하지 않습니다. 최초 조회에서 커밋된 조건부 정리는
+후속 응답 거부로 되돌리지 않습니다. 상세 업무·FE 계약은 [대화 인계서 §12](CONVERSATION_HANDOFF.md#12-scrum-85-아이-home-구현과-최종-검증)를 따릅니다.
+
+기존 `SessionCookieRenewalFilter`와 `AuthStateErrorFilter`의 응답 wrapper는
+`OnCommittedResponseWrapper`로 전송 직전 처리를 연결합니다.
 컨트롤러가 먼저 flush하거나 redirect해도 native 저장 결과를 확인한 뒤 쿠키를 기록합니다.
 저장·재검증이 실패하면 바깥 `AuthStateErrorFilter`가 아직 전송되지 않은 성공 본문과
 `Content-Length`·`Location`·인증 쿠키를 제거하고 401·403·503으로 처리합니다.
@@ -872,6 +904,12 @@ PIN 이메일·문맥/generation/현재 PIN 버전이 바뀌었으면 해당 발
 `conversation.api.ConversationCreationContractTests`는 PostgreSQL에서 시작 요청의 415 우선순위와
 정상 201/200·입력 400·인증 401·CSRF 403·소유권 404를 확인합니다.
 `conversation.api.ConversationMediaTypeExceptionHandlerTests`는 필터 밖 MVC 예외의 415와 처리 범위를 확인합니다.
+`home.api.ChildHomeControllerTests`는 Home 필터의 단일 등록·Security 상대 순서와 기본 HTTP 계약을,
+`home.api.ChildHomeResponseFilterTests`는 writer/output stream/flushBuffer·길이 교체·오류/다른 경로 격리를 확인합니다.
+`home.api.ChildHomeContractTests`는 실제 PostgreSQL·Spring Session JDBC·HTTP에서 응답 준비 후 자정·종료·
+세션 무효화·연결 소실과 DB 잠금 경합·장애·429를 검증합니다. latch/ResponseGate로 순서를 고정하며
+운영 인증·SQL·상태 전이는 mock으로 대체하지 않습니다. 경계 시각만 `ConversationRepository.currentTime()` spy로 고정합니다.
+재실행은 `.\gradlew.bat test --tests "com.dodamdodam.backend.home.*"`이며 최종 전체 검증은 `.\gradlew.bat clean check`입니다.
 `child.api.ChildRegistrationContractTests`는 실제 JDBC 세션으로 등록 201·Location·공개 프로필,
 입력 400·인증 401·CSRF 403·소유권 404·중복 409·업무 저장 500·인증 저장 503을 검증합니다.
 `child.application.ChildRegistrationConcurrencyTests`는 실제 HTTP 요청과 `pg_locks`/`pg_blocking_pids`로
@@ -897,6 +935,7 @@ flowchart TB
         SESSION["SessionRepositoryFilter · H + 50<br/>HttpSession ↔ JDBC"]
         PROXY["springSecurityFilterChain · -100"]
         START_RESPONSE["ConversationStartResponseFilter · 기본 -99<br/>대화 시작 성공 응답 전 보호"]
+        HOME_RESPONSE["ChildHomeResponseFilter · 기본 -98<br/>Home 본문 캐싱 · 최신 상태 교체"]
         HEADERS --> ERROR --> COOKIE --> SESSION --> PROXY
     end
     subgraph SECURITY["SecurityConfig: SecurityFilterChain 내부"]
@@ -914,7 +953,7 @@ flowchart TB
     CLIENT --> HEADERS
     PROXY --> INITIAL
     AUTHZ -->|허용| START_RESPONSE
-    START_RESPONSE --> MVC["DispatcherServlet → Controller"]
+    START_RESPONSE --> HOME_RESPONSE --> MVC["DispatcherServlet → Controller"]
     MVC -->|POST /api/v1/auth/logout| LOGOUT["AuthLogoutController<br/>공통 인증 재확인 → 0바이트 검사<br/>업무 폐기 커밋 → 표준 세션·CSRF 정리 → 204"]
     MVC -->|POST /api/v1/auth/email-verifications| EMAIL["EmailVerificationController<br/>조건부 인증 → 닫힌 입력 → 제한 예약<br/>목적별 snapshot/발급 커밋 → SMTP/실패 보상"]
     EMAIL --> SAVE
@@ -931,7 +970,8 @@ flowchart TB
     FUTURE["후속 이메일 로그인 · SCRUM-78<br/>자격 검증 후 전략 호출·문맥 저장"] -. 연결 계약 .-> STRATEGY
     OAUTHCONFIG["OAuth2ClientConfig<br/>Google · Kakao ClientRegistration"] -. 공급자 설정 .-> OAUTH
     CONTEXT -->|로그인 성공 응답| SAVE
-    MVC -->|일반 응답| SAVE
+    MVC -->|일반 응답| PART2_RECHECK["해당 성공 표식이 있을 때만<br/>시작 응답 재검사 / Home 최신 본문 교체"]
+    PART2_RECHECK --> SAVE
     LOGOUT --> SAVE
 
     subgraph DATA["검증 서비스와 PostgreSQL 저장소"]

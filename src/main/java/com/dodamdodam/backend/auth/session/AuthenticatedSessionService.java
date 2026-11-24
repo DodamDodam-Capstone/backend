@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
@@ -22,10 +23,13 @@ public class AuthenticatedSessionService {
     static final String COOKIE_RENEWAL = AuthenticatedSessionService.class.getName() + ".cookieRenewal";
 
     private final SessionSecurityRepository repository;
+    private final JdbcIndexedSessionRepository sessions;
     private final AuthenticationTrustResolverImpl trustResolver = new AuthenticationTrustResolverImpl();
 
-    public AuthenticatedSessionService(SessionSecurityRepository repository) {
+    /** 업무 문맥과 실제 JDBC 세션을 함께 검증할 저장소를 연결한다. */
+    public AuthenticatedSessionService(SessionSecurityRepository repository, JdbcIndexedSessionRepository sessions) {
         this.repository = repository;
+        this.sessions = sessions;
     }
 
     /** 실제 세션과 업무 문맥을 확인하고 저장소 장애를 인증 무효와 구분한다. */
@@ -40,6 +44,22 @@ public class AuthenticatedSessionService {
                     session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
             markCookieRenewal(request, session.getId(), authenticated);
             return authenticated;
+        }
+        catch (DataAccessException | TransactionException | ConversionException failure) {
+            throw new AuthStateUnavailableException(failure);
+        }
+    }
+
+    /** 요청에서 확인한 문맥과 실제 저장 세션을 재대조하고 유효한 세션만 반환한다. */
+    public Session requireCurrentStoredSession(String sessionId, AuthenticatedSession expected) {
+        try {
+            Session stored = sessions.findById(sessionId);
+            // 조회 이후에도 만료된 세션을 인증 문맥 검증에 사용하지 않는다.
+            if (stored != null && stored.isExpired()) {
+                throw new InsufficientAuthenticationException("로그인이 필요합니다.");
+            }
+            requireStoredSession(stored, expected);
+            return stored;
         }
         catch (DataAccessException | TransactionException | ConversionException failure) {
             throw new AuthStateUnavailableException(failure);
